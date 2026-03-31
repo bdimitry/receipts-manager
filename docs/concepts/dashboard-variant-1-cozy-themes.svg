@@ -1,0 +1,119 @@
+<svg width="1680" height="980" viewBox="0 0 1680 980" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1680" height="980" fill="#E9E2D6"/>
+  <text x="60" y="72" fill="#2E2A25" font-family="Arial" font-size="34" font-weight="700">Variant 1: Cozy Finance Hub</text>
+  <text x="60" y="108" fill="#655B50" font-family="Arial" font-size="18">Warm everyday workspace with donut spending chart as the main focal point.</text>
+
+  <rect x="40" y="140" width="770" height="790" rx="28" fill="#FBF6EE" stroke="#D9CBB8" stroke-width="2"/>
+  <rect x="870" y="140" width="770" height="790" rx="28" fill="#121B1A" stroke="#31413F" stroke-width="2"/>
+
+  <text x="74" y="188" fill="#2A2521" font-family="Arial" font-size="28" font-weight="700">Light Theme</text>
+  <text x="904" y="188" fill="#F6F0E4" font-family="Arial" font-size="28" font-weight="700">Dark Theme</text>
+
+  <rect x="620" y="160" width="154" height="40" rx="14" fill="#F4E7D2" stroke="#E2D3BD"/>
+  <text x="652" y="186" fill="#6F6458" font-family="Arial" font-size="16" font-weight="700">Настройки ▾</text>
+  <rect x="556" y="210" width="218" height="118" rx="18" fill="#FFF9F1" stroke="#E2D3BD"/>
+  <text x="578" y="240" fill="#7A6E61" font-family="Arial" font-size="15" font-weight="700">Язык</text>
+  <rect x="628" y="223" width="30" height="22" rx="7" fill="#FFF8EE" stroke="#DECDB4"/>
+  <text x="637" y="239" fill="#6F6458" font-family="Arial" font-size="11" font-weight="700">RU</text>
+  <rect x="666" y="223" width="30" height="22" rx="7" fill="#F5C969"/>
+  <text x="675" y="239" fill="#17302C" font-family="Arial" font-size="11" font-weight="700">UA</text>
+  <rect x="704" y="223" width="30" height="22" rx="7" fill="#193330"/>
+  <text x="713" y="239" fill="#FFF8EE" font-family="Arial" font-size="11" font-weight="700">EN</text>
+  <text x="578" y="286" fill="#7A6E61" font-family="Arial" font-size="15" font-weight="700">Тема</text>
+  <rect x="676" y="269" width="56" height="24" rx="12" fill="#EADDC7"/>
+  <circle cx="691" cy="281" r="10" fill="#FFF9F0"/>
+  <text x="578" y="316" fill="#A08F7D" font-family="Arial" font-size="13">UI preferences in one menu</text>
+
+  <rect x="1450" y="160" width="154" height="40" rx="14" fill="#1A2827" stroke="#31413E"/>
+  <text x="1482" y="186" fill="#9AB0A8" font-family="Arial" font-size="16" font-weight="700">Настройки ▾</text>
+  <rect x="1386" y="210" width="218" height="118" rx="18" fill="#192624" stroke="#31413E"/>
+  <text x="1408" y="240" fill="#8EA49D" font-family="Arial" font-size="15" font-weight="700">Язык</text>
+  <rect x="1458" y="223" width="30" height="22" rx="7" fill="#2A3937"/>
+  <text x="1467" y="239" fill="#9AB0A8" font-family="Arial" font-size="11" font-weight="700">RU</text>
+  <rect x="1496" y="223" width="30" height="22" rx="7" fill="#F5C969"/>
+  <text x="1505" y="239" fill="#17302C" font-family="Arial" font-size="11" font-weight="700">UA</text>
+  <rect x="1534" y="223" width="30" height="22" rx="7" fill="#243A37"/>
+  <text x="1543" y="239" fill="#D6E5DE" font-family="Arial" font-size="11" font-weight="700">EN</text>
+  <text x="1408" y="286" fill="#8EA49D" font-family="Arial" font-size="15" font-weight="700">Тема</text>
+  <rect x="1506" y="269" width="56" height="24" rx="12" fill="#1F2B29"/>
+  <circle cx="1548" cy="281" r="10" fill="#F5C969"/>
+  <text x="1408" y="316" fill="#67827A" font-family="Arial" font-size="13">UI preferences in one menu</text>
+
+  <rect x="66" y="224" width="170" height="666" rx="24" fill="#193330"/>
+  <text x="94" y="278" fill="#FFF6E6" font-family="Arial" font-size="30" font-weight="700">Receipts</text>
+  <text x="94" y="307" fill="#AFC5BF" font-family="Arial" font-size="17">Manager</text>
+  <rect x="88" y="344" width="124" height="42" rx="14" fill="#F5C969"/>
+  <text x="114" y="371" fill="#17302C" font-family="Arial" font-size="18" font-weight="700">Overview</text>
+  <text x="94" y="432" fill="#E5DCCC" font-family="Arial" font-size="20">Purchases</text>
+  <text x="94" y="476" fill="#E5DCCC" font-family="Arial" font-size="20">Receipts</text>
+  <text x="94" y="520" fill="#E5DCCC" font-family="Arial" font-size="20">Reports</text>
+  <text x="94" y="564" fill="#E5DCCC" font-family="Arial" font-size="20">Notifications</text>
+
+  <rect x="264" y="224" width="518" height="112" rx="24" fill="#FFF2DD" stroke="#E5D5BD"/>
+  <text x="298" y="272" fill="#1F2A28" font-family="Arial" font-size="30" font-weight="700">March Spending</text>
+  <text x="298" y="304" fill="#76695D" font-family="Arial" font-size="17">Your household money flow, receipts and report jobs in one place</text>
+  <rect x="618" y="252" width="132" height="44" rx="14" fill="#193330"/>
+  <text x="649" y="281" fill="#FFF8EE" font-family="Arial" font-size="18" font-weight="700">New Report</text>
+
+  <rect x="264" y="364" width="518" height="330" rx="26" fill="#FFFDF8" stroke="#E5D5BD"/>
+  <text x="296" y="408" fill="#1C2926" font-family="Arial" font-size="28" font-weight="700">Spending by Category</text>
+  <circle cx="450" cy="534" r="92" stroke="#E8E2D7" stroke-width="34"/>
+  <circle cx="450" cy="534" r="92" stroke="#F5C969" stroke-width="34" stroke-dasharray="180 578" transform="rotate(-90 450 534)"/>
+  <circle cx="450" cy="534" r="92" stroke="#D97B5D" stroke-width="34" stroke-dasharray="110 648" stroke-dashoffset="-180" transform="rotate(-90 450 534)"/>
+  <circle cx="450" cy="534" r="92" stroke="#678E7F" stroke-width="34" stroke-dasharray="85 673" stroke-dashoffset="-290" transform="rotate(-90 450 534)"/>
+  <circle cx="450" cy="534" r="92" stroke="#8C6FB0" stroke-width="34" stroke-dasharray="55 703" stroke-dashoffset="-375" transform="rotate(-90 450 534)"/>
+  <text x="402" y="526" fill="#6E6257" font-family="Arial" font-size="17">Total</text>
+  <text x="381" y="558" fill="#1B2925" font-family="Arial" font-size="34" font-weight="700">$1,284</text>
+  <circle cx="620" cy="470" r="9" fill="#F5C969"/>
+  <text x="638" y="476" fill="#4F463E" font-family="Arial" font-size="18">Food - $540</text>
+  <circle cx="620" cy="510" r="9" fill="#D97B5D"/>
+  <text x="638" y="516" fill="#4F463E" font-family="Arial" font-size="18">Utilities - $330</text>
+  <circle cx="620" cy="550" r="9" fill="#678E7F"/>
+  <text x="638" y="556" fill="#4F463E" font-family="Arial" font-size="18">Transport - $210</text>
+  <circle cx="620" cy="590" r="9" fill="#8C6FB0"/>
+  <text x="638" y="596" fill="#4F463E" font-family="Arial" font-size="18">Other - $204</text>
+
+  <rect x="264" y="720" width="518" height="170" rx="26" fill="#EAF2ED" stroke="#CBDAD2"/>
+  <text x="296" y="764" fill="#23463A" font-family="Arial" font-size="25" font-weight="700">Recent Activity</text>
+  <text x="296" y="808" fill="#5D706A" font-family="Arial" font-size="18">OCR finished for "IMG_3021.jpg"</text>
+  <text x="296" y="842" fill="#5D706A" font-family="Arial" font-size="18">Monthly PDF report is ready for download</text>
+
+  <rect x="896" y="224" width="170" height="666" rx="24" fill="#172524"/>
+  <text x="924" y="278" fill="#FFF6E6" font-family="Arial" font-size="30" font-weight="700">Receipts</text>
+  <text x="924" y="307" fill="#8FA8A0" font-family="Arial" font-size="17">Manager</text>
+  <rect x="918" y="344" width="124" height="42" rx="14" fill="#F5C969"/>
+  <text x="944" y="371" fill="#17302C" font-family="Arial" font-size="18" font-weight="700">Overview</text>
+  <text x="924" y="432" fill="#DFD5C8" font-family="Arial" font-size="20">Purchases</text>
+  <text x="924" y="476" fill="#DFD5C8" font-family="Arial" font-size="20">Receipts</text>
+  <text x="924" y="520" fill="#DFD5C8" font-family="Arial" font-size="20">Reports</text>
+  <text x="924" y="564" fill="#DFD5C8" font-family="Arial" font-size="20">Notifications</text>
+
+  <rect x="1094" y="224" width="518" height="112" rx="24" fill="#1A2927" stroke="#31413E"/>
+  <text x="1128" y="272" fill="#F4EFE5" font-family="Arial" font-size="30" font-weight="700">March Spending</text>
+  <text x="1128" y="304" fill="#8DA29B" font-family="Arial" font-size="17">Warm data, dark focus. Same workspace for low-light usage.</text>
+  <rect x="1448" y="252" width="132" height="44" rx="14" fill="#F5C969"/>
+  <text x="1479" y="281" fill="#17302C" font-family="Arial" font-size="18" font-weight="700">New Report</text>
+
+  <rect x="1094" y="364" width="518" height="330" rx="26" fill="#162321" stroke="#31413E"/>
+  <text x="1126" y="408" fill="#F4EEE2" font-family="Arial" font-size="28" font-weight="700">Spending by Category</text>
+  <circle cx="1280" cy="534" r="92" stroke="#283533" stroke-width="34"/>
+  <circle cx="1280" cy="534" r="92" stroke="#F5C969" stroke-width="34" stroke-dasharray="180 578" transform="rotate(-90 1280 534)"/>
+  <circle cx="1280" cy="534" r="92" stroke="#FF8A6A" stroke-width="34" stroke-dasharray="110 648" stroke-dashoffset="-180" transform="rotate(-90 1280 534)"/>
+  <circle cx="1280" cy="534" r="92" stroke="#75B79A" stroke-width="34" stroke-dasharray="85 673" stroke-dashoffset="-290" transform="rotate(-90 1280 534)"/>
+  <circle cx="1280" cy="534" r="92" stroke="#A688CC" stroke-width="34" stroke-dasharray="55 703" stroke-dashoffset="-375" transform="rotate(-90 1280 534)"/>
+  <text x="1232" y="526" fill="#9CACA3" font-family="Arial" font-size="17">Total</text>
+  <text x="1211" y="558" fill="#F5EFE4" font-family="Arial" font-size="34" font-weight="700">$1,284</text>
+  <circle cx="1450" cy="470" r="9" fill="#F5C969"/>
+  <text x="1468" y="476" fill="#DAD1C5" font-family="Arial" font-size="18">Food - $540</text>
+  <circle cx="1450" cy="510" r="9" fill="#FF8A6A"/>
+  <text x="1468" y="516" fill="#DAD1C5" font-family="Arial" font-size="18">Utilities - $330</text>
+  <circle cx="1450" cy="550" r="9" fill="#75B79A"/>
+  <text x="1468" y="556" fill="#DAD1C5" font-family="Arial" font-size="18">Transport - $210</text>
+  <circle cx="1450" cy="590" r="9" fill="#A688CC"/>
+  <text x="1468" y="596" fill="#DAD1C5" font-family="Arial" font-size="18">Other - $204</text>
+
+  <rect x="1094" y="720" width="518" height="170" rx="26" fill="#1A2927" stroke="#31413E"/>
+  <text x="1126" y="764" fill="#F4EEE2" font-family="Arial" font-size="25" font-weight="700">Recent Activity</text>
+  <text x="1126" y="808" fill="#93A89F" font-family="Arial" font-size="18">OCR finished for "IMG_3021.jpg"</text>
+  <text x="1126" y="842" fill="#93A89F" font-family="Arial" font-size="18">Monthly PDF report is ready for download</text>
+</svg>

@@ -1,0 +1,55 @@
+<svg width="1080" height="1440" viewBox="0 0 1080 1440" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1080" height="1440" fill="#F3EFE6"/>
+  <rect x="90" y="70" width="300" height="620" rx="36" fill="#FFF9EF" stroke="#CDBFA7" stroke-width="2"/>
+  <rect x="110" y="104" width="260" height="46" rx="20" fill="#16322F"/>
+  <text x="168" y="135" fill="#FFF7E9" font-family="Arial" font-size="22" font-weight="700">Dashboard</text>
+  <rect x="114" y="178" width="252" height="112" rx="22" fill="#16322F"/>
+  <text x="136" y="216" fill="#FCEFD8" font-family="Arial" font-size="16">Spent This Month</text>
+  <text x="136" y="258" fill="#F5C969" font-family="Arial" font-size="30" font-weight="700">$1,284</text>
+  <rect x="114" y="312" width="252" height="74" rx="18" fill="#F7EBCF"/>
+  <text x="136" y="356" fill="#31403B" font-family="Arial" font-size="18" font-weight="700">Upload Receipt</text>
+  <rect x="114" y="404" width="252" height="74" rx="18" fill="#F7EBCF"/>
+  <text x="136" y="448" fill="#31403B" font-family="Arial" font-size="18" font-weight="700">Create Report</text>
+  <rect x="114" y="498" width="252" height="142" rx="18" fill="#ECF3EE"/>
+  <text x="136" y="534" fill="#24493B" font-family="Arial" font-size="16" font-weight="700">Last OCR Result</text>
+  <text x="136" y="570" fill="#5E716A" font-family="Arial" font-size="15">ATB / $42.70 / Mar 30</text>
+  <text x="136" y="605" fill="#5E716A" font-family="Arial" font-size="15">Confidence: medium</text>
+  <rect x="390" y="70" width="300" height="620" rx="36" fill="#FFF9EF" stroke="#CDBFA7" stroke-width="2"/>
+  <rect x="410" y="104" width="260" height="46" rx="20" fill="#16322F"/>
+  <text x="483" y="135" fill="#FFF7E9" font-family="Arial" font-size="22" font-weight="700">Reports</text>
+  <rect x="414" y="180" width="252" height="84" rx="18" fill="#F7EBCF"/>
+  <text x="436" y="214" fill="#2D3F3A" font-family="Arial" font-size="16" font-weight="700">Monthly spending</text>
+  <text x="436" y="240" fill="#5E706A" font-family="Arial" font-size="14">PDF / DONE</text>
+  <rect x="414" y="278" width="252" height="84" rx="18" fill="#F7EBCF"/>
+  <text x="436" y="312" fill="#2D3F3A" font-family="Arial" font-size="16" font-weight="700">Category summary</text>
+  <text x="436" y="338" fill="#5E706A" font-family="Arial" font-size="14">XLSX / PROCESSING</text>
+  <rect x="414" y="378" width="252" height="228" rx="20" fill="#16322F"/>
+  <text x="438" y="418" fill="#FFF6E4" font-family="Arial" font-size="18" font-weight="700">Create New Report</text>
+  <rect x="438" y="446" width="204" height="42" rx="12" fill="#274845"/>
+  <text x="455" y="473" fill="#D8ECE3" font-family="Arial" font-size="15">Type: Monthly spending</text>
+  <rect x="438" y="500" width="204" height="42" rx="12" fill="#274845"/>
+  <text x="473" y="527" fill="#D8ECE3" font-family="Arial" font-size="15">Format: PDF</text>
+  <rect x="438" y="554" width="204" height="42" rx="12" fill="#274845"/>
+  <text x="500" y="581" fill="#D8ECE3" font-family="Arial" font-size="15">Month: March</text>
+  <rect x="438" y="616" width="204" height="48" rx="14" fill="#F5C969"/>
+  <text x="484" y="647" fill="#17302D" font-family="Arial" font-size="18" font-weight="700">Generate</text>
+  <rect x="690" y="70" width="300" height="620" rx="36" fill="#FFF9EF" stroke="#CDBFA7" stroke-width="2"/>
+  <rect x="710" y="104" width="260" height="46" rx="20" fill="#16322F"/>
+  <text x="757" y="135" fill="#FFF7E9" font-family="Arial" font-size="22" font-weight="700">Receipt Detail</text>
+  <rect x="726" y="182" width="228" height="156" rx="18" fill="#F5E5CC" stroke="#DFC8A6" stroke-dasharray="6 6"/>
+  <text x="800" y="266" fill="#8F7A5B" font-family="Arial" font-size="18" text-anchor="middle">receipt preview</text>
+  <rect x="726" y="360" width="228" height="220" rx="18" fill="#ECF3EE"/>
+  <text x="744" y="398" fill="#224739" font-family="Arial" font-size="16" font-weight="700">OCR Extract</text>
+  <text x="744" y="432" fill="#5A7068" font-family="Arial" font-size="14">Store: ATB</text>
+  <text x="744" y="462" fill="#5A7068" font-family="Arial" font-size="14">Date: 2026-03-30</text>
+  <text x="744" y="492" fill="#5A7068" font-family="Arial" font-size="14">Total: $42.70</text>
+  <text x="744" y="534" fill="#224739" font-family="Arial" font-size="16" font-weight="700">Status</text>
+  <text x="744" y="564" fill="#5A7068" font-family="Arial" font-size="14">OCR: DONE</text>
+  <text x="744" y="594" fill="#5A7068" font-family="Arial" font-size="14">Linked purchase: Yes</text>
+  <text x="120" y="770" fill="#1C2A28" font-family="Arial" font-size="34" font-weight="700">Mobile-first concept</text>
+  <text x="120" y="822" fill="#5F564B" font-family="Arial" font-size="24">Три ключевых мобильных экрана:</text>
+  <text x="120" y="864" fill="#5F564B" font-family="Arial" font-size="24">1. Dashboard с быстрыми действиями</text>
+  <text x="120" y="902" fill="#5F564B" font-family="Arial" font-size="24">2. Reports workspace с генерацией и статусами</text>
+  <text x="120" y="940" fill="#5F564B" font-family="Arial" font-size="24">3. Receipt detail с OCR-результатом</text>
+  <text x="120" y="1000" fill="#3C4D48" font-family="Arial" font-size="24">Мое видение: desktop-first dashboard + mobile-first action flow.</text>
+</svg>

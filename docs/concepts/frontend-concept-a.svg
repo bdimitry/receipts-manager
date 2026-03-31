@@ -1,0 +1,74 @@
+<svg width="1440" height="1080" viewBox="0 0 1440 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1440" height="1080" fill="#F6F1E7"/>
+  <rect x="24" y="24" width="1392" height="1032" rx="28" fill="#FFF9F0" stroke="#DBCDB7" stroke-width="2"/>
+  <rect x="56" y="56" width="224" height="968" rx="24" fill="#16322F"/>
+  <text x="88" y="112" fill="#FFF6E4" font-family="Arial" font-size="34" font-weight="700">Receipts</text>
+  <text x="88" y="145" fill="#A9C2BA" font-family="Arial" font-size="18">Manager</text>
+  <rect x="80" y="196" width="176" height="54" rx="16" fill="#F5C969"/>
+  <text x="112" y="231" fill="#16322F" font-family="Arial" font-size="20" font-weight="700">Dashboard</text>
+  <text x="88" y="304" fill="#E8E0D1" font-family="Arial" font-size="22">Purchases</text>
+  <text x="88" y="350" fill="#E8E0D1" font-family="Arial" font-size="22">Receipts</text>
+  <text x="88" y="396" fill="#E8E0D1" font-family="Arial" font-size="22">Reports</text>
+  <text x="88" y="442" fill="#E8E0D1" font-family="Arial" font-size="22">Notifications</text>
+  <text x="88" y="488" fill="#E8E0D1" font-family="Arial" font-size="22">Profile</text>
+  <rect x="312" y="56" width="1072" height="104" rx="24" fill="#FFF3DD" stroke="#E6D6BF"/>
+  <text x="352" y="106" fill="#1E2B29" font-family="Arial" font-size="36" font-weight="700">Home Budget Command Center</text>
+  <text x="352" y="136" fill="#776B5E" font-family="Arial" font-size="18">Покупки, чеки, OCR, отчеты и уведомления в одном рабочем пространстве</text>
+  <rect x="1140" y="84" width="212" height="48" rx="14" fill="#16322F"/>
+  <text x="1185" y="115" fill="#FFF8EE" font-family="Arial" font-size="20" font-weight="700">New Report</text>
+  <rect x="312" y="192" width="252" height="144" rx="24" fill="#16322F"/>
+  <text x="344" y="236" fill="#FDF7ED" font-family="Arial" font-size="18">Spent This Month</text>
+  <text x="344" y="296" fill="#F5C969" font-family="Arial" font-size="44" font-weight="700">$1,284</text>
+  <text x="344" y="322" fill="#A8C3BC" font-family="Arial" font-size="16">+12% vs previous month</text>
+  <rect x="588" y="192" width="252" height="144" rx="24" fill="#FFF3DD" stroke="#E6D6BF"/>
+  <text x="620" y="236" fill="#4D453B" font-family="Arial" font-size="18">Receipts Processed</text>
+  <text x="620" y="296" fill="#16322F" font-family="Arial" font-size="44" font-weight="700">37</text>
+  <text x="620" y="322" fill="#877B6F" font-family="Arial" font-size="16">4 waiting for OCR review</text>
+  <rect x="864" y="192" width="252" height="144" rx="24" fill="#FFF3DD" stroke="#E6D6BF"/>
+  <text x="896" y="236" fill="#4D453B" font-family="Arial" font-size="18">Reports Ready</text>
+  <text x="896" y="296" fill="#16322F" font-family="Arial" font-size="44" font-weight="700">12</text>
+  <text x="896" y="322" fill="#877B6F" font-family="Arial" font-size="16">CSV, PDF, XLSX available</text>
+  <rect x="1140" y="192" width="244" height="144" rx="24" fill="#E9F1EC" stroke="#C2D7CC"/>
+  <text x="1172" y="236" fill="#2B5043" font-family="Arial" font-size="18">Notifications</text>
+  <text x="1172" y="296" fill="#16322F" font-family="Arial" font-size="44" font-weight="700">2</text>
+  <text x="1172" y="322" fill="#577869" font-family="Arial" font-size="16">Telegram and Email active</text>
+  <rect x="312" y="368" width="668" height="412" rx="28" fill="#FFFDF8" stroke="#E6D6BF"/>
+  <text x="352" y="414" fill="#1F2C29" font-family="Arial" font-size="28" font-weight="700">Recent Purchases</text>
+  <rect x="344" y="444" width="604" height="58" rx="14" fill="#FBF1DF"/>
+  <text x="370" y="480" fill="#4A4239" font-family="Arial" font-size="18">Mar 30</text>
+  <text x="500" y="480" fill="#1D2A28" font-family="Arial" font-size="18" font-weight="700">Weekly groceries</text>
+  <text x="742" y="480" fill="#6A6056" font-family="Arial" font-size="18">FOOD</text>
+  <text x="864" y="480" fill="#16322F" font-family="Arial" font-size="18" font-weight="700">$84.20</text>
+  <rect x="344" y="518" width="604" height="58" rx="14" fill="#FBF1DF"/>
+  <text x="370" y="554" fill="#4A4239" font-family="Arial" font-size="18">Mar 29</text>
+  <text x="500" y="554" fill="#1D2A28" font-family="Arial" font-size="18" font-weight="700">Pharmacy</text>
+  <text x="742" y="554" fill="#6A6056" font-family="Arial" font-size="18">HEALTH</text>
+  <text x="864" y="554" fill="#16322F" font-family="Arial" font-size="18" font-weight="700">$22.10</text>
+  <rect x="344" y="592" width="604" height="58" rx="14" fill="#FBF1DF"/>
+  <text x="370" y="628" fill="#4A4239" font-family="Arial" font-size="18">Mar 28</text>
+  <text x="500" y="628" fill="#1D2A28" font-family="Arial" font-size="18" font-weight="700">Metro ticket</text>
+  <text x="742" y="628" fill="#6A6056" font-family="Arial" font-size="18">TRANSPORT</text>
+  <text x="864" y="628" fill="#16322F" font-family="Arial" font-size="18" font-weight="700">$1.40</text>
+  <rect x="344" y="666" width="604" height="82" rx="18" fill="#EAF3ED" stroke="#C8DDD3"/>
+  <text x="370" y="705" fill="#214338" font-family="Arial" font-size="18" font-weight="700">OCR Insight</text>
+  <text x="370" y="732" fill="#547264" font-family="Arial" font-size="16">Latest receipt parsed: store "ATB", total $42.70, confidence medium</text>
+  <rect x="1008" y="368" width="376" height="412" rx="28" fill="#16322F"/>
+  <text x="1042" y="414" fill="#FFF5E8" font-family="Arial" font-size="28" font-weight="700">Report Pipeline</text>
+  <rect x="1042" y="446" width="308" height="72" rx="18" fill="#224844"/>
+  <text x="1070" y="487" fill="#FFF4E2" font-family="Arial" font-size="18">March spending / PDF</text>
+  <circle cx="1315" cy="482" r="14" fill="#7EC7A2"/>
+  <rect x="1042" y="536" width="308" height="72" rx="18" fill="#224844"/>
+  <text x="1070" y="577" fill="#FFF4E2" font-family="Arial" font-size="18">Category summary / XLSX</text>
+  <circle cx="1315" cy="572" r="14" fill="#F5C969"/>
+  <rect x="1042" y="626" width="308" height="72" rx="18" fill="#224844"/>
+  <text x="1070" y="667" fill="#FFF4E2" font-family="Arial" font-size="18">Store summary / CSV</text>
+  <circle cx="1315" cy="662" r="14" fill="#E27D73"/>
+  <text x="1042" y="736" fill="#A9C2BA" font-family="Arial" font-size="16">Green: DONE</text>
+  <text x="1158" y="736" fill="#A9C2BA" font-family="Arial" font-size="16">Yellow: PROCESSING</text>
+  <text x="1308" y="736" fill="#A9C2BA" font-family="Arial" font-size="16" text-anchor="end">Red: FAILED</text>
+  <rect x="312" y="812" width="1072" height="212" rx="28" fill="#FFF3DD" stroke="#E6D6BF"/>
+  <text x="352" y="858" fill="#1E2A28" font-family="Arial" font-size="28" font-weight="700">Design Direction A</text>
+  <text x="352" y="894" fill="#64594E" font-family="Arial" font-size="20">Warm “kitchen desk” mood: receipt paper palette, dark green command sidebar, calm finance-focused layout.</text>
+  <text x="352" y="928" fill="#64594E" font-family="Arial" font-size="20">Подходит, если хотим ощущение личного домашнего инструмента, а не сухой корпоративной панели.</text>
+</svg>
+

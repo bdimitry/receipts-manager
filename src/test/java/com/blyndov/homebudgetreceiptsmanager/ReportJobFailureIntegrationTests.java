@@ -1,0 +1,212 @@
+package com.blyndov.homebudgetreceiptsmanager;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.blyndov.homebudgetreceiptsmanager.dto.AuthResponse;
+import com.blyndov.homebudgetreceiptsmanager.dto.CreateMonthlyReportRequest;
+import com.blyndov.homebudgetreceiptsmanager.dto.ErrorResponse;
+import com.blyndov.homebudgetreceiptsmanager.dto.LoginRequest;
+import com.blyndov.homebudgetreceiptsmanager.dto.RegisterRequest;
+import com.blyndov.homebudgetreceiptsmanager.dto.ReportJobResponse;
+import com.blyndov.homebudgetreceiptsmanager.entity.ReportJobStatus;
+import com.blyndov.homebudgetreceiptsmanager.repository.ReportJobRepository;
+import com.blyndov.homebudgetreceiptsmanager.repository.UserRepository;
+import com.blyndov.homebudgetreceiptsmanager.service.ReportJobProcessor;
+import com.blyndov.homebudgetreceiptsmanager.support.AbstractPostgresIntegrationTest;
+import java.time.Duration;
+import java.util.List;
+import java.util.UUID;
+import jakarta.mail.internet.MimeMessage;
+import org.awaitility.Awaitility;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.test.annotation.DirtiesContext;
+import software.amazon.awssdk.services.sqs.SqsClient;
+import software.amazon.awssdk.services.sqs.model.DeleteMessageRequest;
+import software.amazon.awssdk.services.sqs.model.GetQueueUrlRequest;
+import software.amazon.awssdk.services.sqs.model.Message;
+import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
+import com.blyndov.homebudgetreceiptsmanager.config.AwsProperties;
+
+@SpringBootTest(
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+    properties = {
+        "app.report-jobs.consumer.enabled=true",
+        "app.report-jobs.consumer.poll-delay-ms=100",
+        "app.report-jobs.consumer.wait-time-seconds=1",
+        "app.receipts.ocr.consumer.enabled=false"
+    }
+)
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+class ReportJobFailureIntegrationTests extends AbstractPostgresIntegrationTest {
+
+    @Autowired
+    private org.springframework.boot.test.web.client.TestRestTemplate restTemplate;
+
+    @Autowired
+    private ReportJobRepository reportJobRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private SqsClient sqsClient;
+
+    @Autowired
+    private AwsProperties awsProperties;
+
+    @BeforeEach
+    void setUp() {
+        reportJobRepository.deleteAll();
+        userRepository.deleteAll();
+        drainQueue();
+        purgeEmails();
+        purgeTelegramMessages();
+    }
+
+    @Test
+    void processingFailureMarksJobAsFailedAndSendsNotification() throws Exception {
+        String ownerEmail = uniqueEmail("owner");
+        String accessToken = registerAndLogin(ownerEmail, "P@ssword123");
+        ReportJobResponse createdJob = createReportJob(accessToken, 2026, 8).getBody();
+
+        Awaitility.await()
+            .atMost(Duration.ofSeconds(10))
+            .untilAsserted(() -> {
+                var reportJob = reportJobRepository.findById(createdJob.id()).orElseThrow();
+                assertThat(reportJob.getStatus()).isEqualTo(ReportJobStatus.FAILED);
+                assertThat(reportJob.getErrorMessage()).contains("Simulated report processing failure");
+            });
+
+        Awaitility.await()
+            .atMost(Duration.ofSeconds(10))
+            .untilAsserted(() -> assertThat(receivedEmails()).hasSize(1));
+
+        MimeMessage notification = receivedEmails()[0];
+        assertThat(notification.getAllRecipients()).hasSize(1);
+        assertThat(notification.getAllRecipients()[0].toString()).isEqualTo(ownerEmail);
+        assertThat(notification.getSubject()).contains("failed");
+        assertThat(notification.getContent().toString()).contains("2026-08");
+        assertThat(notification.getContent().toString()).contains("/api/reports/" + createdJob.id());
+        assertThat(receivedTelegramMessages()).isEmpty();
+    }
+
+    @Test
+    void downloadForFailedJobReturnsConflict() {
+        String accessToken = registerAndLogin(uniqueEmail("owner"), "P@ssword123");
+        ReportJobResponse createdJob = createReportJob(accessToken, 2026, 9).getBody();
+
+        Awaitility.await()
+            .atMost(Duration.ofSeconds(10))
+            .untilAsserted(() -> assertThat(
+                reportJobRepository.findById(createdJob.id()).orElseThrow().getStatus()
+            ).isEqualTo(ReportJobStatus.FAILED));
+
+        ResponseEntity<ErrorResponse> response = restTemplate.exchange(
+            "/api/reports/" + createdJob.id() + "/download",
+            HttpMethod.GET,
+            authorizedEntity(accessToken),
+            ErrorResponse.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().message()).contains("failed");
+    }
+
+    private ResponseEntity<ReportJobResponse> createReportJob(String accessToken, int year, int month) {
+        return restTemplate.exchange(
+            "/api/reports/monthly",
+            HttpMethod.POST,
+            authorizedJsonEntity(new CreateMonthlyReportRequest(year, month), accessToken),
+            ReportJobResponse.class
+        );
+    }
+
+    private String registerAndLogin(String email, String password) {
+        restTemplate.postForEntity(
+            "/api/auth/register",
+            new RegisterRequest(email, password),
+            String.class
+        );
+
+        ResponseEntity<AuthResponse> response = restTemplate.postForEntity(
+            "/api/auth/login",
+            new LoginRequest(email, password),
+            AuthResponse.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
+        return response.getBody().accessToken();
+    }
+
+    private <T> HttpEntity<T> authorizedJsonEntity(T body, String accessToken) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        return new HttpEntity<>(body, headers);
+    }
+
+    private HttpEntity<Void> authorizedEntity(String accessToken) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+        return new HttpEntity<>(headers);
+    }
+
+    private String uniqueEmail(String prefix) {
+        return prefix + "-" + UUID.randomUUID() + "@example.com";
+    }
+
+    private void drainQueue() {
+        String queueUrl = sqsClient.getQueueUrl(
+            GetQueueUrlRequest.builder()
+                .queueName(awsProperties.getSqs().getQueueName())
+                .build()
+        ).queueUrl();
+
+        while (true) {
+            List<Message> messages = sqsClient.receiveMessage(
+                ReceiveMessageRequest.builder()
+                    .queueUrl(queueUrl)
+                    .maxNumberOfMessages(10)
+                    .waitTimeSeconds(1)
+                    .build()
+            ).messages();
+
+            if (messages.isEmpty()) {
+                return;
+            }
+
+            messages.forEach(message -> sqsClient.deleteMessage(
+                DeleteMessageRequest.builder()
+                    .queueUrl(queueUrl)
+                    .receiptHandle(message.receiptHandle())
+                    .build()
+            ));
+        }
+    }
+
+    @TestConfiguration
+    static class FailingProcessorConfiguration {
+
+        @Bean
+        @Primary
+        ReportJobProcessor reportJobProcessor() {
+            return reportJob -> {
+                throw new IllegalStateException("Simulated report processing failure");
+            };
+        }
+    }
+}

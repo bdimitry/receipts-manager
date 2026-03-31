@@ -1,0 +1,176 @@
+﻿# Project Overview
+
+## Purpose
+
+`Home Budget & Receipts Manager` is a full-stack demo product for personal finance tracking.
+
+It allows a user to:
+
+- authenticate with JWT
+- create purchases with explicit currency
+- upload receipt files with explicit currency
+- process receipts through asynchronous OCR
+- inspect parsed OCR fields and receipt line items
+- generate async reports in different types and formats
+- download finished reports from S3-backed flow
+- receive report completion notifications through the selected channel
+
+## What Is Implemented
+
+### Platform Foundation
+
+- Docker Compose environment
+- PostgreSQL
+- LocalStack for S3 and SQS
+- MailHog for email verification
+- Telegram mock for local message delivery checks
+- OCR helper container with Tesseract
+- Flyway migrations
+- Swagger UI and OpenAPI
+- GitHub Actions CI
+
+### Backend Domain
+
+- `User` with JWT auth and notification preferences
+- `Purchase` CRUD with user isolation and required `currency`
+- `Receipt` upload to S3 with OCR lifecycle and required `currency`
+- `ReceiptLineItem` for persisted OCR item rows
+- `ReportJob` async processing lifecycle
+- `CurrencyCode` values:
+  - `USD`
+  - `EUR`
+  - `UAH`
+  - `RUB`
+- report types:
+  - `MONTHLY_SPENDING`
+  - `CATEGORY_SUMMARY`
+  - `STORE_SUMMARY`
+- report formats:
+  - `CSV`
+  - `PDF`
+  - `XLSX`
+- multi-channel notifications:
+  - `EMAIL`
+  - `TELEGRAM`
+
+### OCR And Parsing Model
+
+- raw OCR text is always stored when extraction succeeds
+- parsed store name, total amount, and purchase date are stored as best-effort fields
+- parsed line items are stored separately and linked to the receipt
+- multilingual OCR runs with `ukr+rus+eng` in the local helper container
+- OCR `DONE` means text extraction succeeded, even if structured parsing is partial
+- OCR `FAILED` means extraction or processing itself failed
+
+### Currency Model
+
+- `Purchase.currency` is mandatory
+- `Receipt.currency` is mandatory
+- receipt upload validates currency against linked purchase when `purchaseId` is provided
+- frontend formatting uses the stored currency instead of a hard-coded default
+- dashboard and report generation no longer merge mixed currencies into one misleading total
+- mixed-currency totals are shown separately by currency
+
+### Frontend Product Layer
+
+- cozy dashboard with spending donut chart as the main visual focal point
+- dashboard legend with totals, percentages, translated category labels, and stable `Other` aggregation
+- mixed-currency safe dashboard summaries instead of a single misleading total
+- login and register flows
+- protected app shell with fixed sidebar and independent content scrolling
+- separate topbar theme toggle and language dropdown with persisted preferences
+- language dropdown uses stable local flag assets for `RU`, `UK`, and `EN`
+- purchases list, creation, filtering, calculator window, and multi-item purchase editor
+- receipts list, upload, currency selection, and OCR detail view with parsed line items
+- reports list, report creation, status tracking, and download action
+- profile page with notification settings
+- persisted theme and language preferences
+- Playwright browser smoke coverage for the main UI shell
+
+## Why This Stage Matters
+
+The project now covers a realistic end-to-end product story:
+
+- money data is currency-aware
+- OCR results are more useful because they preserve multiple item rows
+- dashboard and report outputs avoid incorrect mixed-currency aggregation
+- frontend and backend expose the same financial model consistently
+
+## Demo-Ready Scenario
+
+A complete UI-driven walkthrough now looks like this:
+
+1. open the frontend
+2. register and login
+3. create purchases with selected currency
+4. optionally add multiple product rows inside one purchase
+5. use the calculator window to assist amount entry
+6. upload a receipt with selected currency
+7. open receipt OCR detail and inspect parsed line items
+8. create a report in a selected type and format
+9. observe async status progression
+10. download the ready file
+11. verify the notification in MailHog or Telegram mock
+
+## Who This Documentation Is For
+
+### Junior Developer
+
+Understand:
+
+- how a React frontend integrates with a Spring Boot API
+- how JWT flows into a protected SPA
+- how typed API calls, forms, and query state are organized
+- how receipt OCR results are persisted beyond raw text
+
+### Middle Or Senior Developer
+
+Focus on:
+
+- modular frontend structure
+- same-origin proxy approach in Docker
+- UI integration over existing async backend contracts
+- OCR parsing model with persisted line items
+- currency-safe reporting and dashboard behavior
+- test coverage across backend and frontend layers
+
+### Tech Lead
+
+Focus on:
+
+- product completeness without unnecessary architectural churn
+- minimal model evolution for currency safety and OCR usefulness
+- maintainable full-stack handoff story
+
+### Engineering Manager
+
+Focus on:
+
+- reproducible demo environment
+- clear onboarding path
+- CI coverage for both backend and frontend
+- reduced demo risk around OCR and currency presentation
+
+### Product Owner
+
+Focus on:
+
+- the core user journey now exists through a real product interface
+- key value moments are visible: expenses, currencies, OCR, report readiness, notifications
+
+## Current Limitations
+
+- dashboard analytics are intentionally lightweight and derived from existing endpoints
+- no dedicated admin or support UI
+- no offline mode
+- no push/mobile clients
+- no advanced personalization beyond theme, language, and notification preferences
+- OCR line item parsing remains best-effort for noisy real-world receipts
+
+## Where To Go Next
+
+- [Frontend architecture](frontend-architecture.md)
+- [Architecture overview](architecture-overview.md)
+- [OCR flow](ocr-flow.md)
+- [Demo guide](demo-guide.md)
+- [Runbook](runbook.md)

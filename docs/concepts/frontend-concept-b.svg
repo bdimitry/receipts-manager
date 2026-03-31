@@ -1,0 +1,82 @@
+<svg width="1440" height="1080" viewBox="0 0 1440 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1440" height="1080" fill="#E9EEF7"/>
+  <rect x="20" y="20" width="1400" height="1040" rx="32" fill="#0F172A"/>
+  <rect x="48" y="48" width="1344" height="72" rx="22" fill="#141F38"/>
+  <text x="88" y="92" fill="#F7FAFF" font-family="Arial" font-size="32" font-weight="700">ReceiptOps</text>
+  <text x="255" y="92" fill="#93A3C3" font-family="Arial" font-size="18">Operational workspace for home finance workflows</text>
+  <rect x="1178" y="66" width="182" height="38" rx="12" fill="#55C2FF"/>
+  <text x="1220" y="91" fill="#082033" font-family="Arial" font-size="18" font-weight="700">Run Report</text>
+  <rect x="48" y="152" width="280" height="876" rx="28" fill="#141F38"/>
+  <text x="80" y="208" fill="#F7FAFF" font-family="Arial" font-size="24" font-weight="700">Navigation</text>
+  <rect x="76" y="240" width="224" height="56" rx="16" fill="#243658"/>
+  <text x="104" y="276" fill="#EAF2FF" font-family="Arial" font-size="20">Overview</text>
+  <text x="80" y="340" fill="#A6B4D0" font-family="Arial" font-size="20">Purchases</text>
+  <text x="80" y="386" fill="#A6B4D0" font-family="Arial" font-size="20">OCR Queue</text>
+  <text x="80" y="432" fill="#A6B4D0" font-family="Arial" font-size="20">Reports</text>
+  <text x="80" y="478" fill="#A6B4D0" font-family="Arial" font-size="20">S3 Assets</text>
+  <text x="80" y="524" fill="#A6B4D0" font-family="Arial" font-size="20">Notifications</text>
+  <text x="80" y="570" fill="#A6B4D0" font-family="Arial" font-size="20">Settings</text>
+  <rect x="356" y="152" width="1036" height="256" rx="28" fill="#141F38"/>
+  <text x="392" y="204" fill="#F6FBFF" font-family="Arial" font-size="30" font-weight="700">System Overview</text>
+  <rect x="392" y="236" width="208" height="136" rx="22" fill="#1E2C4B"/>
+  <text x="420" y="278" fill="#A9D4FF" font-family="Arial" font-size="16">Active Jobs</text>
+  <text x="420" y="332" fill="#F6FBFF" font-family="Arial" font-size="44" font-weight="700">6</text>
+  <text x="420" y="356" fill="#8DA1C0" font-family="Arial" font-size="16">2 reports, 4 OCR</text>
+  <rect x="620" y="236" width="208" height="136" rx="22" fill="#1E2C4B"/>
+  <text x="648" y="278" fill="#A9D4FF" font-family="Arial" font-size="16">Storage Used</text>
+  <text x="648" y="332" fill="#F6FBFF" font-family="Arial" font-size="44" font-weight="700">1.8GB</text>
+  <text x="648" y="356" fill="#8DA1C0" font-family="Arial" font-size="16">Receipts + reports</text>
+  <rect x="848" y="236" width="208" height="136" rx="22" fill="#1E2C4B"/>
+  <text x="876" y="278" fill="#A9D4FF" font-family="Arial" font-size="16">Notification Health</text>
+  <text x="876" y="332" fill="#F6FBFF" font-family="Arial" font-size="44" font-weight="700">98%</text>
+  <text x="876" y="356" fill="#8DA1C0" font-family="Arial" font-size="16">Delivery success</text>
+  <rect x="1076" y="236" width="280" height="136" rx="22" fill="#1E2C4B"/>
+  <text x="1104" y="278" fill="#A9D4FF" font-family="Arial" font-size="16">Current Focus</text>
+  <text x="1104" y="332" fill="#F6FBFF" font-family="Arial" font-size="24" font-weight="700">March closing pack</text>
+  <text x="1104" y="360" fill="#8DA1C0" font-family="Arial" font-size="16">PDF + XLSX finishing now</text>
+  <rect x="356" y="440" width="508" height="588" rx="28" fill="#141F38"/>
+  <text x="392" y="490" fill="#F6FBFF" font-family="Arial" font-size="28" font-weight="700">Processing Timeline</text>
+  <rect x="392" y="526" width="436" height="92" rx="20" fill="#1C2A46"/>
+  <circle cx="430" cy="572" r="14" fill="#55C2FF"/>
+  <text x="458" y="563" fill="#F6FBFF" font-family="Arial" font-size="18" font-weight="700">Receipt uploaded</text>
+  <text x="458" y="590" fill="#8EA5C8" font-family="Arial" font-size="16">IMG_2034.jpg stored in S3</text>
+  <rect x="392" y="638" width="436" height="92" rx="20" fill="#1C2A46"/>
+  <circle cx="430" cy="684" r="14" fill="#F3B44E"/>
+  <text x="458" y="675" fill="#F6FBFF" font-family="Arial" font-size="18" font-weight="700">OCR running</text>
+  <text x="458" y="702" fill="#8EA5C8" font-family="Arial" font-size="16">Store and total being extracted</text>
+  <rect x="392" y="750" width="436" height="92" rx="20" fill="#1C2A46"/>
+  <circle cx="430" cy="796" r="14" fill="#55E0B5"/>
+  <text x="458" y="787" fill="#F6FBFF" font-family="Arial" font-size="18" font-weight="700">Report generated</text>
+  <text x="458" y="814" fill="#8EA5C8" font-family="Arial" font-size="16">Category summary exported to XLSX</text>
+  <rect x="392" y="862" width="436" height="92" rx="20" fill="#1C2A46"/>
+  <circle cx="430" cy="908" r="14" fill="#55C2FF"/>
+  <text x="458" y="899" fill="#F6FBFF" font-family="Arial" font-size="18" font-weight="700">User notified</text>
+  <text x="458" y="926" fill="#8EA5C8" font-family="Arial" font-size="16">Telegram and Email dispatch complete</text>
+  <rect x="892" y="440" width="500" height="588" rx="28" fill="#141F38"/>
+  <text x="928" y="490" fill="#F6FBFF" font-family="Arial" font-size="28" font-weight="700">Reports Table</text>
+  <rect x="928" y="524" width="428" height="54" rx="14" fill="#1C2A46"/>
+  <text x="950" y="558" fill="#9EB5D6" font-family="Arial" font-size="16">Type</text>
+  <text x="1100" y="558" fill="#9EB5D6" font-family="Arial" font-size="16">Format</text>
+  <text x="1190" y="558" fill="#9EB5D6" font-family="Arial" font-size="16">Status</text>
+  <text x="1290" y="558" fill="#9EB5D6" font-family="Arial" font-size="16">Owner</text>
+  <rect x="928" y="594" width="428" height="64" rx="16" fill="#12203A"/>
+  <text x="950" y="633" fill="#F4F8FF" font-family="Arial" font-size="16">MONTHLY_SPENDING</text>
+  <text x="1100" y="633" fill="#F4F8FF" font-family="Arial" font-size="16">PDF</text>
+  <text x="1190" y="633" fill="#55E0B5" font-family="Arial" font-size="16">DONE</text>
+  <text x="1290" y="633" fill="#D1DAEA" font-family="Arial" font-size="16">me</text>
+  <rect x="928" y="674" width="428" height="64" rx="16" fill="#12203A"/>
+  <text x="950" y="713" fill="#F4F8FF" font-family="Arial" font-size="16">CATEGORY_SUMMARY</text>
+  <text x="1100" y="713" fill="#F4F8FF" font-family="Arial" font-size="16">XLSX</text>
+  <text x="1190" y="713" fill="#F3B44E" font-family="Arial" font-size="16">PROCESSING</text>
+  <text x="1290" y="713" fill="#D1DAEA" font-family="Arial" font-size="16">me</text>
+  <rect x="928" y="754" width="428" height="64" rx="16" fill="#12203A"/>
+  <text x="950" y="793" fill="#F4F8FF" font-family="Arial" font-size="16">STORE_SUMMARY</text>
+  <text x="1100" y="793" fill="#F4F8FF" font-family="Arial" font-size="16">CSV</text>
+  <text x="1190" y="793" fill="#FF8C87" font-family="Arial" font-size="16">FAILED</text>
+  <text x="1290" y="793" fill="#D1DAEA" font-family="Arial" font-size="16">me</text>
+  <rect x="928" y="862" width="428" height="120" rx="20" fill="#1C2A46"/>
+  <text x="956" y="906" fill="#F6FBFF" font-family="Arial" font-size="18" font-weight="700">Design Direction B</text>
+  <text x="956" y="940" fill="#A7B8D5" font-family="Arial" font-size="18">More operational and “system dashboard” driven.</text>
+  <text x="956" y="969" fill="#A7B8D5" font-family="Arial" font-size="18">Подходит, если хотим подчеркнуть очереди, пайплайны, статусы и multi-format reporting.</text>
+</svg>
+

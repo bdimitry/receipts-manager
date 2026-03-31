@@ -1,0 +1,81 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: home-budget-receipts-manager
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/home_budget}
+    username: ${SPRING_DATASOURCE_USERNAME:home_budget_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:home_budget_password}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  mail:
+    host: ${SPRING_MAIL_HOST:localhost}
+    port: ${SPRING_MAIL_PORT:1025}
+    properties:
+      mail:
+        smtp:
+          auth: ${SPRING_MAIL_SMTP_AUTH:false}
+          starttls:
+            enable: ${SPRING_MAIL_SMTP_STARTTLS_ENABLE:false}
+
+aws:
+  region: ${AWS_REGION:eu-central-1}
+  endpoint: ${AWS_ENDPOINT:http://localhost:4566}
+  credentials:
+    access-key: ${AWS_ACCESS_KEY:test}
+    secret-key: ${AWS_SECRET_KEY:test}
+  s3:
+    bucket-name: ${AWS_S3_BUCKET:home-budget-files}
+  sqs:
+    queue-name: ${AWS_SQS_QUEUE:report-generation-queue}
+    receipt-ocr-queue-name: ${AWS_SQS_RECEIPT_OCR_QUEUE:receipt-ocr-queue}
+
+security:
+  jwt:
+    secret: ${JWT_SECRET:change-me-please-use-a-very-secret-32-byte-key}
+    access-token-expiration: ${JWT_EXPIRATION:PT1H}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+app:
+  ocr:
+    service:
+      base-url: ${OCR_SERVICE_BASE_URL:http://localhost:8081}
+  notifications:
+    email:
+      from: ${NOTIFICATION_EMAIL_FROM:noreply@home-budget.local}
+    telegram:
+      base-url: ${NOTIFICATION_TELEGRAM_BASE_URL:http://localhost:8082}
+      bot-token: ${NOTIFICATION_TELEGRAM_BOT_TOKEN:dev-telegram-bot-token}
+  receipts:
+    ocr:
+      consumer:
+        enabled: ${RECEIPT_OCR_CONSUMER_ENABLED:true}
+        poll-delay-ms: ${RECEIPT_OCR_CONSUMER_POLL_DELAY_MS:1000}
+        wait-time-seconds: ${RECEIPT_OCR_CONSUMER_WAIT_TIME_SECONDS:1}
+        max-messages: ${RECEIPT_OCR_CONSUMER_MAX_MESSAGES:1}
+  report-jobs:
+    consumer:
+      enabled: ${REPORT_JOBS_CONSUMER_ENABLED:true}
+      poll-delay-ms: ${REPORT_JOBS_CONSUMER_POLL_DELAY_MS:1000}
+      wait-time-seconds: ${REPORT_JOBS_CONSUMER_WAIT_TIME_SECONDS:1}
+      max-messages: ${REPORT_JOBS_CONSUMER_MAX_MESSAGES:1}
+    download:
+      expiration: ${REPORT_JOBS_DOWNLOAD_EXPIRATION:PT15M}

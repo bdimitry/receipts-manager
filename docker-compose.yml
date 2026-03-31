@@ -1,0 +1,134 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: home-budget-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-home_budget}
+      POSTGRES_USER: ${POSTGRES_USER:-home_budget_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-home_budget_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  localstack:
+    image: localstack/localstack:3.7.2
+    container_name: home-budget-localstack
+    environment:
+      SERVICES: s3,sqs
+      AWS_DEFAULT_REGION: ${AWS_REGION:-eu-central-1}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-home-budget-files}
+      AWS_SQS_QUEUE: ${AWS_SQS_QUEUE:-report-generation-queue}
+      AWS_SQS_RECEIPT_OCR_QUEUE: ${AWS_SQS_RECEIPT_OCR_QUEUE:-receipt-ocr-queue}
+      DEBUG: ${LOCALSTACK_DEBUG:-0}
+    ports:
+      - "4566:4566"
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - ./docker/localstack/init:/etc/localstack/init/ready.d
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "awslocal s3api head-bucket --bucket $$AWS_S3_BUCKET >/dev/null 2>&1 && awslocal sqs get-queue-url --queue-name $$AWS_SQS_QUEUE >/dev/null 2>&1 && awslocal sqs get-queue-url --queue-name $$AWS_SQS_RECEIPT_OCR_QUEUE >/dev/null 2>&1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: home-budget-mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  telegram-mock:
+    build:
+      context: ./docker/telegram-mock-service
+      dockerfile: Dockerfile
+    container_name: home-budget-telegram-mock
+    ports:
+      - "8082:8082"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8082/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  ocr-service:
+    build:
+      context: ./docker/ocr-service
+      dockerfile: Dockerfile
+    container_name: home-budget-ocr-service
+    environment:
+      OCR_LANGUAGES: ${OCR_LANGUAGES:-ukr+rus+eng}
+      OCR_TESSERACT_CONFIG: ${OCR_TESSERACT_CONFIG:---oem 3 --psm 6}
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: home-budget-app
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: ${SERVER_PORT:-8080}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-home_budget}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-home_budget_user}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-home_budget_password}
+      AWS_REGION: ${AWS_REGION:-eu-central-1}
+      AWS_ENDPOINT: http://localstack:4566
+      AWS_ACCESS_KEY: ${AWS_ACCESS_KEY:-test}
+      AWS_SECRET_KEY: ${AWS_SECRET_KEY:-test}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-home-budget-files}
+      AWS_SQS_QUEUE: ${AWS_SQS_QUEUE:-report-generation-queue}
+      AWS_SQS_RECEIPT_OCR_QUEUE: ${AWS_SQS_RECEIPT_OCR_QUEUE:-receipt-ocr-queue}
+      OCR_SERVICE_BASE_URL: ${OCR_SERVICE_BASE_URL:-http://ocr-service:8081}
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-mailhog}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-1025}
+      NOTIFICATION_EMAIL_FROM: ${NOTIFICATION_EMAIL_FROM:-noreply@home-budget.local}
+      NOTIFICATION_TELEGRAM_BASE_URL: ${NOTIFICATION_TELEGRAM_BASE_URL:-http://telegram-mock:8082}
+      NOTIFICATION_TELEGRAM_BOT_TOKEN: ${NOTIFICATION_TELEGRAM_BOT_TOKEN:-dev-telegram-bot-token}
+      JWT_SECRET: ${JWT_SECRET:-change-me-please-use-a-very-secret-32-byte-key}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-PT1H}
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+      telegram-mock:
+        condition: service_healthy
+      ocr-service:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: home-budget-frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      app:
+        condition: service_started
+
+volumes:
+  postgres_data:
+  localstack_data:

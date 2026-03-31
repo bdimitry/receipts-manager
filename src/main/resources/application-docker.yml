@@ -1,0 +1,17 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5432/home_budget}
+  mail:
+    host: ${SPRING_MAIL_HOST:mailhog}
+    port: ${SPRING_MAIL_PORT:1025}
+
+aws:
+  endpoint: ${AWS_ENDPOINT:http://localstack:4566}
+
+app:
+  notifications:
+    telegram:
+      base-url: ${NOTIFICATION_TELEGRAM_BASE_URL:http://telegram-mock:8082}
+  ocr:
+    service:
+      base-url: ${OCR_SERVICE_BASE_URL:http://ocr-service:8081}

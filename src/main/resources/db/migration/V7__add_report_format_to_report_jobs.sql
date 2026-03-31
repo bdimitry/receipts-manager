@@ -1,0 +1,2 @@
+ALTER TABLE report_jobs
+ADD COLUMN report_format VARCHAR(20) NOT NULL DEFAULT 'CSV';
