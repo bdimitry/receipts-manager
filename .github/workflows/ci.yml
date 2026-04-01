@@ -24,6 +24,16 @@ jobs:
       - name: Run Maven tests
         run: mvn -B test
 
+      - name: Upload backend test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-surefire-reports
+          path: |
+            target/surefire-reports/**
+            **/target/surefire-reports/**
+          if-no-files-found: ignore
+
   frontend:
     runs-on: ubuntu-latest
 
@@ -57,3 +67,13 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: npm run build
+
+      - name: Upload frontend Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-playwright-report
+          path: |
+            frontend/playwright-report/**
+            frontend/test-results/**
+          if-no-files-found: ignore

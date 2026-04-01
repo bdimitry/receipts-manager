@@ -40,6 +40,18 @@ Backend:
 docker compose logs -f app
 ```
 
+Run the full local verification before pushing:
+
+```powershell
+mvn test
+cd frontend
+npm ci
+npm test
+npx playwright install chromium
+npm run test:smoke
+npm run build
+```
+
 Infrastructure:
 
 ```powershell
@@ -134,6 +146,13 @@ Check:
 - `GET /api/reports/{id}`
 - report queue contents
 - backend logs around report consumer and generation
+- if GitHub Actions failed, download `backend-surefire-reports` from the workflow artifacts
+
+CI stability note:
+
+- report integration tests keep the real queue and scheduler
+- the test environment no longer adds a 1-second SQS long-poll delay before every receive cycle
+- GitHub Actions now uploads diagnostic artifacts for easier failure analysis
 
 ## If Download Is Disabled In The UI
 

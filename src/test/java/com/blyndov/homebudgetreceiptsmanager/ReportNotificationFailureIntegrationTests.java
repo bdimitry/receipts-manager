@@ -44,7 +44,7 @@ import com.blyndov.homebudgetreceiptsmanager.config.AwsProperties;
     properties = {
         "app.report-jobs.consumer.enabled=true",
         "app.report-jobs.consumer.poll-delay-ms=100",
-        "app.report-jobs.consumer.wait-time-seconds=1",
+        "app.report-jobs.consumer.wait-time-seconds=0",
         "app.receipts.ocr.consumer.enabled=false"
     }
 )

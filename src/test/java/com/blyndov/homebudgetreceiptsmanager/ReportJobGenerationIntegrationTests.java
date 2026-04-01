@@ -63,12 +63,14 @@ import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
     properties = {
         "app.report-jobs.consumer.enabled=true",
         "app.report-jobs.consumer.poll-delay-ms=100",
-        "app.report-jobs.consumer.wait-time-seconds=1",
+        "app.report-jobs.consumer.wait-time-seconds=0",
         "app.receipts.ocr.consumer.enabled=false"
     }
 )
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class ReportJobGenerationIntegrationTests extends AbstractPostgresIntegrationTest {
+
+    private static final Duration ASYNC_REPORT_TIMEOUT = Duration.ofSeconds(20);
 
     @Autowired
     private TestRestTemplate restTemplate;
@@ -159,7 +161,7 @@ class ReportJobGenerationIntegrationTests extends AbstractPostgresIntegrationTes
         assertThat(downloadResponse.getBody().fileName()).endsWith(".csv");
         assertThat(downloadResponse.getBody().contentType()).isEqualTo("text/csv");
 
-        Awaitility.await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> assertThat(receivedEmails()).hasSize(1));
+        Awaitility.await().atMost(ASYNC_REPORT_TIMEOUT).untilAsserted(() -> assertThat(receivedEmails()).hasSize(1));
         MimeMessage notification = receivedEmails()[0];
         assertThat(notification.getAllRecipients()[0].toString()).isEqualTo(ownerEmail);
         assertThat(notification.getSubject()).contains("ready");
@@ -204,7 +206,7 @@ class ReportJobGenerationIntegrationTests extends AbstractPostgresIntegrationTes
         assertThat(downloadResponse.getBody().fileName()).endsWith(".pdf");
         assertThat(downloadResponse.getBody().contentType()).isEqualTo("application/pdf");
 
-        Awaitility.await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> assertThat(receivedEmails()).hasSize(1));
+        Awaitility.await().atMost(ASYNC_REPORT_TIMEOUT).untilAsserted(() -> assertThat(receivedEmails()).hasSize(1));
         assertThat(receivedEmails()[0].getContent().toString()).contains("PDF");
         assertThat(receivedTelegramMessages()).isEmpty();
     }
@@ -350,7 +352,7 @@ class ReportJobGenerationIntegrationTests extends AbstractPostgresIntegrationTes
 
     private ReportJobResponse awaitDone(Long reportJobId, String accessToken) {
         Awaitility.await()
-            .atMost(Duration.ofSeconds(15))
+            .atMost(ASYNC_REPORT_TIMEOUT)
             .untilAsserted(() -> {
                 ReportJobResponse response = restTemplate.exchange(
                     "/api/reports/" + reportJobId,

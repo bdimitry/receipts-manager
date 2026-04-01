@@ -14,7 +14,7 @@ public class ReportJobConsumerProperties {
     @Min(50)
     private long pollDelayMs = 1000;
 
-    @Min(1)
+    @Min(0)
     @Max(10)
     private int waitTimeSeconds = 1;
 

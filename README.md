@@ -148,6 +148,16 @@ CI runs both layers:
 - frontend unit/integration tests
 - frontend Playwright smoke check
 - frontend production build
+- backend failures upload Surefire reports as artifacts
+- frontend smoke failures upload the Playwright HTML report
+
+## Async Report Test Stability
+
+The report integration tests still use the real async SQS flow, but the test environment now avoids extra queue latency:
+
+- report consumer polling remains asynchronous
+- report integration tests run with `app.report-jobs.consumer.wait-time-seconds=0`
+- Awaitility timeouts are aligned with the real async contract instead of assuming an unusually fast CI runner
 
 ## Demo
 
