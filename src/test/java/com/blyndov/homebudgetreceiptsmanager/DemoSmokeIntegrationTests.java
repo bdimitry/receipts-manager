@@ -235,7 +235,9 @@ class DemoSmokeIntegrationTests extends AbstractPostgresIntegrationTest {
         );
         assertThat(downloadResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(downloadResponse.getBody()).isNotNull();
-        assertThat(downloadResponse.getBody().downloadUrl()).contains(completedJob.s3Key());
+        assertThat(downloadResponse.getBody().downloadUrl()).isEqualTo("/api/reports/" + completedJob.id() + "/file");
+        assertThat(downloadResponse.getBody().fileName()).contains("monthly-spending");
+        assertThat(downloadResponse.getBody().contentType()).isEqualTo("text/csv");
 
         ResponseEntity<List<ReceiptResponse>> receiptsResponse = restTemplate.exchange(
             "/api/receipts",

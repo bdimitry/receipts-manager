@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { getCurrentUser } from "../../features/user/api";
 import { useAuth } from "../../shared/auth/AuthContext";
 import { useI18n } from "../../shared/i18n/I18nContext";
+import { dispatchCalculatorResult, OPEN_CALCULATOR_EVENT } from "../../shared/lib/calculator-events";
 import { Button } from "../../shared/ui/Button";
 import { CalculatorModal } from "../../shared/ui/CalculatorModal";
 import { LanguageDropdown } from "../../shared/ui/LanguageDropdown";
@@ -39,6 +40,12 @@ export function AppLayout() {
       ? location.pathname === path
       : location.pathname === path || location.pathname.startsWith(`${path}/`),
   )?.[1] ?? t("overview");
+
+  useEffect(() => {
+    const handleOpen = () => setCalculatorOpen(true);
+    window.addEventListener(OPEN_CALCULATOR_EVENT, handleOpen);
+    return () => window.removeEventListener(OPEN_CALCULATOR_EVENT, handleOpen);
+  }, []);
 
   return (
     <div className="app-shell">
@@ -115,6 +122,10 @@ export function AppLayout() {
         applyLabel={t("applyToAmount")}
         expressionLabel={t("expression")}
         open={calculatorOpen}
+        onApply={(value) => {
+          dispatchCalculatorResult(value);
+          setCalculatorOpen(false);
+        }}
         onClose={() => setCalculatorOpen(false)}
         resultLabel={t("lineTotal")}
       />

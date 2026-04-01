@@ -151,6 +151,19 @@ CI runs both layers:
 - backend failures upload Surefire reports as artifacts
 - frontend smoke failures upload the Playwright HTML report
 
+Before pushing to Git, use the full local verification script so CI does not fail on unverified regressions:
+
+```powershell
+./scripts/verify-all.ps1
+```
+
+The script:
+
+- runs the full Maven backend suite
+- runs frontend unit tests, browser smoke, and production build
+- supports `MAVEN_CMD` when Maven is installed outside your PATH
+- falls back to a Dockerized Playwright environment if `npm` is not available in your local PATH
+
 ## Async Report Test Stability
 
 The report integration tests still use the real async SQS flow, but the test environment now avoids extra queue latency:

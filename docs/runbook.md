@@ -43,14 +43,17 @@ docker compose logs -f app
 Run the full local verification before pushing:
 
 ```powershell
-mvn test
-cd frontend
-npm ci
-npm test
-npx playwright install chromium
-npm run test:smoke
-npm run build
+./scripts/verify-all.ps1
 ```
+
+What it does:
+
+- runs the full backend Maven suite
+- runs frontend unit tests
+- runs Playwright browser smoke
+- runs the frontend production build
+- supports `MAVEN_CMD` if Maven is installed outside PATH
+- uses a Dockerized Playwright fallback if local `npm` is unavailable
 
 Infrastructure:
 

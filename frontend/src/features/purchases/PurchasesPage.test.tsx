@@ -1,9 +1,11 @@
+import { createRoutesFromElements, Route } from "react-router-dom";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import { PurchasesPage } from "./pages/PurchasesPage";
-import { renderWithProviders } from "../../test/test-utils";
+import { AppLayout } from "../../app/layout/AppLayout";
+import { renderWithProviders, renderWithRouter } from "../../test/test-utils";
 import { server } from "../../test/server";
 
 describe("purchases page", () => {
@@ -76,13 +78,30 @@ describe("purchases page", () => {
   });
 
   it("opens calculator and applies the result to amount", async () => {
-    server.use(http.get("/api/purchases", () => HttpResponse.json([])));
+    server.use(
+      http.get("/api/purchases", () => HttpResponse.json([])),
+      http.get("/api/users/me", () =>
+        HttpResponse.json({
+          id: 7,
+          email: "demo@example.com",
+          createdAt: "2026-04-01T09:00:00Z",
+        }),
+      ),
+    );
 
     const user = userEvent.setup();
-    renderWithProviders(<PurchasesPage />);
+    renderWithRouter(
+      createRoutesFromElements(
+        <Route element={<AppLayout />}>
+          <Route path="/" element={<PurchasesPage />} />
+        </Route>,
+      ),
+      ["/"],
+      "demo-token",
+    );
 
     await screen.findByText("No product items added yet.");
-    await user.click(screen.getByRole("button", { name: "Calculator" }));
+    await user.click(screen.getByTestId("purchase-calculator-trigger"));
     await user.click(screen.getByRole("button", { name: "7" }));
     await user.click(screen.getByRole("button", { name: "+" }));
     await user.click(screen.getByRole("button", { name: "5" }));

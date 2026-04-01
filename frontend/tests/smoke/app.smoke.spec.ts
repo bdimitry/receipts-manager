@@ -177,7 +177,7 @@ test.describe("frontend smoke", () => {
 
     await page.locator('.sidebar__nav a[href="/purchases"]').click();
     await expect(page.locator(".content .page-intro h1")).toHaveText("Purchases");
-    await page.getByRole("button", { name: "Calculator" }).click();
+    await page.getByTestId("purchase-calculator-trigger").click();
     await expect(page.getByTestId("calculator-window")).toBeVisible();
 
     const calculatorBox = await page.getByTestId("calculator-window").boundingBox();

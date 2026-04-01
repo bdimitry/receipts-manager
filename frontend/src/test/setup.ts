@@ -10,8 +10,46 @@ class ResizeObserverMock {
   disconnect() {}
 }
 
+const NativeRequest = globalThis.Request;
+
+class CompatibleRequest extends NativeRequest {
+  constructor(input: RequestInfo | URL, init?: RequestInit) {
+    const nextInit = init?.signal ? { ...init, signal: undefined } : init;
+
+    super(input, nextInit);
+  }
+}
+
 beforeAll(() => {
   server.listen({ onUnhandledRequest: "error" });
+  Object.defineProperty(window, "AbortController", {
+    writable: true,
+    value: globalThis.AbortController,
+  });
+  Object.defineProperty(window, "AbortSignal", {
+    writable: true,
+    value: globalThis.AbortSignal,
+  });
+  Object.defineProperty(window, "fetch", {
+    writable: true,
+    value: globalThis.fetch,
+  });
+  Object.defineProperty(window, "Request", {
+    writable: true,
+    value: CompatibleRequest,
+  });
+  Object.defineProperty(window, "Response", {
+    writable: true,
+    value: globalThis.Response,
+  });
+  Object.defineProperty(window, "Headers", {
+    writable: true,
+    value: globalThis.Headers,
+  });
+  Object.defineProperty(globalThis, "Request", {
+    writable: true,
+    value: CompatibleRequest,
+  });
   Object.defineProperty(window, "matchMedia", {
     writable: true,
     value: vi.fn().mockImplementation((query: string) => ({

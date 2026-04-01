@@ -18,6 +18,10 @@ import {
 } from "../lib/items";
 import { useI18n } from "../../../shared/i18n/I18nContext";
 import { DEFAULT_CURRENCY, SUPPORTED_CURRENCIES } from "../../../shared/lib/currency";
+import {
+  APPLY_CALCULATOR_RESULT_EVENT,
+  requestCalculatorOpen,
+} from "../../../shared/lib/calculator-events";
 import { getCategoryLabel, getCurrencyLabel } from "../../../shared/lib/domain";
 import { formatCurrency, formatDate } from "../../../shared/lib/format";
 import { Button } from "../../../shared/ui/Button";
@@ -159,6 +163,27 @@ export function PurchasesPage() {
     }
   }, [amountManagedByItems, itemsTotal, setValue]);
 
+  useEffect(() => {
+    const handleApply = (event: Event) => {
+      if (amountManagedByItems) {
+        return;
+      }
+
+      const detail = (event as CustomEvent<number>).detail;
+      if (typeof detail !== "number" || Number.isNaN(detail)) {
+        return;
+      }
+
+      setValue("amount", detail, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    };
+
+    window.addEventListener(APPLY_CALCULATOR_RESULT_EVENT, handleApply);
+    return () => window.removeEventListener(APPLY_CALCULATOR_RESULT_EVENT, handleApply);
+  }, [amountManagedByItems, setValue]);
+
   return (
     <div className="page-grid page-grid--two-columns">
       <PageIntro title={t("purchases")} subtitle={t("purchasesSubtitle")} />
@@ -243,6 +268,17 @@ export function PurchasesPage() {
               readOnly={amountManagedByItems}
               {...register("amount")}
             />
+            {!amountManagedByItems ? (
+              <div className="field-inline-actions">
+                <Button
+                  data-testid="purchase-calculator-trigger"
+                  variant="ghost"
+                  onClick={requestCalculatorOpen}
+                >
+                  {t("calculator")}
+                </Button>
+              </div>
+            ) : null}
             {amountManagedByItems ? <small>{t("amountCalculatedFromItems")}</small> : null}
             {errors.amount ? <small>{errors.amount.message}</small> : null}
           </label>
