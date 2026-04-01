@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { createReport, getReportDownload, getReports } from "../api";
+import { createReport, downloadReportFile, getReportDownload, getReports } from "../api";
 import type { ReportFormat, ReportType } from "../../../shared/api/types";
 import { useI18n } from "../../../shared/i18n/I18nContext";
 import {
@@ -84,9 +84,20 @@ export function ReportsPage() {
   });
 
   const downloadMutation = useMutation({
-    mutationFn: getReportDownload,
-    onSuccess: (download) => {
-      window.open(download.downloadUrl, "_blank", "noopener,noreferrer");
+    mutationFn: async (id: number) => {
+      const download = await getReportDownload(id);
+      const file = await downloadReportFile(id);
+      return { download, file };
+    },
+    onSuccess: ({ download, file }) => {
+      const objectUrl = window.URL.createObjectURL(file);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = download.fileName;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(objectUrl);
     },
   });
 

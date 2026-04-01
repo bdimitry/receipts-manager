@@ -30,6 +30,7 @@ describe("receipts flow", () => {
       {
         id: 10,
         purchaseId: 1,
+        category: "FOOD",
         originalFileName: "receipt-10.png",
         contentType: "image/png",
         fileSize: 3000,
@@ -66,11 +67,12 @@ describe("receipts flow", () => {
       http.get("/api/receipts", () => HttpResponse.json(receipts)),
     );
 
-    uploadReceiptMock.mockImplementation(async (_file, currency, purchaseId) => {
+    uploadReceiptMock.mockImplementation(async (_file, currency, purchaseId, category) => {
       uploadedCurrency = currency;
       const createdReceipt = {
         id: 11,
         purchaseId: purchaseId ?? 1,
+        category: category ?? "FOOD",
         originalFileName: "new-receipt.png",
         contentType: "image/png",
         fileSize: 2048,
@@ -105,7 +107,7 @@ describe("receipts flow", () => {
 
     await waitFor(() => {
       expect(uploadedCurrency).toBe("EUR");
-      expect(uploadReceiptMock).toHaveBeenCalledWith(expect.any(File), "EUR", 1);
+      expect(uploadReceiptMock).toHaveBeenCalledWith(expect.any(File), "EUR", 1, "FOOD");
     });
     expect(await screen.findByText("new-receipt.png", {}, { timeout: 5_000 })).toBeInTheDocument();
     expect(screen.getByText(/Receipt uploaded/i)).toBeInTheDocument();
@@ -117,6 +119,7 @@ describe("receipts flow", () => {
         HttpResponse.json({
           id: 11,
           purchaseId: 1,
+          category: "FOOD",
           originalFileName: "receipt-11.png",
           contentType: "image/png",
           fileSize: 3000,
@@ -182,5 +185,6 @@ describe("receipts flow", () => {
     expect(screen.getByText("Bread")).toBeInTheDocument();
     expect(screen.getByText("Milk 2 x 10.50 21.00")).toBeInTheDocument();
     expect(screen.getByText("UAH")).toBeInTheDocument();
+    expect(screen.getByText("Food")).toBeInTheDocument();
   });
 });

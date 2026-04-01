@@ -25,17 +25,20 @@ public class ReceiptOcrService {
     private final S3StorageService s3StorageService;
     private final OcrClient ocrClient;
     private final ReceiptOcrParser receiptOcrParser;
+    private final PurchaseService purchaseService;
 
     public ReceiptOcrService(
         ReceiptRepository receiptRepository,
         S3StorageService s3StorageService,
         OcrClient ocrClient,
-        ReceiptOcrParser receiptOcrParser
+        ReceiptOcrParser receiptOcrParser,
+        PurchaseService purchaseService
     ) {
         this.receiptRepository = receiptRepository;
         this.s3StorageService = s3StorageService;
         this.ocrClient = ocrClient;
         this.receiptOcrParser = receiptOcrParser;
+        this.purchaseService = purchaseService;
     }
 
     @Transactional
@@ -69,6 +72,7 @@ public class ReceiptOcrService {
         receipt.setParsedTotalAmount(parsedData.parsedTotalAmount());
         receipt.setParsedPurchaseDate(parsedData.parsedPurchaseDate());
         receipt.setLineItems(parsedData.lineItems().stream().map(item -> mapLineItem(receipt, item)).toList());
+        purchaseService.createPurchaseFromReceipt(receipt);
         receipt.setOcrStatus(ReceiptOcrStatus.DONE);
         receipt.setOcrErrorMessage(null);
         receipt.setOcrProcessedAt(Instant.now());

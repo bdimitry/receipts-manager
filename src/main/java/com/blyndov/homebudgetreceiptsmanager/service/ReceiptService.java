@@ -11,6 +11,7 @@ import com.blyndov.homebudgetreceiptsmanager.exception.InvalidFileException;
 import com.blyndov.homebudgetreceiptsmanager.exception.ResourceNotFoundException;
 import com.blyndov.homebudgetreceiptsmanager.repository.ReceiptRepository;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -56,12 +57,13 @@ public class ReceiptService {
     }
 
     @Transactional
-    public ReceiptResponse uploadReceipt(MultipartFile file, Long purchaseId, CurrencyCode currency) {
+    public ReceiptResponse uploadReceipt(MultipartFile file, Long purchaseId, CurrencyCode currency, String category) {
         validateFile(file);
 
         User currentUser = authService.getCurrentAuthenticatedUser();
         Purchase purchase = purchaseId == null ? null : purchaseService.getOwnedPurchaseEntity(purchaseId);
         validatePurchaseCurrency(purchase, currency);
+        String normalizedCategory = resolveReceiptCategory(purchase, category);
         String originalFileName = extractOriginalFilename(file);
         String s3Key = buildS3Key(currentUser.getId(), originalFileName);
 
@@ -84,6 +86,7 @@ public class ReceiptService {
             receipt.setContentType(file.getContentType());
             receipt.setFileSize(file.getSize());
             receipt.setCurrency(currency);
+            receipt.setCategory(normalizedCategory);
             receipt.setS3Key(s3Key);
 
             Receipt savedReceipt = receiptRepository.saveAndFlush(receipt);
@@ -151,7 +154,8 @@ public class ReceiptService {
             receipt.getParsedPurchaseDate(),
             receipt.getLineItems().size(),
             receipt.getOcrErrorMessage(),
-            receipt.getOcrProcessedAt()
+            receipt.getOcrProcessedAt(),
+            receipt.getCategory()
         );
     }
 
@@ -182,5 +186,17 @@ public class ReceiptService {
 
     private String sanitizeFilename(String filename) {
         return filename.replaceAll("[^A-Za-z0-9._-]", "_");
+    }
+
+    private String resolveReceiptCategory(Purchase purchase, String category) {
+        if (purchase != null) {
+            return purchase.getCategory();
+        }
+
+        if (!StringUtils.hasText(category)) {
+            return null;
+        }
+
+        return category.trim().toUpperCase(Locale.ROOT);
     }
 }

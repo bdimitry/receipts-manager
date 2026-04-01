@@ -21,7 +21,6 @@ import { DEFAULT_CURRENCY, SUPPORTED_CURRENCIES } from "../../../shared/lib/curr
 import { getCategoryLabel, getCurrencyLabel } from "../../../shared/lib/domain";
 import { formatCurrency, formatDate } from "../../../shared/lib/format";
 import { Button } from "../../../shared/ui/Button";
-import { CalculatorModal } from "../../../shared/ui/CalculatorModal";
 import { Card } from "../../../shared/ui/Card";
 import { EmptyState } from "../../../shared/ui/EmptyState";
 import { ErrorState } from "../../../shared/ui/ErrorState";
@@ -95,7 +94,6 @@ export function PurchasesPage() {
   const queryClient = useQueryClient();
   const defaultFilters = useMemo(() => getDefaultFilters(), []);
   const [filters, setFilters] = useState<PurchaseFilters>(defaultFilters);
-  const [calculatorOpen, setCalculatorOpen] = useState(false);
   const {
     register,
     control,
@@ -141,7 +139,6 @@ export function PurchasesPage() {
       queryClient.invalidateQueries({ queryKey: ["purchases"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-purchases"] });
       reset(getDefaultFormValues());
-      setCalculatorOpen(false);
     },
   });
 
@@ -240,21 +237,12 @@ export function PurchasesPage() {
           </label>
           <label className="field">
             <span>{t("amount")}</span>
-            <div className="field-inline">
-              <input
-                step="0.01"
-                type="number"
-                readOnly={amountManagedByItems}
-                {...register("amount")}
-              />
-              <Button
-                className="field-inline__action"
-                variant="ghost"
-                onClick={() => setCalculatorOpen(true)}
-              >
-                {t("calculator")}
-              </Button>
-            </div>
+            <input
+              step="0.01"
+              type="number"
+              readOnly={amountManagedByItems}
+              {...register("amount")}
+            />
             {amountManagedByItems ? <small>{t("amountCalculatedFromItems")}</small> : null}
             {errors.amount ? <small>{errors.amount.message}</small> : null}
           </label>
@@ -414,20 +402,6 @@ export function PurchasesPage() {
           </div>
         ) : null}
       </Card>
-      <CalculatorModal
-        title={t("calculator")}
-        closeLabel={t("close")}
-        clearLabel={t("clear")}
-        applyLabel={t("applyToAmount")}
-        expressionLabel={t("expression")}
-        resultLabel={t("lineTotal")}
-        open={calculatorOpen}
-        onApply={(value) => {
-          setValue("amount", value, { shouldDirty: true, shouldValidate: true });
-          setCalculatorOpen(false);
-        }}
-        onClose={() => setCalculatorOpen(false)}
-      />
     </div>
   );
 }

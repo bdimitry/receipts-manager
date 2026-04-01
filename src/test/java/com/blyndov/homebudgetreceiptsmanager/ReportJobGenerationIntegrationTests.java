@@ -160,6 +160,18 @@ class ReportJobGenerationIntegrationTests extends AbstractPostgresIntegrationTes
         assertThat(downloadResponse.getBody().reportFormat()).isEqualTo(ReportFormat.CSV);
         assertThat(downloadResponse.getBody().fileName()).endsWith(".csv");
         assertThat(downloadResponse.getBody().contentType()).isEqualTo("text/csv");
+        assertThat(downloadResponse.getBody().downloadUrl()).isEqualTo("/api/reports/" + completedJob.id() + "/file");
+
+        ResponseEntity<byte[]> fileResponse = restTemplate.exchange(
+            "/api/reports/" + completedJob.id() + "/file",
+            HttpMethod.GET,
+            authorizedEntity(ownerToken),
+            byte[].class
+        );
+
+        assertThat(fileResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(fileResponse.getHeaders().getContentType()).isEqualTo(MediaType.parseMediaType("text/csv"));
+        assertThat(new String(fileResponse.getBody(), StandardCharsets.UTF_8)).isEqualTo(csvContent);
 
         Awaitility.await().atMost(ASYNC_REPORT_TIMEOUT).untilAsserted(() -> assertThat(receivedEmails()).hasSize(1));
         MimeMessage notification = receivedEmails()[0];
@@ -205,6 +217,18 @@ class ReportJobGenerationIntegrationTests extends AbstractPostgresIntegrationTes
         assertThat(downloadResponse.getBody().reportFormat()).isEqualTo(ReportFormat.PDF);
         assertThat(downloadResponse.getBody().fileName()).endsWith(".pdf");
         assertThat(downloadResponse.getBody().contentType()).isEqualTo("application/pdf");
+        assertThat(downloadResponse.getBody().downloadUrl()).isEqualTo("/api/reports/" + completedJob.id() + "/file");
+
+        ResponseEntity<byte[]> fileResponse = restTemplate.exchange(
+            "/api/reports/" + completedJob.id() + "/file",
+            HttpMethod.GET,
+            authorizedEntity(ownerToken),
+            byte[].class
+        );
+
+        assertThat(fileResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(fileResponse.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PDF);
+        assertThat(fileResponse.getBody()).isEqualTo(pdfBytes);
 
         Awaitility.await().atMost(ASYNC_REPORT_TIMEOUT).untilAsserted(() -> assertThat(receivedEmails()).hasSize(1));
         assertThat(receivedEmails()[0].getContent().toString()).contains("PDF");
@@ -249,6 +273,20 @@ class ReportJobGenerationIntegrationTests extends AbstractPostgresIntegrationTes
         assertThat(downloadResponse.getBody()).isNotNull();
         assertThat(downloadResponse.getBody().reportFormat()).isEqualTo(ReportFormat.XLSX);
         assertThat(downloadResponse.getBody().fileName()).endsWith(".xlsx");
+        assertThat(downloadResponse.getBody().downloadUrl()).isEqualTo("/api/reports/" + completedJob.id() + "/file");
+
+        ResponseEntity<byte[]> fileResponse = restTemplate.exchange(
+            "/api/reports/" + completedJob.id() + "/file",
+            HttpMethod.GET,
+            authorizedEntity(ownerToken),
+            byte[].class
+        );
+
+        assertThat(fileResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(fileResponse.getHeaders().getContentType()).isEqualTo(
+            MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        );
+        assertThat(fileResponse.getBody()).isEqualTo(xlsxBytes);
     }
 
     @Test

@@ -1,13 +1,14 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ReportsPage } from "./pages/ReportsPage";
 import { renderWithProviders } from "../../test/test-utils";
 import { server } from "../../test/server";
 
 describe("reports flow", () => {
   it("creates a report job and triggers download for a ready report", async () => {
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     let reports = [
       {
         id: 10,
@@ -53,8 +54,15 @@ describe("reports flow", () => {
           status: "DONE",
           fileName: "monthly.pdf",
           contentType: "application/pdf",
-          downloadUrl: "http://localhost:4566/download/monthly.pdf",
+          downloadUrl: "/api/reports/10/file",
           expiresAt: "2026-03-31T12:00:00Z",
+        }),
+      ),
+      http.get("/api/reports/10/file", () =>
+        new HttpResponse(new Uint8Array([1, 2, 3, 4]), {
+          headers: {
+            "Content-Type": "application/pdf",
+          },
         }),
       ),
     );
@@ -83,10 +91,10 @@ describe("reports flow", () => {
     });
     await user.click(screen.getByRole("button", { name: "Download" }));
 
-    expect(window.open).toHaveBeenCalledWith(
-      "http://localhost:4566/download/monthly.pdf",
-      "_blank",
-      "noopener,noreferrer",
-    );
+    expect(window.URL.createObjectURL).toHaveBeenCalled();
+    expect(clickSpy).toHaveBeenCalled();
+    expect(window.URL.revokeObjectURL).toHaveBeenCalledWith("blob:mock-report");
+
+    clickSpy.mockRestore();
   });
 });

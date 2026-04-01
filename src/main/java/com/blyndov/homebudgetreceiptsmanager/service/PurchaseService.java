@@ -6,12 +6,16 @@ import com.blyndov.homebudgetreceiptsmanager.dto.PurchaseItemResponse;
 import com.blyndov.homebudgetreceiptsmanager.dto.PurchaseResponse;
 import com.blyndov.homebudgetreceiptsmanager.entity.PurchaseItem;
 import com.blyndov.homebudgetreceiptsmanager.entity.Purchase;
+import com.blyndov.homebudgetreceiptsmanager.entity.Receipt;
+import com.blyndov.homebudgetreceiptsmanager.entity.ReceiptLineItem;
 import com.blyndov.homebudgetreceiptsmanager.entity.User;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import com.blyndov.homebudgetreceiptsmanager.exception.ResourceNotFoundException;
 import com.blyndov.homebudgetreceiptsmanager.repository.PurchaseRepository;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -55,6 +59,28 @@ public class PurchaseService {
         buildItems(request.items(), purchase).forEach(purchase::addItem);
 
         return mapToResponse(purchaseRepository.save(purchase));
+    }
+
+    @Transactional
+    public Purchase createPurchaseFromReceipt(Receipt receipt) {
+        if (receipt.getPurchase() != null || !StringUtils.hasText(receipt.getCategory()) || receipt.getParsedTotalAmount() == null) {
+            return receipt.getPurchase();
+        }
+
+        Purchase purchase = new Purchase();
+        purchase.setUser(receipt.getUser());
+        purchase.setTitle(resolveReceiptTitle(receipt));
+        purchase.setCategory(normalizeCategory(receipt.getCategory()));
+        purchase.setAmount(normalizeMoney(receipt.getParsedTotalAmount()));
+        purchase.setCurrency(receipt.getCurrency());
+        purchase.setPurchaseDate(resolveReceiptPurchaseDate(receipt));
+        purchase.setStoreName(normalizeOptionalText(receipt.getParsedStoreName()));
+        purchase.setComment("Created from receipt " + receipt.getOriginalFileName());
+        buildItemsFromReceipt(receipt, purchase).forEach(purchase::addItem);
+
+        Purchase savedPurchase = purchaseRepository.save(purchase);
+        receipt.setPurchase(savedPurchase);
+        return savedPurchase;
     }
 
     public List<PurchaseResponse> getPurchases(Integer year, Integer month, String category) {
@@ -141,6 +167,27 @@ public class PurchaseService {
         return items;
     }
 
+    private List<PurchaseItem> buildItemsFromReceipt(Receipt receipt, Purchase purchase) {
+        if (receipt.getLineItems() == null || receipt.getLineItems().isEmpty()) {
+            return List.of();
+        }
+
+        List<PurchaseItem> items = new ArrayList<>();
+        for (ReceiptLineItem receiptLineItem : receipt.getLineItems()) {
+            PurchaseItem item = new PurchaseItem();
+            item.setPurchase(purchase);
+            item.setLineIndex(receiptLineItem.getLineIndex());
+            item.setTitle(resolveReceiptItemTitle(receiptLineItem));
+            item.setQuantity(receiptLineItem.getQuantity());
+            item.setUnit(normalizeOptionalText(receiptLineItem.getUnit()));
+            item.setUnitPrice(normalizeMoney(receiptLineItem.getUnitPrice()));
+            item.setLineTotal(normalizeMoney(receiptLineItem.getLineTotal()));
+            items.add(item);
+        }
+
+        return items;
+    }
+
     private BigDecimal resolvePurchaseAmount(CreatePurchaseRequest request) {
         if (request.items() == null || request.items().isEmpty()) {
             return normalizeMoney(request.amount());
@@ -194,5 +241,40 @@ public class PurchaseService {
 
     private String normalizeCategory(String category) {
         return category.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private String resolveReceiptTitle(Receipt receipt) {
+        if (receipt.getLineItems() != null && !receipt.getLineItems().isEmpty()) {
+            ReceiptLineItem firstLineItem = receipt.getLineItems().get(0);
+            if (StringUtils.hasText(firstLineItem.getTitle())) {
+                return normalizeRequiredText(firstLineItem.getTitle());
+            }
+        }
+
+        if (StringUtils.hasText(receipt.getParsedStoreName())) {
+            return normalizeRequiredText(receipt.getParsedStoreName());
+        }
+
+        return normalizeRequiredText(receipt.getOriginalFileName());
+    }
+
+    private LocalDate resolveReceiptPurchaseDate(Receipt receipt) {
+        if (receipt.getParsedPurchaseDate() != null) {
+            return receipt.getParsedPurchaseDate();
+        }
+
+        return receipt.getUploadedAt().atZone(ZoneOffset.UTC).toLocalDate();
+    }
+
+    private String resolveReceiptItemTitle(ReceiptLineItem lineItem) {
+        if (StringUtils.hasText(lineItem.getTitle())) {
+            return normalizeRequiredText(lineItem.getTitle());
+        }
+
+        if (StringUtils.hasText(lineItem.getRawFragment())) {
+            return normalizeRequiredText(lineItem.getRawFragment());
+        }
+
+        return "Receipt item";
     }
 }

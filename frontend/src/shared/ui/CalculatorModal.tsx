@@ -151,9 +151,11 @@ export function CalculatorModal({
         <Button variant="ghost" onClick={() => appendToken("C")}>
           {clearLabel}
         </Button>
-        <Button disabled={result === null} onClick={() => result !== null && onApply?.(result)}>
-          {applyLabel}
-        </Button>
+        {onApply ? (
+          <Button disabled={result === null} onClick={() => result !== null && onApply(result)}>
+            {applyLabel}
+          </Button>
+        ) : null}
       </div>
     </aside>
   );

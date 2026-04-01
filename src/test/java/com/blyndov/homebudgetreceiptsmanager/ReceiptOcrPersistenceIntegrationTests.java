@@ -14,6 +14,7 @@ import com.blyndov.homebudgetreceiptsmanager.dto.RegisterRequest;
 import com.blyndov.homebudgetreceiptsmanager.entity.CurrencyCode;
 import com.blyndov.homebudgetreceiptsmanager.entity.Receipt;
 import com.blyndov.homebudgetreceiptsmanager.entity.ReceiptOcrStatus;
+import com.blyndov.homebudgetreceiptsmanager.repository.PurchaseRepository;
 import com.blyndov.homebudgetreceiptsmanager.repository.ReceiptRepository;
 import com.blyndov.homebudgetreceiptsmanager.repository.UserRepository;
 import com.blyndov.homebudgetreceiptsmanager.support.AbstractPostgresIntegrationTest;
@@ -69,6 +70,9 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
     private ReceiptRepository receiptRepository;
 
     @Autowired
+    private PurchaseRepository purchaseRepository;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -87,6 +91,7 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
     void setUp() throws Exception {
         ensureOcrQueueExists();
         receiptRepository.deleteAll();
+        purchaseRepository.deleteAll();
         userRepository.deleteAll();
         clearBucket();
         drainOcrQueue();

@@ -11,6 +11,7 @@ import com.blyndov.homebudgetreceiptsmanager.dto.RegisterRequest;
 import com.blyndov.homebudgetreceiptsmanager.entity.Receipt;
 import com.blyndov.homebudgetreceiptsmanager.entity.CurrencyCode;
 import com.blyndov.homebudgetreceiptsmanager.entity.ReceiptOcrStatus;
+import com.blyndov.homebudgetreceiptsmanager.repository.PurchaseRepository;
 import com.blyndov.homebudgetreceiptsmanager.repository.ReceiptRepository;
 import com.blyndov.homebudgetreceiptsmanager.repository.UserRepository;
 import com.blyndov.homebudgetreceiptsmanager.support.AbstractPostgresIntegrationTest;
@@ -72,6 +73,9 @@ class ReceiptOcrProcessingIntegrationTests extends AbstractPostgresIntegrationTe
     private ReceiptRepository receiptRepository;
 
     @Autowired
+    private PurchaseRepository purchaseRepository;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -87,6 +91,7 @@ class ReceiptOcrProcessingIntegrationTests extends AbstractPostgresIntegrationTe
     void setUp() {
         ensureOcrQueueExists();
         receiptRepository.deleteAll();
+        purchaseRepository.deleteAll();
         userRepository.deleteAll();
         clearBucket();
         drainOcrQueue();
@@ -102,7 +107,7 @@ class ReceiptOcrProcessingIntegrationTests extends AbstractPostgresIntegrationTe
         ResponseEntity<ReceiptResponse> uploadResponse = restTemplate.exchange(
             "/api/receipts/upload",
             HttpMethod.POST,
-            multipartEntity("receipt.png", MediaType.IMAGE_PNG, image, CurrencyCode.UAH, accessToken),
+            multipartEntity("receipt.png", MediaType.IMAGE_PNG, image, CurrencyCode.UAH, "FOOD", accessToken),
             ReceiptResponse.class
         );
 
@@ -124,6 +129,9 @@ class ReceiptOcrProcessingIntegrationTests extends AbstractPostgresIntegrationTe
         assertThat(processedReceipt.getParsedPurchaseDate()).isEqualTo(LocalDate.of(2026, 3, 14));
         assertThat(processedReceipt.getOcrErrorMessage()).isNull();
         assertThat(processedReceipt.getOcrProcessedAt()).isNotNull();
+        assertThat(processedReceipt.getPurchase()).isNotNull();
+        assertThat(processedReceipt.getPurchase().getCategory()).isEqualTo("FOOD");
+        assertThat(processedReceipt.getPurchase().getAmount()).isEqualByComparingTo("123.45");
 
         ResponseEntity<ReceiptResponse> receiptResponse = restTemplate.exchange(
             "/api/receipts/" + processedReceipt.getId(),
@@ -137,6 +145,8 @@ class ReceiptOcrProcessingIntegrationTests extends AbstractPostgresIntegrationTe
         assertThat(receiptResponse.getBody().ocrStatus()).isEqualTo(ReceiptOcrStatus.DONE);
         assertThat(receiptResponse.getBody().currency()).isEqualTo(CurrencyCode.UAH);
         assertThat(receiptResponse.getBody().parsedStoreName()).isEqualTo("FRESH MARKET");
+        assertThat(receiptResponse.getBody().purchaseId()).isEqualTo(processedReceipt.getPurchase().getId());
+        assertThat(receiptResponse.getBody().category()).isEqualTo("FOOD");
 
         ResponseEntity<ReceiptOcrResponse> ocrResponse = restTemplate.exchange(
             "/api/receipts/" + processedReceipt.getId() + "/ocr",
@@ -169,7 +179,7 @@ class ReceiptOcrProcessingIntegrationTests extends AbstractPostgresIntegrationTe
         ResponseEntity<ReceiptResponse> uploadResponse = restTemplate.exchange(
             "/api/receipts/upload",
             HttpMethod.POST,
-            multipartEntity("receipt-multilingual.png", MediaType.IMAGE_PNG, image, CurrencyCode.UAH, accessToken),
+            multipartEntity("receipt-multilingual.png", MediaType.IMAGE_PNG, image, CurrencyCode.UAH, null, accessToken),
             ReceiptResponse.class
         );
 
@@ -203,7 +213,7 @@ class ReceiptOcrProcessingIntegrationTests extends AbstractPostgresIntegrationTe
         ResponseEntity<ReceiptResponse> uploadResponse = restTemplate.exchange(
             "/api/receipts/upload",
             HttpMethod.POST,
-            multipartEntity("partial.png", MediaType.IMAGE_PNG, image, CurrencyCode.UAH, accessToken),
+            multipartEntity("partial.png", MediaType.IMAGE_PNG, image, CurrencyCode.UAH, null, accessToken),
             ReceiptResponse.class
         );
 
@@ -223,7 +233,7 @@ class ReceiptOcrProcessingIntegrationTests extends AbstractPostgresIntegrationTe
         ResponseEntity<ReceiptResponse> uploadResponse = restTemplate.exchange(
             "/api/receipts/upload",
             HttpMethod.POST,
-            multipartEntity("owner.png", MediaType.IMAGE_PNG, image, CurrencyCode.UAH, ownerToken),
+            multipartEntity("owner.png", MediaType.IMAGE_PNG, image, CurrencyCode.UAH, null, ownerToken),
             ReceiptResponse.class
         );
 
@@ -270,6 +280,7 @@ class ReceiptOcrProcessingIntegrationTests extends AbstractPostgresIntegrationTe
         MediaType mediaType,
         byte[] content,
         CurrencyCode currency,
+        String category,
         String accessToken
     ) {
         HttpHeaders headers = new HttpHeaders();
@@ -286,6 +297,9 @@ class ReceiptOcrProcessingIntegrationTests extends AbstractPostgresIntegrationTe
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         body.add("file", fileEntity);
         body.add("currency", currency.name());
+        if (category != null) {
+            body.add("category", category);
+        }
 
         return new HttpEntity<>(body, headers);
     }

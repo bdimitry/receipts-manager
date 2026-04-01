@@ -104,6 +104,7 @@ class ReceiptIntegrationTests extends AbstractPostgresIntegrationTest {
         assertThat(response.getBody().parsedLineItemCount()).isZero();
         assertThat(response.getBody().ocrErrorMessage()).isNull();
         assertThat(response.getBody().ocrProcessedAt()).isNull();
+        assertThat(response.getBody().category()).isEqualTo("SHOPPING");
 
         assertThat(
             s3Client.headObject(
@@ -139,6 +140,31 @@ class ReceiptIntegrationTests extends AbstractPostgresIntegrationTest {
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void uploadReceiptWithoutPurchaseStoresManualCategory() {
+        String accessToken = registerAndLogin(uniqueEmail("buyer"), "P@ssword123");
+
+        ResponseEntity<ReceiptResponse> response = restTemplate.exchange(
+            "/api/receipts/upload",
+            HttpMethod.POST,
+            multipartEntity(
+                "receipt.png",
+                MediaType.IMAGE_PNG,
+                "png".getBytes(),
+                null,
+                CurrencyCode.UAH,
+                "FOOD",
+                accessToken
+            ),
+            ReceiptResponse.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().purchaseId()).isNull();
+        assertThat(response.getBody().category()).isEqualTo("FOOD");
     }
 
     @Test
@@ -223,6 +249,7 @@ class ReceiptIntegrationTests extends AbstractPostgresIntegrationTest {
         assertThat(response.getBody().id()).isEqualTo(uploadedReceipt.id());
         assertThat(response.getBody().originalFileName()).isEqualTo("receipt.jpg");
         assertThat(response.getBody().ocrStatus()).isEqualTo(ReceiptOcrStatus.NEW);
+        assertThat(response.getBody().category()).isEqualTo("SHOPPING");
     }
 
     @Test
@@ -296,6 +323,18 @@ class ReceiptIntegrationTests extends AbstractPostgresIntegrationTest {
         CurrencyCode currency,
         String accessToken
     ) {
+        return multipartEntity(filename, mediaType, content, purchaseId, currency, "SHOPPING", accessToken);
+    }
+
+    private HttpEntity<MultiValueMap<String, Object>> multipartEntity(
+        String filename,
+        MediaType mediaType,
+        byte[] content,
+        Long purchaseId,
+        CurrencyCode currency,
+        String category,
+        String accessToken
+    ) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
         if (accessToken != null) {
@@ -312,6 +351,9 @@ class ReceiptIntegrationTests extends AbstractPostgresIntegrationTest {
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         body.add("file", fileEntity);
         body.add("currency", currency.name());
+        if (category != null) {
+            body.add("category", category);
+        }
         if (purchaseId != null) {
             body.add("purchaseId", purchaseId.toString());
         }

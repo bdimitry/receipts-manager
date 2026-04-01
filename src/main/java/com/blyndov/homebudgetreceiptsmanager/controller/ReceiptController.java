@@ -29,9 +29,10 @@ public class ReceiptController {
     public ResponseEntity<ReceiptResponse> uploadReceipt(
         @RequestParam("file") MultipartFile file,
         @RequestParam(required = false) Long purchaseId,
-        @RequestParam CurrencyCode currency
+        @RequestParam CurrencyCode currency,
+        @RequestParam(required = false) String category
     ) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(receiptService.uploadReceipt(file, purchaseId, currency));
+        return ResponseEntity.status(HttpStatus.CREATED).body(receiptService.uploadReceipt(file, purchaseId, currency, category));
     }
 
     @GetMapping

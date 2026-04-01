@@ -1,4 +1,4 @@
-import { apiFetch } from "../../shared/api/http";
+import { apiFetch, apiFetchBlob } from "../../shared/api/http";
 import type {
   ReportDownloadResponse,
   ReportFormat,
@@ -33,4 +33,12 @@ export function createReport(request: CreateReportRequest) {
 
 export function getReportDownload(id: number) {
   return apiFetch<ReportDownloadResponse>(`/api/reports/${id}/download`);
+}
+
+export function downloadReportFile(id: number) {
+  return apiFetchBlob(`/api/reports/${id}/file`, {
+    headers: {
+      Accept: "*/*",
+    },
+  });
 }

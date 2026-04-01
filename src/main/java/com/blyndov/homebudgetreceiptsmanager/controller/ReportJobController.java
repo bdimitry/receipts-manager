@@ -3,11 +3,15 @@ package com.blyndov.homebudgetreceiptsmanager.controller;
 import com.blyndov.homebudgetreceiptsmanager.dto.CreateReportRequest;
 import com.blyndov.homebudgetreceiptsmanager.dto.CreateMonthlyReportRequest;
 import com.blyndov.homebudgetreceiptsmanager.dto.ReportDownloadResponse;
+import com.blyndov.homebudgetreceiptsmanager.dto.ReportFileContent;
 import com.blyndov.homebudgetreceiptsmanager.dto.ReportJobResponse;
 import com.blyndov.homebudgetreceiptsmanager.service.ReportJobService;
 import jakarta.validation.Valid;
 import java.util.List;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -53,5 +57,17 @@ public class ReportJobController {
     @GetMapping("/{id}/download")
     public ReportDownloadResponse downloadReport(@PathVariable Long id) {
         return reportJobService.getDownload(id);
+    }
+
+    @GetMapping("/{id}/file")
+    public ResponseEntity<byte[]> downloadReportFile(@PathVariable Long id) {
+        ReportFileContent file = reportJobService.downloadFile(id);
+        return ResponseEntity.ok()
+            .contentType(MediaType.parseMediaType(file.contentType()))
+            .header(
+                HttpHeaders.CONTENT_DISPOSITION,
+                ContentDisposition.attachment().filename(file.fileName()).build().toString()
+            )
+            .body(file.content());
     }
 }

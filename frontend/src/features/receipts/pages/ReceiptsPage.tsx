@@ -9,7 +9,7 @@ import { getReceipts, uploadReceipt } from "../api";
 import type { ReceiptResponse } from "../../../shared/api/types";
 import { useI18n } from "../../../shared/i18n/I18nContext";
 import { DEFAULT_CURRENCY, SUPPORTED_CURRENCIES } from "../../../shared/lib/currency";
-import { getCurrencyLabel, getOcrStatusLabel } from "../../../shared/lib/domain";
+import { getCategoryLabel, getCurrencyLabel, getOcrStatusLabel } from "../../../shared/lib/domain";
 import { formatCurrency, formatDateTime } from "../../../shared/lib/format";
 import { Button } from "../../../shared/ui/Button";
 import { Card } from "../../../shared/ui/Card";
@@ -25,6 +25,7 @@ const schema = z.object({
     .refine((value) => value instanceof FileList && value.length > 0, "Please choose a file"),
   purchaseId: z.string().optional(),
   currency: z.enum(["USD", "EUR", "UAH", "RUB"]),
+  category: z.string().trim().optional(),
 });
 
 type ReceiptFormValues = z.infer<typeof schema>;
@@ -68,6 +69,7 @@ export function ReceiptsPage() {
     defaultValues: {
       purchaseId: "",
       currency: DEFAULT_CURRENCY,
+      category: "",
     },
   });
   const selectedPurchaseId = watch("purchaseId");
@@ -78,6 +80,7 @@ export function ReceiptsPage() {
         values.file[0],
         values.currency,
         values.purchaseId ? Number(values.purchaseId) : undefined,
+        values.category,
       ),
     onSuccess: (createdReceipt) => {
       queryClient.setQueryData<ReceiptResponse[]>(["receipts"], (currentReceipts) => {
@@ -88,6 +91,7 @@ export function ReceiptsPage() {
       reset({
         purchaseId: "",
         currency: DEFAULT_CURRENCY,
+        category: "",
       });
     },
   });
@@ -100,6 +104,9 @@ export function ReceiptsPage() {
     const linkedPurchase = purchasesQuery.data?.find((purchase) => purchase.id === Number(selectedPurchaseId));
     if (linkedPurchase) {
       setValue("currency", linkedPurchase.currency, { shouldDirty: true });
+      setValue("category", linkedPurchase.category, { shouldDirty: true });
+    } else {
+      setValue("category", "", { shouldDirty: true });
     }
   }, [purchasesQuery.data, selectedPurchaseId, setValue]);
 
@@ -138,6 +145,12 @@ export function ReceiptsPage() {
             </select>
             {errors.currency ? <small>{errors.currency.message}</small> : null}
           </label>
+          <label className="field field--wide">
+            <span>
+              {t("category")} ({t("optional")})
+            </span>
+            <input readOnly={Boolean(selectedPurchaseId)} {...register("category")} />
+          </label>
           {uploadMutation.isError ? <p className="form-error">{uploadMutation.error.message}</p> : null}
           {uploadMutation.isSuccess ? <p className="form-success">{t("receiptUploadSuccess")}</p> : null}
           <Button disabled={uploadMutation.isPending} type="submit">
@@ -168,6 +181,7 @@ export function ReceiptsPage() {
                   <span>
                     {formatDateTime(receipt.uploadedAt, language)}
                     {receipt.parsedStoreName ? ` / ${receipt.parsedStoreName}` : ""}
+                    {receipt.category ? ` / ${getCategoryLabel(receipt.category, t)}` : ""}
                     {receipt.parsedTotalAmount ? ` / ${formatCurrency(receipt.parsedTotalAmount, language, receipt.currency)}` : ""}
                     {receipt.parsedLineItemCount ? ` / ${receipt.parsedLineItemCount} ${t("recognizedItems")}` : ""}
                   </span>

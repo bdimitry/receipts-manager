@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { getReceipt, getReceiptOcr } from "../api";
 import { useI18n } from "../../../shared/i18n/I18nContext";
-import { getOcrStatusLabel } from "../../../shared/lib/domain";
+import { getCategoryLabel, getOcrStatusLabel } from "../../../shared/lib/domain";
 import { formatCurrency, formatDate, formatDateTime } from "../../../shared/lib/format";
 import { Button } from "../../../shared/ui/Button";
 import { Card } from "../../../shared/ui/Card";
@@ -94,6 +94,10 @@ export function ReceiptDetailPage() {
           <div>
             <dt>{t("storeName")}</dt>
             <dd>{ocr.parsedStoreName ?? "-"}</dd>
+          </div>
+          <div>
+            <dt>{t("category")}</dt>
+            <dd>{receipt.category ? getCategoryLabel(receipt.category, t) : "-"}</dd>
           </div>
           <div>
             <dt>{t("amount")}</dt>

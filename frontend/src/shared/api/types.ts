@@ -59,6 +59,7 @@ export interface PurchaseItemResponse {
 export interface ReceiptResponse {
   id: number;
   purchaseId: number | null;
+  category?: string | null;
   originalFileName: string;
   contentType: string;
   fileSize: number;

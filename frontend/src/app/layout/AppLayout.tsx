@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { getCurrentUser } from "../../features/user/api";
 import { useAuth } from "../../shared/auth/AuthContext";
 import { useI18n } from "../../shared/i18n/I18nContext";
 import { Button } from "../../shared/ui/Button";
+import { CalculatorModal } from "../../shared/ui/CalculatorModal";
 import { LanguageDropdown } from "../../shared/ui/LanguageDropdown";
 import { LoadingState } from "../../shared/ui/LoadingState";
 import { ThemeToggle } from "../../shared/ui/ThemeToggle";
@@ -13,13 +15,13 @@ const navItems = [
   { to: "/purchases", key: "purchases" as const },
   { to: "/receipts", key: "receipts" as const },
   { to: "/reports", key: "reports" as const },
-  { to: "/profile", key: "profile" as const },
 ];
 
 export function AppLayout() {
   const { t } = useI18n();
   const { logout } = useAuth();
   const location = useLocation();
+  const [calculatorOpen, setCalculatorOpen] = useState(false);
   const { data: currentUser, isLoading } = useQuery({
     queryKey: ["current-user"],
     queryFn: getCurrentUser,
@@ -58,6 +60,22 @@ export function AppLayout() {
               {t(item.key)}
             </NavLink>
           ))}
+          <button
+            className={`sidebar__nav-link sidebar__nav-link--button ${calculatorOpen ? "sidebar__nav-link--active" : ""}`.trim()}
+            data-testid="sidebar-calculator-toggle"
+            onClick={() => setCalculatorOpen((current) => !current)}
+            type="button"
+          >
+            {t("calculator")}
+          </button>
+          <NavLink
+            className={({ isActive }) =>
+              `sidebar__nav-link ${isActive ? "sidebar__nav-link--active" : ""}`.trim()
+            }
+            to="/profile"
+          >
+            {t("profile")}
+          </NavLink>
         </nav>
         <div className="sidebar__footer">
           {isLoading ? (
@@ -90,6 +108,16 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
+      <CalculatorModal
+        title={t("calculator")}
+        closeLabel={t("close")}
+        clearLabel={t("clear")}
+        applyLabel={t("applyToAmount")}
+        expressionLabel={t("expression")}
+        open={calculatorOpen}
+        onClose={() => setCalculatorOpen(false)}
+        resultLabel={t("lineTotal")}
+      />
     </div>
   );
 }

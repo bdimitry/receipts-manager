@@ -56,6 +56,13 @@ export function DashboardPage() {
   const purchases = purchasesQuery.data ?? [];
   const receipts = receiptsQuery.data ?? [];
   const reports = reportsQuery.data ?? [];
+
+  useEffect(() => {
+    if (receipts.some((receipt) => receipt.ocrStatus === "NEW" || receipt.ocrStatus === "PROCESSING")) {
+      purchasesQuery.refetch();
+    }
+  }, [purchasesQuery.refetch, receipts]);
+
   const currencySummaries = useMemo(() => buildCurrencySummaries(purchases), [purchases]);
   const [selectedCurrency, setSelectedCurrency] = useState<CurrencyCode | null>(currencySummaries[0]?.currency ?? null);
 

@@ -51,6 +51,9 @@ public class Receipt {
     @Column(nullable = false, length = 3)
     private CurrencyCode currency;
 
+    @Column(length = 100)
+    private String category;
+
     @Column(name = "s3_key", nullable = false, unique = true, length = 1024)
     private String s3Key;
 
@@ -141,6 +144,14 @@ public class Receipt {
 
     public String getS3Key() {
         return s3Key;
+    }
+
+    public String getCategory() {
+        return category;
+    }
+
+    public void setCategory(String category) {
+        this.category = category;
     }
 
     public void setS3Key(String s3Key) {

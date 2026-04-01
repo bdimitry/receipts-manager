@@ -19,7 +19,7 @@ export function setUnauthorizedHandler(handler: (() => void) | null) {
   unauthorizedHandler = handler;
 }
 
-export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function performFetch(path: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
   const token = getStoredToken();
 
@@ -57,6 +57,12 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
     );
   }
 
+  return response;
+}
+
+export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const response = await performFetch(path, init);
+
   if (response.status === 204) {
     return undefined as T;
   }
@@ -67,4 +73,9 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   }
 
   return (await response.json()) as T;
+}
+
+export async function apiFetchBlob(path: string, init: RequestInit = {}) {
+  const response = await performFetch(path, init);
+  return response.blob();
 }

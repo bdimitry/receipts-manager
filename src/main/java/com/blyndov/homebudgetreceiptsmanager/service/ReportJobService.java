@@ -6,6 +6,7 @@ import com.blyndov.homebudgetreceiptsmanager.config.ReportDownloadProperties;
 import com.blyndov.homebudgetreceiptsmanager.dto.CreateMonthlyReportRequest;
 import com.blyndov.homebudgetreceiptsmanager.dto.CreateReportRequest;
 import com.blyndov.homebudgetreceiptsmanager.dto.ReportDownloadResponse;
+import com.blyndov.homebudgetreceiptsmanager.dto.ReportFileContent;
 import com.blyndov.homebudgetreceiptsmanager.dto.ReportJobResponse;
 import com.blyndov.homebudgetreceiptsmanager.entity.ReportFormat;
 import com.blyndov.homebudgetreceiptsmanager.entity.ReportJob;
@@ -15,6 +16,7 @@ import com.blyndov.homebudgetreceiptsmanager.entity.User;
 import com.blyndov.homebudgetreceiptsmanager.exception.ReportJobStateException;
 import com.blyndov.homebudgetreceiptsmanager.exception.ResourceNotFoundException;
 import com.blyndov.homebudgetreceiptsmanager.repository.ReportJobRepository;
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import org.slf4j.Logger;
@@ -22,7 +24,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 
 @Service
 public class ReportJobService {
@@ -129,20 +130,7 @@ public class ReportJobService {
 
     @Transactional(readOnly = true)
     public ReportDownloadResponse getDownload(Long id) {
-        ReportJob reportJob = getOwnedReportJobEntity(id);
-
-        if (reportJob.getStatus() == ReportJobStatus.FAILED) {
-            throw new ReportJobStateException(buildFailedMessage(reportJob));
-        }
-
-        if (reportJob.getStatus() != ReportJobStatus.DONE || !StringUtils.hasText(reportJob.getS3Key())) {
-            throw new ReportJobStateException("Report is not ready for download yet");
-        }
-
-        PresignedGetObjectRequest presignedRequest = s3StorageService.generateDownloadRequest(
-            reportJob.getS3Key(),
-            reportDownloadProperties.getExpiration()
-        );
+        ReportJob reportJob = getReadyOwnedReportJob(id);
 
         log.info(
             "Generated report download contract for jobId={}, userId={}, reportType={}, reportFormat={}, s3Key={}",
@@ -160,8 +148,19 @@ public class ReportJobService {
             reportJob.getStatus(),
             buildFileName(reportJob),
             reportJob.getReportFormat().getContentType(),
-            presignedRequest.url().toString(),
-            presignedRequest.expiration()
+            "/api/reports/" + reportJob.getId() + "/file",
+            Instant.now().plus(reportDownloadProperties.getExpiration())
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public ReportFileContent downloadFile(Long id) {
+        ReportJob reportJob = getReadyOwnedReportJob(id);
+
+        return new ReportFileContent(
+            buildFileName(reportJob),
+            reportJob.getReportFormat().getContentType(),
+            s3StorageService.download(reportJob.getS3Key())
         );
     }
 
@@ -197,6 +196,20 @@ public class ReportJobService {
         User currentUser = authService.getCurrentAuthenticatedUser();
         return reportJobRepository.findByIdAndUser_Id(id, currentUser.getId())
             .orElseThrow(() -> new ResourceNotFoundException("Report job not found"));
+    }
+
+    private ReportJob getReadyOwnedReportJob(Long id) {
+        ReportJob reportJob = getOwnedReportJobEntity(id);
+
+        if (reportJob.getStatus() == ReportJobStatus.FAILED) {
+            throw new ReportJobStateException(buildFailedMessage(reportJob));
+        }
+
+        if (reportJob.getStatus() != ReportJobStatus.DONE || !StringUtils.hasText(reportJob.getS3Key())) {
+            throw new ReportJobStateException("Report is not ready for download yet");
+        }
+
+        return reportJob;
     }
 
     private ReportJobResponse mapToResponse(ReportJob reportJob) {

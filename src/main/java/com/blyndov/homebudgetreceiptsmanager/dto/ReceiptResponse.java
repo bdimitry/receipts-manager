@@ -21,6 +21,7 @@ public record ReceiptResponse(
     LocalDate parsedPurchaseDate,
     Integer parsedLineItemCount,
     String ocrErrorMessage,
-    Instant ocrProcessedAt
+    Instant ocrProcessedAt,
+    String category
 ) {
 }
