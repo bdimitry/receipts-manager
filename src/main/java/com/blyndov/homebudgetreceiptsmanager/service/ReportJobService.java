@@ -157,6 +157,13 @@ public class ReportJobService {
     public ReportFileContent downloadFile(Long id) {
         ReportJob reportJob = getReadyOwnedReportJob(id);
 
+        return buildReadyFileContent(reportJob);
+    }
+
+    @Transactional(readOnly = true)
+    public ReportFileContent buildReadyFileContent(ReportJob reportJob) {
+        validateReadyReportJob(reportJob);
+
         return new ReportFileContent(
             buildFileName(reportJob),
             reportJob.getReportFormat().getContentType(),
@@ -200,7 +207,11 @@ public class ReportJobService {
 
     private ReportJob getReadyOwnedReportJob(Long id) {
         ReportJob reportJob = getOwnedReportJobEntity(id);
+        validateReadyReportJob(reportJob);
+        return reportJob;
+    }
 
+    private void validateReadyReportJob(ReportJob reportJob) {
         if (reportJob.getStatus() == ReportJobStatus.FAILED) {
             throw new ReportJobStateException(buildFailedMessage(reportJob));
         }
@@ -208,8 +219,6 @@ public class ReportJobService {
         if (reportJob.getStatus() != ReportJobStatus.DONE || !StringUtils.hasText(reportJob.getS3Key())) {
             throw new ReportJobStateException("Report is not ready for download yet");
         }
-
-        return reportJob;
     }
 
     private ReportJobResponse mapToResponse(ReportJob reportJob) {

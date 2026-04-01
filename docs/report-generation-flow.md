@@ -21,7 +21,8 @@ It is written for:
 - upload of the generated file to S3
 - persistence of `s3Key` on `ReportJob`
 - presigned download-link contract for finished reports
-- email notification after `DONE` or `FAILED`
+- email attachment delivery after `DONE` or status email after `FAILED`
+- Telegram document delivery after `DONE` or text delivery after `FAILED`
 - failure handling with persisted diagnostic message
 
 ## Queue Message Contract
@@ -110,7 +111,9 @@ On success:
 - `ReportJob.s3Key` is stored
 - `ReportJob.errorMessage = null`
 - `updatedAt` is refreshed
-- success email is sent to the owner
+- success delivery is attempted through the notification subsystem
+- email sends the generated file as an attachment
+- Telegram sends the generated file as a document when the user is connected
 
 On failure:
 
@@ -118,7 +121,8 @@ On failure:
 - `ReportJob.s3Key = null`
 - `ReportJob.errorMessage` stores a diagnostic message
 - `updatedAt` is refreshed
-- failure email is sent to the owner
+- failure delivery is attempted through the notification subsystem
+- channels fall back to text-based status messaging because no file is available
 
 ## Status Model
 
@@ -176,9 +180,9 @@ Current behavior:
 - only three report types are implemented
 - report layouts are intentionally simple and backend-oriented
 - generated reports are uploaded to S3, but there is no retention management yet
-- email delivery errors are logged but not persisted as separate domain records
+- notification delivery errors are logged but not persisted as separate domain records
 - no retry or dead-letter queue orchestration yet
-- only one notification channel exists: email
+- Telegram connection currently relies on polling instead of webhooks
 - no download history is stored
 
 ## How To Verify Locally
@@ -244,6 +248,8 @@ Relevant integration-test classes:
 - `ReportJobProcessingIntegrationTests`
 - `ReportJobGenerationIntegrationTests`
 - `ReportJobFailureIntegrationTests`
+- `NotificationChannelDispatchIntegrationTests`
+- `TelegramConnectIntegrationTests`
 
 These tests verify:
 

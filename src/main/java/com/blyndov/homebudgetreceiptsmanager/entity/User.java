@@ -28,6 +28,9 @@ public class User {
     @Column(name = "telegram_chat_id", length = 255)
     private String telegramChatId;
 
+    @Column(name = "telegram_connected_at")
+    private Instant telegramConnectedAt;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "preferred_notification_channel", nullable = false, length = 20)
     private NotificationChannel preferredNotificationChannel;
@@ -65,6 +68,14 @@ public class User {
 
     public void setTelegramChatId(String telegramChatId) {
         this.telegramChatId = telegramChatId;
+    }
+
+    public Instant getTelegramConnectedAt() {
+        return telegramConnectedAt;
+    }
+
+    public void setTelegramConnectedAt(Instant telegramConnectedAt) {
+        this.telegramConnectedAt = telegramConnectedAt;
     }
 
     public NotificationChannel getPreferredNotificationChannel() {

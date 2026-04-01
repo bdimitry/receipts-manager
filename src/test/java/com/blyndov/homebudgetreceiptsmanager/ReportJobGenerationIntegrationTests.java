@@ -19,6 +19,8 @@ import com.blyndov.homebudgetreceiptsmanager.repository.PurchaseRepository;
 import com.blyndov.homebudgetreceiptsmanager.repository.ReportJobRepository;
 import com.blyndov.homebudgetreceiptsmanager.repository.UserRepository;
 import com.blyndov.homebudgetreceiptsmanager.support.AbstractPostgresIntegrationTest;
+import jakarta.mail.BodyPart;
+import jakarta.mail.Multipart;
 import jakarta.mail.internet.MimeMessage;
 import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
@@ -175,9 +177,15 @@ class ReportJobGenerationIntegrationTests extends AbstractPostgresIntegrationTes
 
         Awaitility.await().atMost(ASYNC_REPORT_TIMEOUT).untilAsserted(() -> assertThat(receivedEmails()).hasSize(1));
         MimeMessage notification = receivedEmails()[0];
+        Multipart multipart = (Multipart) notification.getContent();
+        BodyPart attachment = multipart.getBodyPart(1);
         assertThat(notification.getAllRecipients()[0].toString()).isEqualTo(ownerEmail);
         assertThat(notification.getSubject()).contains("ready");
+        assertThat(notification.getSubject()).contains("CSV");
+        assertThat(attachment.getFileName()).endsWith(".csv");
+        assertThat(attachment.getContentType()).contains("text/csv");
         assertThat(receivedTelegramMessages()).isEmpty();
+        assertThat(receivedTelegramDocuments()).isEmpty();
     }
 
     @Test
@@ -231,8 +239,11 @@ class ReportJobGenerationIntegrationTests extends AbstractPostgresIntegrationTes
         assertThat(fileResponse.getBody()).isEqualTo(pdfBytes);
 
         Awaitility.await().atMost(ASYNC_REPORT_TIMEOUT).untilAsserted(() -> assertThat(receivedEmails()).hasSize(1));
-        assertThat(receivedEmails()[0].getContent().toString()).contains("PDF");
+        Multipart emailContent = (Multipart) receivedEmails()[0].getContent();
+        assertThat(receivedEmails()[0].getSubject()).contains("PDF");
+        assertThat(emailContent.getBodyPart(1).getFileName()).endsWith(".pdf");
         assertThat(receivedTelegramMessages()).isEmpty();
+        assertThat(receivedTelegramDocuments()).isEmpty();
     }
 
     @Test

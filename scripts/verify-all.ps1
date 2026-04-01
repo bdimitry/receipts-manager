@@ -1,6 +1,9 @@
 param()
 
 $ErrorActionPreference = "Stop"
+if ($PSVersionTable.PSVersion.Major -ge 7) {
+    $PSNativeCommandUseErrorActionPreference = $true
+}
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $frontendPath = Join-Path $repoRoot "frontend"
@@ -10,6 +13,14 @@ function Test-CommandExists {
     param([string]$Name)
 
     return [bool](Get-Command $Name -ErrorAction SilentlyContinue)
+}
+
+function Assert-LastExitCode {
+    param([string]$CommandName)
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "$CommandName failed with exit code $LASTEXITCODE."
+    }
 }
 
 function Test-RealMavenWrapper {
@@ -26,16 +37,19 @@ function Invoke-MavenTest {
 
     if (Test-RealMavenWrapper $RepoRoot) {
         & (Join-Path $RepoRoot "mvnw.cmd") test
+        Assert-LastExitCode "mvnw.cmd test"
         return
     }
 
     if ($env:MAVEN_CMD) {
         & $env:MAVEN_CMD test
+        Assert-LastExitCode $env:MAVEN_CMD
         return
     }
 
     if (Test-CommandExists "mvn") {
         mvn test
+        Assert-LastExitCode "mvn test"
         return
     }
 
@@ -64,18 +78,23 @@ try {
         if (Test-CommandExists "npm") {
             Invoke-Step "Install frontend dependencies" {
                 npm ci
+                Assert-LastExitCode "npm ci"
             }
             Invoke-Step "Run frontend tests" {
                 npm test
+                Assert-LastExitCode "npm test"
             }
             Invoke-Step "Install Playwright Chromium" {
                 npx playwright install chromium
+                Assert-LastExitCode "npx playwright install chromium"
             }
             Invoke-Step "Run frontend smoke tests" {
                 npm run test:smoke
+                Assert-LastExitCode "npm run test:smoke"
             }
             Invoke-Step "Build frontend" {
                 npm run build
+                Assert-LastExitCode "npm run build"
             }
         } else {
             Invoke-Step "Run frontend verification in Dockerized Playwright environment" {
@@ -84,6 +103,7 @@ try {
                     -w /app `
                     $playwrightImage `
                     /bin/bash -lc "npm ci && npm test && npx playwright install chromium && npm run test:smoke && npm run build"
+                Assert-LastExitCode "dockerized frontend verification"
             }
         }
     } finally {

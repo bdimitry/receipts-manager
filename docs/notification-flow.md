@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document explains the multi-channel notification subsystem used after asynchronous report processing.
+This document explains the multi-channel notification subsystem used after asynchronous report processing, including real email attachment delivery and Telegram bot-based connect flow.
 
 It is intended for:
 
@@ -23,7 +23,13 @@ User-specific configuration is stored on `User`:
 
 - `email`
 - `telegramChatId`
+- `telegramConnectedAt`
 - `preferredNotificationChannel`
+
+Temporary Telegram link state is stored in:
+
+- `TelegramConnectToken`
+- `TelegramPollingState`
 
 ## Channel Selection Strategy
 
@@ -45,9 +51,14 @@ Why this strategy was chosen:
 - `NotificationDispatcher` orchestration layer
 - `EmailNotificationService`
 - `TelegramNotificationService`
+- `TelegramConnectService`
+- `TelegramPollingService`
 - user-scoped notification settings API
-- local MailHog verification for email
-- local Telegram Bot API compatible mock for Telegram
+- real SMTP delivery when SMTP env variables are configured
+- MailHog fallback for local development
+- Telegram deep-link connection via bot polling
+- Telegram document delivery for ready reports
+- local Telegram Bot API compatible mock for development and integration tests
 
 ## When Notifications Are Sent
 
@@ -60,7 +71,9 @@ On success:
 3. the job moves to `DONE`
 4. `NotificationDispatcher` chooses the preferred channel
 5. delivery is attempted
-6. if needed, fallback delivery is attempted through the alternative channel
+6. if email is selected and the report is ready, the generated file is attached to the email
+7. if Telegram is selected and the report is ready, the generated file is sent with `sendDocument`
+8. if needed, fallback delivery is attempted through the alternative channel
 
 On failure:
 
@@ -71,14 +84,15 @@ On failure:
 
 ## Message Content
 
-Success notification includes:
+Success delivery includes:
 
 - that the report is ready
 - report type
 - report format
 - reporting period
 - report job id
-- the API path to get the download contract
+- the generated file itself for email and Telegram when the job is `DONE`
+- the API path to get the download contract as secondary guidance
 
 Failure notification includes:
 
@@ -88,25 +102,82 @@ Failure notification includes:
 - report job id
 - the API path to inspect current status
 
-## Settings API
+## Email Delivery
+
+Implementation notes:
+
+- recipient is always `User.email`
+- `MimeMessageHelper` is used instead of `SimpleMailMessage`
+- attachment content comes from the existing report file flow through `ReportJobService.buildReadyFileContent(...)`
+- filename and content type are preserved for `CSV`, `PDF`, and `XLSX`
+
+SMTP modes:
+
+- real SMTP when `SPRING_MAIL_HOST` and related credentials are configured
+- local MailHog fallback in the default Docker setup
+
+## Telegram Connect Flow
+
+The user never enters `telegramChatId` manually.
+
+Flow:
+
+1. frontend calls `POST /api/users/me/telegram/connect-session`
+2. backend creates a one-time token bound to the current user
+3. backend returns:
+   - bot username
+   - deep-link `https://t.me/<bot_username>?start=<token>`
+   - expiration timestamp
+4. user opens the bot and presses `Start`
+5. `TelegramPollingService` reads `getUpdates`
+6. backend extracts `/start <token>`
+7. token is validated, marked as used, and the chat id is stored on the user
+8. frontend polls `GET /api/users/me/telegram/connection` until the status becomes connected
+
+Connect token guarantees:
+
+- one-time
+- expiration-based
+- bound to a specific user
+
+Polling behavior:
+
+- polling is configurable
+- processed offsets are stored in `TelegramPollingState`
+- repeated updates are not reprocessed indefinitely
+
+## Telegram Delivery
+
+For ready reports:
+
+- Telegram uses `sendDocument`
+- the caption contains report type, format, and period
+- `CSV`, `PDF`, and `XLSX` are all sent as files
+
+For failure notifications:
+
+- Telegram falls back to text because there is no ready file to deliver
+
+## User-Facing API
 
 Protected endpoints:
 
 - `GET /api/users/me/notification-settings`
 - `PUT /api/users/me/notification-settings`
+- `POST /api/users/me/telegram/connect-session`
+- `GET /api/users/me/telegram/connection`
 
-Example request:
+Settings update example:
 
 ```json
 {
-  "preferredNotificationChannel": "TELEGRAM",
-  "telegramChatId": "555000111"
+  "preferredNotificationChannel": "TELEGRAM"
 }
 ```
 
 Validation rule:
 
-- `TELEGRAM` requires a non-empty `telegramChatId`
+- `TELEGRAM` requires an already connected Telegram account
 
 ## Failure Behavior
 
@@ -144,17 +215,9 @@ Useful URLs:
 
 - MailHog: [http://localhost:8025](http://localhost:8025)
 - Telegram mock messages: [http://localhost:8082/messages](http://localhost:8082/messages)
+- Telegram mock documents: [http://localhost:8082/documents](http://localhost:8082/documents)
 
 ### 2. Configure Notification Settings
-
-```powershell
-Invoke-RestMethod -Method Put `
-  -Uri "http://localhost:8080/api/users/me/notification-settings" `
-  -Headers @{ Authorization = "Bearer <JWT>"; ContentType = "application/json" } `
-  -Body '{"preferredNotificationChannel":"TELEGRAM","telegramChatId":"555000111"}'
-```
-
-Switch back to email:
 
 ```powershell
 Invoke-RestMethod -Method Put `
@@ -163,22 +226,68 @@ Invoke-RestMethod -Method Put `
   -Body '{"preferredNotificationChannel":"EMAIL"}'
 ```
 
-### 3. Create A Report Job
+### 3. Connect Telegram
+
+Create a connect session:
+
+```powershell
+$session = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8080/api/users/me/telegram/connect-session" `
+  -Headers @{ Authorization = "Bearer <JWT>" }
+```
+
+The response contains the deep-link. In local mock mode you can simulate the bot start update with:
+
+```powershell
+Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8082/updates" `
+  -ContentType "application/json" `
+  -Body (@{
+    update_id = 1001
+    message = @{
+      message_id = 1
+      text = "/start $($session.deepLink.Split('=')[-1])"
+      chat = @{ id = "555000111" }
+    }
+  } | ConvertTo-Json -Depth 5)
+```
+
+Then confirm connection status:
+
+```powershell
+Invoke-RestMethod -Method Get `
+  -Uri "http://localhost:8080/api/users/me/telegram/connection" `
+  -Headers @{ Authorization = "Bearer <JWT>" }
+```
+
+After the account is connected, select Telegram as the preferred channel:
+
+```powershell
+Invoke-RestMethod -Method Put `
+  -Uri "http://localhost:8080/api/users/me/notification-settings" `
+  -Headers @{ Authorization = "Bearer <JWT>"; ContentType = "application/json" } `
+  -Body '{"preferredNotificationChannel":"TELEGRAM"}'
+```
+
+### 4. Create A Report Job
 
 Use the existing report endpoints and wait until the job becomes `DONE` or `FAILED`.
 
-### 4. Inspect The Result
+### 5. Inspect The Result
 
 For email:
 
-- open MailHog and verify the recipient, subject, and body
+- open MailHog or your real inbox
+- verify recipient, subject, text body, and attached report file
 
 For Telegram:
 
 - open [http://localhost:8082/messages](http://localhost:8082/messages)
-- confirm `chat_id` and `text`
+- confirm status/caption text
+- open [http://localhost:8082/documents](http://localhost:8082/documents)
+- confirm document filename, content type, and chat id
 
-### 5. Verify The Report Still Works
+### 6. Verify The Report Still Works
 
 If the job is `DONE`, call:
 
@@ -202,8 +311,11 @@ Relevant integration-test classes:
 
 These tests verify:
 
-- successful email delivery
-- successful Telegram delivery
+- email attachment delivery to `User.email`
+- Telegram connect token generation
+- Telegram polling-based chat linking
+- Telegram connected status API
+- Telegram document delivery for ready reports
 - preferred-channel selection
 - owner-only targeting
 - fallback from Telegram to email

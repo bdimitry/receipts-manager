@@ -11,11 +11,13 @@ import com.blyndov.homebudgetreceiptsmanager.dto.ReportJobResponse;
 import com.blyndov.homebudgetreceiptsmanager.dto.UpdateNotificationSettingsRequest;
 import com.blyndov.homebudgetreceiptsmanager.entity.NotificationChannel;
 import com.blyndov.homebudgetreceiptsmanager.entity.ReportJobStatus;
+import com.blyndov.homebudgetreceiptsmanager.entity.User;
 import com.blyndov.homebudgetreceiptsmanager.repository.ReportJobRepository;
 import com.blyndov.homebudgetreceiptsmanager.repository.UserRepository;
 import com.blyndov.homebudgetreceiptsmanager.service.ReportJobProcessor;
 import com.blyndov.homebudgetreceiptsmanager.support.AbstractPostgresIntegrationTest;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.awaitility.Awaitility;
@@ -80,8 +82,10 @@ class TelegramFailureReportNotificationIntegrationTests extends AbstractPostgres
 
     @Test
     void failedReportUsesTelegramWhenTelegramIsPreferred() {
-        String accessToken = registerAndLogin(uniqueEmail("telegram-failed"), "P@ssword123");
-        updateNotificationSettings(accessToken, NotificationChannel.TELEGRAM, "999555111");
+        String email = uniqueEmail("telegram-failed");
+        String accessToken = registerAndLogin(email, "P@ssword123");
+        markTelegramConnected(email, "999555111");
+        updateNotificationSettings(accessToken, NotificationChannel.TELEGRAM);
 
         ReportJobResponse createdJob = createReportJob(accessToken, 2026, 8).getBody();
 
@@ -101,24 +105,28 @@ class TelegramFailureReportNotificationIntegrationTests extends AbstractPostgres
         assertThat(notification.text()).contains("2026-08");
         assertThat(notification.text()).contains("/api/reports/" + createdJob.id());
         assertThat(receivedEmails()).isEmpty();
+        assertThat(receivedTelegramDocuments()).isEmpty();
     }
 
-    private void updateNotificationSettings(
-        String accessToken,
-        NotificationChannel channel,
-        String telegramChatId
-    ) {
+    private void updateNotificationSettings(String accessToken, NotificationChannel channel) {
         ResponseEntity<String> response = restTemplate.exchange(
             "/api/users/me/notification-settings",
             HttpMethod.PUT,
             authorizedJsonEntity(
-                new UpdateNotificationSettingsRequest(channel, telegramChatId),
+                new UpdateNotificationSettingsRequest(channel, null),
                 accessToken
             ),
             String.class
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    private void markTelegramConnected(String email, String chatId) {
+        User user = userRepository.findByEmail(email).orElseThrow();
+        user.setTelegramChatId(chatId);
+        user.setTelegramConnectedAt(Instant.now());
+        userRepository.save(user);
     }
 
     private ResponseEntity<ReportJobResponse> createReportJob(String accessToken, int year, int month) {

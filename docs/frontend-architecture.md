@@ -135,7 +135,10 @@ Main UI principles:
 
 - current user info
 - notification preference update
-- Telegram chat id field when needed
+- email delivery status
+- Telegram connected or not connected state
+- `Connect Telegram` action that requests a one-time deep-link from the backend
+- automatic status refresh while the user is completing bot linking
 
 ## Theme And Language
 
@@ -177,6 +180,7 @@ This keeps backend changes minimal and preserves compatibility with the already-
 3. detail panel reflects status, error, and S3 key
 4. ready jobs expose the download action
 5. generated content remains currency-safe because totals are kept separate by currency
+6. delivery continues through email attachment or Telegram document flow after completion
 
 ## Docker Delivery Model
 
@@ -209,8 +213,9 @@ Verify:
 8. open receipt OCR detail and inspect line items
 9. create a report in PDF or XLSX
 10. wait for `DONE`
-11. download the report
-12. check MailHog or Telegram mock
+11. open profile and connect Telegram through the deep-link flow if you want Telegram delivery
+12. download the report
+13. check MailHog, your real mailbox, or Telegram mock
 
 Run frontend checks:
 

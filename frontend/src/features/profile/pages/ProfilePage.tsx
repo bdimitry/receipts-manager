@@ -4,8 +4,10 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
+  createTelegramConnectSession,
   getCurrentUser,
   getNotificationSettings,
+  getTelegramConnectionStatus,
   updateNotificationSettings,
 } from "../../user/api";
 import { useI18n } from "../../../shared/i18n/I18nContext";
@@ -16,16 +18,70 @@ import { Card } from "../../../shared/ui/Card";
 import { ErrorState } from "../../../shared/ui/ErrorState";
 import { LoadingState } from "../../../shared/ui/LoadingState";
 import { PageIntro } from "../../../shared/ui/PageIntro";
+import type { LanguageCode } from "../../../shared/api/types";
+
+const profileCopy: Record<
+  LanguageCode,
+  {
+    emailDeliveryStatus: string;
+    emailReady: string;
+    telegramConnectionStatus: string;
+    telegramConnected: string;
+    telegramNotConnected: string;
+    telegramConnectedAt: string;
+    connectTelegram: string;
+    openTelegramBot: string;
+    telegramPendingHint: string;
+    telegramConnectReady: string;
+  }
+> = {
+  en: {
+    emailDeliveryStatus: "Email delivery status",
+    emailReady: "Finished reports are automatically sent to the email used during registration.",
+    telegramConnectionStatus: "Telegram connection",
+    telegramConnected: "Telegram connected",
+    telegramNotConnected: "Telegram not connected yet",
+    telegramConnectedAt: "Connected at:",
+    connectTelegram: "Connect Telegram",
+    openTelegramBot: "Open bot",
+    telegramPendingHint: "This connect link stays active until",
+    telegramConnectReady: "Create a connect link and confirm Start in the bot to pair Telegram delivery.",
+  },
+  ru: {
+    emailDeliveryStatus: "Статус email-доставки",
+    emailReady: "Готовые отчеты автоматически отправляются на email из регистрации.",
+    telegramConnectionStatus: "Статус Telegram",
+    telegramConnected: "Telegram подключен",
+    telegramNotConnected: "Telegram еще не подключен",
+    telegramConnectedAt: "Подключено:",
+    connectTelegram: "Подключить Telegram",
+    openTelegramBot: "Открыть бота",
+    telegramPendingHint: "Ссылка для подключения активна до",
+    telegramConnectReady: "Создайте ссылку и подтвердите Start в боте, чтобы подключить доставку в Telegram.",
+  },
+  uk: {
+    emailDeliveryStatus: "Статус email-доставки",
+    emailReady: "Готові звіти автоматично надсилаються на email з реєстрації.",
+    telegramConnectionStatus: "Статус Telegram",
+    telegramConnected: "Telegram підключено",
+    telegramNotConnected: "Telegram ще не підключено",
+    telegramConnectedAt: "Підключено:",
+    connectTelegram: "Підключити Telegram",
+    openTelegramBot: "Відкрити бота",
+    telegramPendingHint: "Посилання для підключення активне до",
+    telegramConnectReady: "Створіть посилання й підтвердіть Start у боті, щоб підключити доставку в Telegram.",
+  },
+};
 
 const schema = z.object({
   preferredNotificationChannel: z.enum(["EMAIL", "TELEGRAM"]),
-  telegramChatId: z.string().optional(),
 });
 
 type NotificationFormValues = z.infer<typeof schema>;
 
 export function ProfilePage() {
   const { t, language } = useI18n();
+  const copy = profileCopy[language];
   const queryClient = useQueryClient();
   const currentUserQuery = useQuery({
     queryKey: ["current-user"],
@@ -35,18 +91,21 @@ export function ProfilePage() {
     queryKey: ["notification-settings"],
     queryFn: getNotificationSettings,
   });
+  const telegramConnectionQuery = useQuery({
+    queryKey: ["telegram-connection-status"],
+    queryFn: getTelegramConnectionStatus,
+    refetchInterval: (query) => (query.state.data?.connected ? false : 3000),
+  });
 
   const {
     register,
     handleSubmit,
     reset,
-    watch,
     formState: { errors },
   } = useForm<NotificationFormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       preferredNotificationChannel: "EMAIL",
-      telegramChatId: "",
     },
   });
 
@@ -54,34 +113,49 @@ export function ProfilePage() {
     if (notificationQuery.data) {
       reset({
         preferredNotificationChannel: notificationQuery.data.preferredNotificationChannel,
-        telegramChatId: notificationQuery.data.telegramChatId ?? "",
       });
     }
   }, [notificationQuery.data, reset]);
 
   const mutation = useMutation({
     mutationFn: updateNotificationSettings,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notification-settings"] }),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["notification-settings"] }),
+        queryClient.invalidateQueries({ queryKey: ["telegram-connection-status"] }),
+      ]),
   });
 
-  if (currentUserQuery.isLoading || notificationQuery.isLoading) {
+  const connectMutation = useMutation({
+    mutationFn: createTelegramConnectSession,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["telegram-connection-status"] });
+    },
+  });
+
+  if (currentUserQuery.isLoading || notificationQuery.isLoading || telegramConnectionQuery.isLoading) {
     return <LoadingState label={t("loading")} />;
   }
 
-  if (currentUserQuery.isError || notificationQuery.isError) {
+  if (currentUserQuery.isError || notificationQuery.isError || telegramConnectionQuery.isError) {
     return (
       <ErrorState
         title={t("errorTitle")}
-        message={currentUserQuery.error?.message ?? notificationQuery.error?.message ?? t("errorTitle")}
+        message={
+          currentUserQuery.error?.message ??
+          notificationQuery.error?.message ??
+          telegramConnectionQuery.error?.message ??
+          t("errorTitle")
+        }
       />
     );
   }
 
   const currentUser = currentUserQuery.data;
   const notificationSettings = notificationQuery.data;
-  const preferredChannel = watch("preferredNotificationChannel");
+  const telegramConnection = telegramConnectionQuery.data;
 
-  if (!currentUser || !notificationSettings) {
+  if (!currentUser || !notificationSettings || !telegramConnection) {
     return <ErrorState title={t("errorTitle")} message={t("noData")} />;
   }
 
@@ -103,12 +177,60 @@ export function ProfilePage() {
       </Card>
       <Card>
         <h2>{t("notificationSettings")}</h2>
+        <div className="detail-grid detail-grid--single-column">
+          <div>
+            <dt>{copy.emailDeliveryStatus}</dt>
+            <dd>{notificationSettings.email}</dd>
+            <p className="field-hint">{copy.emailReady}</p>
+          </div>
+          <div>
+            <dt>{copy.telegramConnectionStatus}</dt>
+            <dd>{telegramConnection.connected ? copy.telegramConnected : copy.telegramNotConnected}</dd>
+            <p className="field-hint">
+              {telegramConnection.connected
+                ? telegramConnection.connectedAt
+                  ? `${copy.telegramConnectedAt} ${formatDateTime(telegramConnection.connectedAt, language)}`
+                  : copy.telegramConnected
+                : copy.telegramConnectReady}
+            </p>
+            {!telegramConnection.connected ? (
+              <div className="stack-sm">
+                <Button
+                  disabled={connectMutation.isPending}
+                  onClick={() => connectMutation.mutate()}
+                  variant="secondary"
+                >
+                  {copy.connectTelegram}
+                </Button>
+                {telegramConnection.pendingDeepLink ? (
+                  <a
+                    className="inline-link"
+                    href={telegramConnection.pendingDeepLink}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    {copy.openTelegramBot}
+                  </a>
+                ) : null}
+                {telegramConnection.pendingExpiresAt ? (
+                  <p className="field-hint">
+                    {copy.telegramPendingHint}{" "}
+                    {formatDateTime(telegramConnection.pendingExpiresAt, language)}
+                  </p>
+                ) : null}
+                {connectMutation.isError ? (
+                  <p className="form-error">{connectMutation.error.message}</p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        </div>
         <form
           className="form-grid"
           onSubmit={handleSubmit((values) =>
             mutation.mutate({
               preferredNotificationChannel: values.preferredNotificationChannel,
-              telegramChatId: values.telegramChatId || null,
+              telegramChatId: null,
             }))
           }
         >
@@ -119,14 +241,12 @@ export function ProfilePage() {
               <option value="TELEGRAM">{getNotificationChannelLabel("TELEGRAM", t)}</option>
             </select>
           </label>
-          <label className="field">
-            <span>{t("telegramChatId")}</span>
-            <input placeholder="555000111" {...register("telegramChatId")} />
-            {errors.telegramChatId ? <small>{errors.telegramChatId.message}</small> : null}
-          </label>
+          {errors.preferredNotificationChannel ? (
+            <small>{errors.preferredNotificationChannel.message}</small>
+          ) : null}
           <p className="field-hint">
-            {preferredChannel === "TELEGRAM"
-              ? `${t("notificationChannelTelegram")} -> ${watch("telegramChatId") || "555000111"}`
+            {notificationSettings.preferredNotificationChannel === "TELEGRAM" && telegramConnection.connected
+              ? `${t("notificationChannelTelegram")} -> ${copy.telegramConnected}`
               : `${t("notificationChannelEmail")} -> ${notificationSettings.email}`}
           </p>
           {mutation.isError ? <p className="form-error">{mutation.error.message}</p> : null}

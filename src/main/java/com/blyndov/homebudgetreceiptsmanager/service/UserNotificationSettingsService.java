@@ -31,16 +31,14 @@ public class UserNotificationSettingsService {
     ) {
         User user = authService.getCurrentAuthenticatedUser();
         NotificationChannel preferredChannel = request.preferredNotificationChannel();
-        String telegramChatId = applyTelegramChatIdUpdate(user.getTelegramChatId(), request.telegramChatId());
 
-        if (preferredChannel == NotificationChannel.TELEGRAM && telegramChatId == null) {
+        if (preferredChannel == NotificationChannel.TELEGRAM && !isTelegramConnected(user)) {
             throw new InvalidNotificationSettingsException(
-                "Telegram chat id is required when preferred notification channel is TELEGRAM"
+                "Connect Telegram before choosing TELEGRAM as the preferred notification channel"
             );
         }
 
         user.setPreferredNotificationChannel(preferredChannel);
-        user.setTelegramChatId(telegramChatId);
 
         return mapToResponse(userRepository.save(user));
     }
@@ -49,16 +47,13 @@ public class UserNotificationSettingsService {
         return new NotificationSettingsResponse(
             user.getEmail(),
             user.getTelegramChatId(),
+            isTelegramConnected(user),
+            user.getTelegramConnectedAt(),
             user.getPreferredNotificationChannel()
         );
     }
 
-    private String applyTelegramChatIdUpdate(String currentChatId, String requestedChatId) {
-        if (requestedChatId == null) {
-            return currentChatId;
-        }
-
-        String normalized = requestedChatId.trim();
-        return normalized.isEmpty() ? null : normalized;
+    private boolean isTelegramConnected(User user) {
+        return user.getTelegramChatId() != null && !user.getTelegramChatId().isBlank();
     }
 }

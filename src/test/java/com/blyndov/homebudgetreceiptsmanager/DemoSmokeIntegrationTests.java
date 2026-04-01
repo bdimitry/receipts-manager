@@ -22,6 +22,7 @@ import com.blyndov.homebudgetreceiptsmanager.repository.ReceiptRepository;
 import com.blyndov.homebudgetreceiptsmanager.repository.ReportJobRepository;
 import com.blyndov.homebudgetreceiptsmanager.repository.UserRepository;
 import com.blyndov.homebudgetreceiptsmanager.support.AbstractPostgresIntegrationTest;
+import jakarta.mail.Multipart;
 import jakarta.mail.internet.MimeMessage;
 import java.awt.Color;
 import java.awt.Font;
@@ -256,9 +257,10 @@ class DemoSmokeIntegrationTests extends AbstractPostgresIntegrationTest {
         MimeMessage notification = receivedEmails()[0];
         assertThat(notification.getAllRecipients()).hasSize(1);
         assertThat(notification.getAllRecipients()[0].toString()).isEqualTo(email);
-        assertThat(notification.getContent().toString()).contains("ready");
-        assertThat(notification.getContent().toString()).contains("/api/reports/" + completedJob.id() + "/download");
+        assertThat(notification.getSubject()).contains("ready");
+        assertThat(extractEmailText(notification)).contains("/api/reports/" + completedJob.id() + "/download");
         assertThat(receivedTelegramMessages()).isEmpty();
+        assertThat(receivedTelegramDocuments()).isEmpty();
     }
 
     private ReportJobResponse awaitDone(Long reportJobId, String accessToken) {

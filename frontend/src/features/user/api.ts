@@ -3,6 +3,8 @@ import type {
   CurrentUserResponse,
   NotificationChannel,
   NotificationSettingsResponse,
+  TelegramConnectSessionResponse,
+  TelegramConnectionStatusResponse,
 } from "../../shared/api/types";
 
 export function getCurrentUser() {
@@ -24,4 +26,14 @@ export function updateNotificationSettings(request: {
     },
     body: JSON.stringify(request),
   });
+}
+
+export function createTelegramConnectSession() {
+  return apiFetch<TelegramConnectSessionResponse>("/api/users/me/telegram/connect-session", {
+    method: "POST",
+  });
+}
+
+export function getTelegramConnectionStatus() {
+  return apiFetch<TelegramConnectionStatusResponse>("/api/users/me/telegram/connection");
 }

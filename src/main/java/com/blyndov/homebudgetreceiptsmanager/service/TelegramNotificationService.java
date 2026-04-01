@@ -1,28 +1,28 @@
 package com.blyndov.homebudgetreceiptsmanager.service;
 
-import com.blyndov.homebudgetreceiptsmanager.config.NotificationTelegramProperties;
+import com.blyndov.homebudgetreceiptsmanager.client.TelegramBotClient;
 import com.blyndov.homebudgetreceiptsmanager.entity.NotificationChannel;
 import com.blyndov.homebudgetreceiptsmanager.entity.ReportJob;
 import com.blyndov.homebudgetreceiptsmanager.entity.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
+import org.springframework.util.StringUtils;
 
 @Service
 public class TelegramNotificationService implements NotificationChannelSender {
 
     private static final Logger log = LoggerFactory.getLogger(TelegramNotificationService.class);
 
-    private final RestClient restClient;
-    private final NotificationTelegramProperties notificationTelegramProperties;
+    private final TelegramBotClient telegramBotClient;
+    private final ReportJobService reportJobService;
 
-    public TelegramNotificationService(NotificationTelegramProperties notificationTelegramProperties) {
-        this.notificationTelegramProperties = notificationTelegramProperties;
-        this.restClient = RestClient.builder()
-            .baseUrl(notificationTelegramProperties.getBaseUrl())
-            .build();
+    public TelegramNotificationService(
+        TelegramBotClient telegramBotClient,
+        ReportJobService reportJobService
+    ) {
+        this.telegramBotClient = telegramBotClient;
+        this.reportJobService = reportJobService;
     }
 
     @Override
@@ -45,14 +45,17 @@ public class TelegramNotificationService implements NotificationChannelSender {
             chatId
         );
 
-        restClient.post()
-            .uri("/bot{botToken}/sendMessage", notificationTelegramProperties.getBotToken())
-            .contentType(MediaType.APPLICATION_JSON)
-            .body(new TelegramSendMessageRequest(chatId, message.subject() + "\n\n" + message.body()))
-            .retrieve()
-            .toBodilessEntity();
+        String payloadText = message.subject() + "\n\n" + message.body();
+        if (isReadyForDocument(reportJob)) {
+            telegramBotClient.sendDocument(chatId, reportJobService.buildReadyFileContent(reportJob), payloadText);
+            return;
+        }
+
+        telegramBotClient.sendMessage(chatId, payloadText);
     }
 
-    private record TelegramSendMessageRequest(String chat_id, String text) {
+    private boolean isReadyForDocument(ReportJob reportJob) {
+        return reportJob.getStatus() == com.blyndov.homebudgetreceiptsmanager.entity.ReportJobStatus.DONE
+            && StringUtils.hasText(reportJob.getS3Key());
     }
 }

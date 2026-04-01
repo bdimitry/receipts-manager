@@ -27,7 +27,8 @@ import org.springframework.http.ResponseEntity;
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     properties = {
         "app.report-jobs.consumer.enabled=false",
-        "app.receipts.ocr.consumer.enabled=false"
+        "app.receipts.ocr.consumer.enabled=false",
+        "app.notifications.telegram.polling-enabled=false"
     }
 )
 class NotificationSettingsIntegrationTests extends AbstractPostgresIntegrationTest {
@@ -64,11 +65,13 @@ class NotificationSettingsIntegrationTests extends AbstractPostgresIntegrationTe
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().email()).isEqualTo(TEST_EMAIL);
         assertThat(response.getBody().telegramChatId()).isNull();
+        assertThat(response.getBody().telegramConnected()).isFalse();
+        assertThat(response.getBody().telegramConnectedAt()).isNull();
         assertThat(response.getBody().preferredNotificationChannel()).isEqualTo(NotificationChannel.EMAIL);
     }
 
     @Test
-    void updateNotificationSettingsToTelegramPersistsPreference() {
+    void updateNotificationSettingsToEmailKeepsTelegramDisconnected() {
         register(TEST_EMAIL, TEST_PASSWORD);
         String accessToken = login(TEST_EMAIL, TEST_PASSWORD).getBody().accessToken();
 
@@ -76,7 +79,7 @@ class NotificationSettingsIntegrationTests extends AbstractPostgresIntegrationTe
             "/api/users/me/notification-settings",
             HttpMethod.PUT,
             authorizedJsonEntity(
-                new UpdateNotificationSettingsRequest(NotificationChannel.TELEGRAM, "123456789"),
+                new UpdateNotificationSettingsRequest(NotificationChannel.EMAIL, "123456789"),
                 accessToken
             ),
             NotificationSettingsResponse.class
@@ -84,16 +87,17 @@ class NotificationSettingsIntegrationTests extends AbstractPostgresIntegrationTe
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().preferredNotificationChannel()).isEqualTo(NotificationChannel.TELEGRAM);
-        assertThat(response.getBody().telegramChatId()).isEqualTo("123456789");
+        assertThat(response.getBody().preferredNotificationChannel()).isEqualTo(NotificationChannel.EMAIL);
+        assertThat(response.getBody().telegramChatId()).isNull();
+        assertThat(response.getBody().telegramConnected()).isFalse();
 
         var savedUser = userRepository.findByEmail(TEST_EMAIL).orElseThrow();
-        assertThat(savedUser.getPreferredNotificationChannel()).isEqualTo(NotificationChannel.TELEGRAM);
-        assertThat(savedUser.getTelegramChatId()).isEqualTo("123456789");
+        assertThat(savedUser.getPreferredNotificationChannel()).isEqualTo(NotificationChannel.EMAIL);
+        assertThat(savedUser.getTelegramChatId()).isNull();
     }
 
     @Test
-    void updateNotificationSettingsToTelegramWithoutChatIdReturnsBadRequest() {
+    void updateNotificationSettingsToTelegramWithoutConnectionReturnsBadRequest() {
         register(TEST_EMAIL, TEST_PASSWORD);
         String accessToken = login(TEST_EMAIL, TEST_PASSWORD).getBody().accessToken();
 
@@ -101,7 +105,7 @@ class NotificationSettingsIntegrationTests extends AbstractPostgresIntegrationTe
             "/api/users/me/notification-settings",
             HttpMethod.PUT,
             authorizedJsonEntity(
-                new UpdateNotificationSettingsRequest(NotificationChannel.TELEGRAM, ""),
+                new UpdateNotificationSettingsRequest(NotificationChannel.TELEGRAM, null),
                 accessToken
             ),
             ErrorResponse.class
@@ -109,7 +113,7 @@ class NotificationSettingsIntegrationTests extends AbstractPostgresIntegrationTe
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().message()).contains("Telegram chat id is required");
+        assertThat(response.getBody().message()).contains("Connect Telegram");
     }
 
     @Test

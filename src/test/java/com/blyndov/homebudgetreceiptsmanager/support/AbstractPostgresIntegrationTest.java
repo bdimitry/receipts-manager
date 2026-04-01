@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.icegreen.greenmail.util.GreenMail;
 import com.icegreen.greenmail.util.ServerSetupTest;
+import jakarta.mail.BodyPart;
+import jakarta.mail.Multipart;
 import jakarta.mail.internet.MimeMessage;
 import java.io.IOException;
 import java.net.URI;
@@ -133,8 +135,18 @@ public abstract class AbstractPostgresIntegrationTest {
         return GREEN_MAIL.getReceivedMessages();
     }
 
+    protected static String extractEmailText(MimeMessage message) {
+        try {
+            return extractEmailText(message.getContent());
+        } catch (Exception exception) {
+            throw new IllegalStateException("Failed to extract email text", exception);
+        }
+    }
+
     protected static void purgeTelegramMessages() {
         sendTelegramMockRequest("DELETE", "/messages");
+        sendTelegramMockRequest("DELETE", "/documents");
+        sendTelegramMockRequest("DELETE", "/updates");
     }
 
     protected static List<TelegramMockMessage> receivedTelegramMessages() {
@@ -150,7 +162,40 @@ public abstract class AbstractPostgresIntegrationTest {
         }
     }
 
+    protected static List<TelegramMockDocument> receivedTelegramDocuments() {
+        try {
+            HttpResponse<String> response = sendTelegramMockRequest("GET", "/documents");
+            return OBJECT_MAPPER.readValue(
+                response.body(),
+                new TypeReference<List<TelegramMockDocument>>() {
+                }
+            );
+        } catch (IOException exception) {
+            throw new IllegalStateException("Failed to parse telegram mock documents", exception);
+        }
+    }
+
+    protected static void enqueueTelegramStartUpdate(String token, String chatId) {
+        try {
+            String requestBody = OBJECT_MAPPER.writeValueAsString(
+                new TelegramMockUpdate(TEST_TELEGRAM_BOT_TOKEN, chatId, "/start " + token)
+            );
+            sendTelegramMockRequest("POST", "/updates", requestBody, "application/json");
+        } catch (IOException exception) {
+            throw new IllegalStateException("Failed to serialize telegram start update", exception);
+        }
+    }
+
     private static HttpResponse<String> sendTelegramMockRequest(String method, String path) {
+        return sendTelegramMockRequest(method, path, null, null);
+    }
+
+    private static HttpResponse<String> sendTelegramMockRequest(
+        String method,
+        String path,
+        String requestBody,
+        String contentType
+    ) {
         try {
             HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(
@@ -164,6 +209,15 @@ public abstract class AbstractPostgresIntegrationTest {
                 );
 
             HttpRequest request = switch (method) {
+                case "POST" -> {
+                    if (requestBody == null) {
+                        yield builder.POST(HttpRequest.BodyPublishers.noBody()).build();
+                    }
+                    if (contentType != null) {
+                        builder.header("Content-Type", contentType);
+                    }
+                    yield builder.POST(HttpRequest.BodyPublishers.ofString(requestBody)).build();
+                }
                 case "DELETE" -> builder.DELETE().build();
                 case "GET" -> builder.GET().build();
                 default -> throw new IllegalArgumentException("Unsupported HTTP method: " + method);
@@ -179,6 +233,40 @@ public abstract class AbstractPostgresIntegrationTest {
     }
 
     protected record TelegramMockMessage(String token, String chat_id, String text) {
+    }
+
+    protected record TelegramMockDocument(
+        String token,
+        String chat_id,
+        String caption,
+        String file_name,
+        String content_type,
+        int size
+    ) {
+    }
+
+    private record TelegramMockUpdate(String token, String chat_id, String text) {
+    }
+
+    private static String extractEmailText(Object content) throws Exception {
+        if (content == null) {
+            return "";
+        }
+
+        if (content instanceof String stringContent) {
+            return stringContent;
+        }
+
+        if (content instanceof Multipart multipart) {
+            StringBuilder builder = new StringBuilder();
+            for (int index = 0; index < multipart.getCount(); index++) {
+                BodyPart bodyPart = multipart.getBodyPart(index);
+                builder.append(extractEmailText(bodyPart.getContent())).append('\n');
+            }
+            return builder.toString();
+        }
+
+        return content.toString();
     }
 
     private static void initializeAwsResources() {

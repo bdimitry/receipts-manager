@@ -115,7 +115,27 @@ async function mockApi(page: Page) {
       return fulfillJson(route, {
         email: currentUser.email,
         telegramChatId: null,
+        telegramConnected: false,
+        telegramConnectedAt: null,
         preferredNotificationChannel: "EMAIL",
+      });
+    }
+
+    if (method === "GET" && path === "/api/users/me/telegram/connection") {
+      return fulfillJson(route, {
+        connected: false,
+        connectedAt: null,
+        botUsername: "home_budget_receipts_bot",
+        pendingDeepLink: null,
+        pendingExpiresAt: null,
+      });
+    }
+
+    if (method === "POST" && path === "/api/users/me/telegram/connect-session") {
+      return fulfillJson(route, {
+        botUsername: "home_budget_receipts_bot",
+        deepLink: "https://t.me/home_budget_receipts_bot?start=smoke",
+        expiresAt: "2026-03-31T12:15:00Z",
       });
     }
 
@@ -156,7 +176,7 @@ test.describe("frontend smoke", () => {
       window.localStorage.removeItem("hb.jwt");
     });
 
-    await page.goto("/", { waitUntil: "networkidle" });
+    await page.goto("/", { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Login" })).toBeVisible();
     await page.locator('a[href="/register"]').click();
     await expect(page).toHaveURL(/\/register$/);
@@ -219,7 +239,7 @@ test.describe("frontend smoke", () => {
 
     const persistedPage = await page.context().newPage();
     await mockApi(persistedPage);
-    await persistedPage.goto("/", { waitUntil: "networkidle" });
+    await persistedPage.goto("/", { waitUntil: "domcontentloaded" });
 
     await expect(persistedPage.getByTestId("language-dropdown-trigger")).toBeVisible();
     await expect.poll(() =>

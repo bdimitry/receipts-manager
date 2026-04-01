@@ -16,6 +16,7 @@ import com.blyndov.homebudgetreceiptsmanager.support.AbstractPostgresIntegration
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
+import jakarta.mail.Multipart;
 import jakarta.mail.internet.MimeMessage;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeEach;
@@ -96,12 +97,15 @@ class ReportJobFailureIntegrationTests extends AbstractPostgresIntegrationTest {
             .untilAsserted(() -> assertThat(receivedEmails()).hasSize(1));
 
         MimeMessage notification = receivedEmails()[0];
+        Multipart multipart = (Multipart) notification.getContent();
         assertThat(notification.getAllRecipients()).hasSize(1);
         assertThat(notification.getAllRecipients()[0].toString()).isEqualTo(ownerEmail);
         assertThat(notification.getSubject()).contains("failed");
-        assertThat(notification.getContent().toString()).contains("2026-08");
-        assertThat(notification.getContent().toString()).contains("/api/reports/" + createdJob.id());
+        assertThat(multipart.getCount()).isEqualTo(1);
+        assertThat(extractEmailText(notification)).contains("2026-08");
+        assertThat(extractEmailText(notification)).contains("/api/reports/" + createdJob.id());
         assertThat(receivedTelegramMessages()).isEmpty();
+        assertThat(receivedTelegramDocuments()).isEmpty();
     }
 
     @Test

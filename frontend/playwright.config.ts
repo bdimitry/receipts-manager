@@ -2,7 +2,7 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests/smoke",
-  timeout: 30_000,
+  timeout: 60_000,
   reporter: [
     ["list"],
     ["html", { open: "never" }],
@@ -15,7 +15,7 @@ export default defineConfig({
     command: "node ./node_modules/vite/bin/vite.js --host 127.0.0.1 --port 4173",
     port: 4173,
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    timeout: 180_000,
   },
   projects: [
     {

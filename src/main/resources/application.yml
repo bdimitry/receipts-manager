@@ -26,6 +26,8 @@ spring:
   mail:
     host: ${SPRING_MAIL_HOST:localhost}
     port: ${SPRING_MAIL_PORT:1025}
+    username: ${SPRING_MAIL_USERNAME:}
+    password: ${SPRING_MAIL_PASSWORD:}
     properties:
       mail:
         smtp:
@@ -64,6 +66,11 @@ app:
     telegram:
       base-url: ${NOTIFICATION_TELEGRAM_BASE_URL:http://localhost:8082}
       bot-token: ${NOTIFICATION_TELEGRAM_BOT_TOKEN:dev-telegram-bot-token}
+      bot-username: ${NOTIFICATION_TELEGRAM_BOT_USERNAME:home_budget_receipts_bot}
+      polling-enabled: ${NOTIFICATION_TELEGRAM_POLLING_ENABLED:true}
+      polling-interval-ms: ${NOTIFICATION_TELEGRAM_POLLING_INTERVAL_MS:3000}
+      max-updates: ${NOTIFICATION_TELEGRAM_MAX_UPDATES:20}
+      connect-token-ttl: ${NOTIFICATION_TELEGRAM_CONNECT_TOKEN_TTL:PT15M}
   receipts:
     ocr:
       consumer:

@@ -32,18 +32,25 @@ public class NotificationDispatcher implements NotificationService {
 
     @Override
     public void sendReportReadyNotification(ReportJob reportJob) {
+        String reportType = reportType(reportJob);
+        String period = period(reportJob);
         dispatch(
             reportJob,
             new NotificationMessage(
-                "Your report is ready",
+                "%s %s report for %s is ready".formatted(
+                    capitalize(reportType),
+                    reportJob.getReportFormat(),
+                    period
+                ),
                 """
                 Your %s report in %s format for %s is ready.
                 Report job id: %d
-                Download it via GET /api/reports/%d/download after authenticating.
+                The report file is attached or delivered directly in your selected channel.
+                You can also download it via GET /api/reports/%d/download after authenticating.
                 """.formatted(
-                    reportType(reportJob),
+                    reportType,
                     reportJob.getReportFormat(),
-                    period(reportJob),
+                    period,
                     reportJob.getId(),
                     reportJob.getId()
                 ).strip()
@@ -53,18 +60,24 @@ public class NotificationDispatcher implements NotificationService {
 
     @Override
     public void sendReportFailedNotification(ReportJob reportJob) {
+        String reportType = reportType(reportJob);
+        String period = period(reportJob);
         dispatch(
             reportJob,
             new NotificationMessage(
-                "Your report generation failed",
+                "%s %s report for %s failed".formatted(
+                    capitalize(reportType),
+                    reportJob.getReportFormat(),
+                    period
+                ),
                 """
                 %s report generation in %s format for %s failed.
                 Report job id: %d
                 Check GET /api/reports/%d for the current status and error details.
                 """.formatted(
-                    reportType(reportJob),
+                    reportType,
                     reportJob.getReportFormat(),
-                    period(reportJob),
+                    period,
                     reportJob.getId(),
                     reportJob.getId()
                 ).strip()
@@ -166,5 +179,12 @@ public class NotificationDispatcher implements NotificationService {
 
     private String reportType(ReportJob reportJob) {
         return reportJob.getReportType().name().toLowerCase(Locale.ROOT).replace('_', ' ');
+    }
+
+    private String capitalize(String value) {
+        if (value == null || value.isBlank()) {
+            return value;
+        }
+        return value.substring(0, 1).toUpperCase(Locale.ROOT) + value.substring(1);
     }
 }

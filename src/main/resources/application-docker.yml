@@ -4,6 +4,14 @@ spring:
   mail:
     host: ${SPRING_MAIL_HOST:mailhog}
     port: ${SPRING_MAIL_PORT:1025}
+    username: ${SPRING_MAIL_USERNAME:}
+    password: ${SPRING_MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:false}
+          starttls:
+            enable: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE:false}
 
 aws:
   endpoint: ${AWS_ENDPOINT:http://localstack:4566}
@@ -12,6 +20,12 @@ app:
   notifications:
     telegram:
       base-url: ${NOTIFICATION_TELEGRAM_BASE_URL:http://telegram-mock:8082}
+      bot-token: ${NOTIFICATION_TELEGRAM_BOT_TOKEN:dev-telegram-bot-token}
+      bot-username: ${NOTIFICATION_TELEGRAM_BOT_USERNAME:home_budget_receipts_bot}
+      polling-enabled: ${NOTIFICATION_TELEGRAM_POLLING_ENABLED:true}
+      polling-interval-ms: ${NOTIFICATION_TELEGRAM_POLLING_INTERVAL_MS:3000}
+      max-updates: ${NOTIFICATION_TELEGRAM_MAX_UPDATES:20}
+      connect-token-ttl: ${NOTIFICATION_TELEGRAM_CONNECT_TOKEN_TTL:PT15M}
   ocr:
     service:
       base-url: ${OCR_SERVICE_BASE_URL:http://ocr-service:8081}

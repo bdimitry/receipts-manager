@@ -15,12 +15,16 @@ import com.blyndov.homebudgetreceiptsmanager.entity.NotificationChannel;
 import com.blyndov.homebudgetreceiptsmanager.entity.ReportFormat;
 import com.blyndov.homebudgetreceiptsmanager.entity.ReportJobStatus;
 import com.blyndov.homebudgetreceiptsmanager.entity.ReportType;
+import com.blyndov.homebudgetreceiptsmanager.entity.User;
 import com.blyndov.homebudgetreceiptsmanager.repository.PurchaseRepository;
 import com.blyndov.homebudgetreceiptsmanager.repository.ReportJobRepository;
 import com.blyndov.homebudgetreceiptsmanager.repository.UserRepository;
 import com.blyndov.homebudgetreceiptsmanager.support.AbstractPostgresIntegrationTest;
+import jakarta.mail.BodyPart;
+import jakarta.mail.Multipart;
 import jakarta.mail.internet.MimeMessage;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
@@ -95,50 +99,65 @@ class NotificationChannelDispatchIntegrationTests extends AbstractPostgresIntegr
 
         Awaitility.await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(receivedEmails()).hasSize(1));
         MimeMessage notification = receivedEmails()[0];
+        Multipart multipart = (Multipart) notification.getContent();
+        BodyPart attachment = multipart.getBodyPart(1);
 
         assertThat(notification.getAllRecipients()[0].toString()).isEqualTo(email);
-        assertThat(notification.getSubject()).contains("ready");
-        assertThat(notification.getContent().toString()).contains("CSV");
+        assertThat(notification.getSubject()).contains("Monthly spending");
+        assertThat(notification.getSubject()).contains("CSV");
+        assertThat(extractEmailText(notification)).contains("attached or delivered directly");
+        assertThat(attachment.getDisposition()).isEqualToIgnoringCase("attachment");
+        assertThat(attachment.getFileName()).endsWith(".csv");
+        assertThat(attachment.getContentType()).contains("text/csv");
         assertThat(receivedTelegramMessages()).isEmpty();
+        assertThat(receivedTelegramDocuments()).isEmpty();
         assertThat(completedJob.status()).isEqualTo(ReportJobStatus.DONE);
     }
 
     @Test
     void preferredTelegramChannelSendsOnlyTelegram() {
-        String accessToken = registerAndLogin(uniqueEmail("telegram"), "P@ssword123");
-        updateNotificationSettings(accessToken, NotificationChannel.TELEGRAM, "555000111");
+        String email = uniqueEmail("telegram");
+        String accessToken = registerAndLogin(email, "P@ssword123");
+        markTelegramConnected(email, "555000111");
+        updateNotificationSettings(accessToken, NotificationChannel.TELEGRAM);
         createPurchase(accessToken);
 
         ReportJobResponse createdJob = createReport(accessToken, ReportType.MONTHLY_SPENDING, ReportFormat.PDF).getBody();
         ReportJobResponse completedJob = awaitDone(createdJob.id(), accessToken);
 
-        Awaitility.await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(receivedTelegramMessages()).hasSize(1));
-        AbstractPostgresIntegrationTest.TelegramMockMessage message = receivedTelegramMessages().getFirst();
+        Awaitility.await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(receivedTelegramDocuments()).hasSize(1));
+        AbstractPostgresIntegrationTest.TelegramMockDocument document = receivedTelegramDocuments().getFirst();
 
-        assertThat(message.chat_id()).isEqualTo("555000111");
-        assertThat(message.text()).contains("Your report is ready");
-        assertThat(message.text()).contains("PDF");
-        assertThat(message.text()).contains("/api/reports/" + completedJob.id() + "/download");
+        assertThat(document.chat_id()).isEqualTo("555000111");
+        assertThat(document.caption()).contains("PDF");
+        assertThat(document.caption()).contains("ready");
+        assertThat(document.file_name()).endsWith(".pdf");
+        assertThat(document.content_type()).contains("application/pdf");
+        assertThat(document.size()).isPositive();
+        assertThat(receivedTelegramMessages()).isEmpty();
         assertThat(receivedEmails()).isEmpty();
         assertThat(completedJob.status()).isEqualTo(ReportJobStatus.DONE);
     }
 
-    private void updateNotificationSettings(
-        String accessToken,
-        NotificationChannel channel,
-        String telegramChatId
-    ) {
+    private void updateNotificationSettings(String accessToken, NotificationChannel channel) {
         ResponseEntity<String> response = restTemplate.exchange(
             "/api/users/me/notification-settings",
             HttpMethod.PUT,
             authorizedJsonEntity(
-                new UpdateNotificationSettingsRequest(channel, telegramChatId),
+                new UpdateNotificationSettingsRequest(channel, null),
                 accessToken
             ),
             String.class
         );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    private void markTelegramConnected(String email, String chatId) {
+        User user = userRepository.findByEmail(email).orElseThrow();
+        user.setTelegramChatId(chatId);
+        user.setTelegramConnectedAt(Instant.now());
+        userRepository.save(user);
     }
 
     private void createPurchase(String accessToken) {

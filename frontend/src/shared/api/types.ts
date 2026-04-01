@@ -30,7 +30,23 @@ export interface CurrentUserResponse {
 export interface NotificationSettingsResponse {
   email: string;
   telegramChatId: string | null;
+  telegramConnected: boolean;
+  telegramConnectedAt: string | null;
   preferredNotificationChannel: NotificationChannel;
+}
+
+export interface TelegramConnectSessionResponse {
+  botUsername: string;
+  deepLink: string;
+  expiresAt: string;
+}
+
+export interface TelegramConnectionStatusResponse {
+  connected: boolean;
+  connectedAt: string | null;
+  botUsername: string;
+  pendingDeepLink: string | null;
+  pendingExpiresAt: string | null;
 }
 
 export interface PurchaseResponse {

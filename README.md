@@ -60,7 +60,7 @@ The product now supports a full demo-ready scenario:
 7. create report jobs in multiple types and formats
 8. wait for async completion through SQS
 9. download ready reports from S3-backed flow
-10. receive completion notifications by email or Telegram
+10. receive report delivery by email or Telegram
 
 ## Local Run
 
@@ -124,6 +124,30 @@ Both preferences persist after reload.
 
 The application shell keeps the left navigation in place while the right content area scrolls independently.
 
+## Delivery Env Variables
+
+Real delivery can be switched on through `.env` values that are passed into Docker Compose:
+
+- `SPRING_MAIL_HOST`
+- `SPRING_MAIL_PORT`
+- `SPRING_MAIL_USERNAME`
+- `SPRING_MAIL_PASSWORD`
+- `SPRING_MAIL_SMTP_AUTH`
+- `SPRING_MAIL_SMTP_STARTTLS_ENABLE`
+- `NOTIFICATION_EMAIL_FROM`
+- `NOTIFICATION_TELEGRAM_BOT_TOKEN`
+- `NOTIFICATION_TELEGRAM_BOT_USERNAME`
+- `NOTIFICATION_TELEGRAM_POLLING_ENABLED`
+- `NOTIFICATION_TELEGRAM_POLLING_INTERVAL_MS`
+- `NOTIFICATION_TELEGRAM_MAX_UPDATES`
+- `NOTIFICATION_TELEGRAM_CONNECT_TOKEN_TTL`
+
+Behavior:
+
+- if SMTP credentials are configured, email delivery uses the real SMTP server
+- if SMTP credentials are not configured, the default local MailHog setup remains available
+- Telegram connect and document delivery use the configured bot token and bot username
+
 ## Testing
 
 Backend:
@@ -181,6 +205,32 @@ Backend smoke script:
 ```
 
 For the full UI walkthrough use [demo-guide.md](docs/demo-guide.md).
+
+## Real Email And Telegram Delivery
+
+Email:
+
+- report completion sends a multipart email to the registration email address
+- ready reports are attached directly to the message with the correct filename and content type
+- the subject includes report type, format, and period
+
+Telegram:
+
+- the profile page exposes a `Connect Telegram` action
+- the backend creates a one-time connect token and returns a deep-link
+- the user opens the bot link and presses `Start`
+- the backend polling worker reads `/start <token>` updates and binds the chat automatically
+- ready reports are sent as Telegram documents instead of plain text when file delivery is available
+
+Local verification:
+
+1. set real SMTP values in `.env` if you want to test delivery to an external mailbox
+2. run `docker compose up -d --build`
+3. connect Telegram from the profile page or through the API
+4. create a report and wait for `DONE`
+5. verify:
+   - MailHog or your real inbox for email attachment delivery
+   - [http://localhost:8082/messages](http://localhost:8082/messages) and [http://localhost:8082/documents](http://localhost:8082/documents) for Telegram mock delivery
 
 For a realistic OCR check, upload a receipt image or PDF that contains:
 
