@@ -9,6 +9,7 @@ import com.blyndov.homebudgetreceiptsmanager.dto.NotificationSettingsResponse;
 import com.blyndov.homebudgetreceiptsmanager.dto.RegisterRequest;
 import com.blyndov.homebudgetreceiptsmanager.dto.UpdateNotificationSettingsRequest;
 import com.blyndov.homebudgetreceiptsmanager.entity.NotificationChannel;
+import com.blyndov.homebudgetreceiptsmanager.entity.User;
 import com.blyndov.homebudgetreceiptsmanager.repository.UserRepository;
 import com.blyndov.homebudgetreceiptsmanager.support.AbstractPostgresIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
@@ -114,6 +115,30 @@ class NotificationSettingsIntegrationTests extends AbstractPostgresIntegrationTe
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().message()).contains("Connect Telegram");
+    }
+
+    @Test
+    void staleManualTelegramValueDoesNotCountAsConnected() {
+        register(TEST_EMAIL, TEST_PASSWORD);
+        String accessToken = login(TEST_EMAIL, TEST_PASSWORD).getBody().accessToken();
+
+        User user = userRepository.findByEmail(TEST_EMAIL).orElseThrow();
+        user.setTelegramChatId("@legacy_username");
+        user.setTelegramConnectedAt(null);
+        userRepository.save(user);
+
+        ResponseEntity<NotificationSettingsResponse> response = restTemplate.exchange(
+            "/api/users/me/notification-settings",
+            HttpMethod.GET,
+            authorizedEntity(accessToken),
+            NotificationSettingsResponse.class
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().telegramChatId()).isEqualTo("@legacy_username");
+        assertThat(response.getBody().telegramConnected()).isFalse();
+        assertThat(response.getBody().telegramConnectedAt()).isNull();
     }
 
     @Test

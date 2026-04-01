@@ -23,6 +23,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
 @Service
@@ -71,17 +73,15 @@ public class ReportJobService {
         reportJob.setStatus(ReportJobStatus.NEW);
 
         ReportJob savedJob = reportJobRepository.saveAndFlush(reportJob);
-
-        reportJobQueueProducer.publish(
-            new ReportGenerationMessage(
-                savedJob.getId(),
-                currentUser.getId(),
-                savedJob.getYear(),
-                savedJob.getMonth(),
-                savedJob.getReportType(),
-                savedJob.getReportFormat()
-            )
+        ReportGenerationMessage reportMessage = new ReportGenerationMessage(
+            savedJob.getId(),
+            currentUser.getId(),
+            savedJob.getYear(),
+            savedJob.getMonth(),
+            savedJob.getReportType(),
+            savedJob.getReportFormat()
         );
+        publishAfterCommit(reportMessage);
 
         log.info(
             "Report job created and queued: jobId={}, userId={}, reportType={}, reportFormat={}",
@@ -254,5 +254,19 @@ public class ReportJobService {
 
     private String toSlug(String value) {
         return value.toLowerCase(Locale.ROOT).replace('_', '-');
+    }
+
+    private void publishAfterCommit(ReportGenerationMessage reportMessage) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            reportJobQueueProducer.publish(reportMessage);
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                reportJobQueueProducer.publish(reportMessage);
+            }
+        });
     }
 }

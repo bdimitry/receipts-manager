@@ -32,7 +32,9 @@ public class TelegramNotificationService implements NotificationChannelSender {
 
     @Override
     public boolean isConfigured(User user) {
-        return user.getTelegramChatId() != null && !user.getTelegramChatId().isBlank();
+        return user.getTelegramChatId() != null
+            && !user.getTelegramChatId().isBlank()
+            && user.getTelegramConnectedAt() != null;
     }
 
     @Override

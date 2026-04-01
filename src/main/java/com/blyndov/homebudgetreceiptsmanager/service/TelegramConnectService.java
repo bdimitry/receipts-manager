@@ -112,7 +112,7 @@ public class TelegramConnectService {
     }
 
     private TelegramConnectionStatusResponse mapToStatusResponse(User user, TelegramConnectToken pending) {
-        boolean connected = StringUtils.hasText(user.getTelegramChatId());
+        boolean connected = isTelegramConnected(user);
         return new TelegramConnectionStatusResponse(
             connected,
             user.getTelegramConnectedAt(),
@@ -124,5 +124,9 @@ public class TelegramConnectService {
 
     private String buildDeepLink(String token) {
         return "https://t.me/%s?start=%s".formatted(telegramProperties.getBotUsername(), token);
+    }
+
+    private boolean isTelegramConnected(User user) {
+        return StringUtils.hasText(user.getTelegramChatId()) && user.getTelegramConnectedAt() != null;
     }
 }

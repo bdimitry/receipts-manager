@@ -54,6 +54,8 @@ public class UserNotificationSettingsService {
     }
 
     private boolean isTelegramConnected(User user) {
-        return user.getTelegramChatId() != null && !user.getTelegramChatId().isBlank();
+        return user.getTelegramChatId() != null
+            && !user.getTelegramChatId().isBlank()
+            && user.getTelegramConnectedAt() != null;
     }
 }
