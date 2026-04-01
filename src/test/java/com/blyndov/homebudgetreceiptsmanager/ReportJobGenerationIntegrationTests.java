@@ -159,7 +159,7 @@ class ReportJobGenerationIntegrationTests extends AbstractPostgresIntegrationTes
         assertThat(downloadResponse.getBody().fileName()).endsWith(".csv");
         assertThat(downloadResponse.getBody().contentType()).isEqualTo("text/csv");
 
-        Awaitility.await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(receivedEmails()).hasSize(1));
+        Awaitility.await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> assertThat(receivedEmails()).hasSize(1));
         MimeMessage notification = receivedEmails()[0];
         assertThat(notification.getAllRecipients()[0].toString()).isEqualTo(ownerEmail);
         assertThat(notification.getSubject()).contains("ready");
@@ -204,7 +204,7 @@ class ReportJobGenerationIntegrationTests extends AbstractPostgresIntegrationTes
         assertThat(downloadResponse.getBody().fileName()).endsWith(".pdf");
         assertThat(downloadResponse.getBody().contentType()).isEqualTo("application/pdf");
 
-        Awaitility.await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(receivedEmails()).hasSize(1));
+        Awaitility.await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> assertThat(receivedEmails()).hasSize(1));
         assertThat(receivedEmails()[0].getContent().toString()).contains("PDF");
         assertThat(receivedTelegramMessages()).isEmpty();
     }

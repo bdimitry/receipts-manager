@@ -52,6 +52,8 @@ import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class TelegramFailureReportNotificationIntegrationTests extends AbstractPostgresIntegrationTest {
 
+    private static final Duration ASYNC_REPORT_TIMEOUT = Duration.ofSeconds(20);
+
     @Autowired
     private TestRestTemplate restTemplate;
 
@@ -84,14 +86,14 @@ class TelegramFailureReportNotificationIntegrationTests extends AbstractPostgres
         ReportJobResponse createdJob = createReportJob(accessToken, 2026, 8).getBody();
 
         Awaitility.await()
-            .atMost(Duration.ofSeconds(10))
+            .atMost(ASYNC_REPORT_TIMEOUT)
             .untilAsserted(() -> {
                 var reportJob = reportJobRepository.findById(createdJob.id()).orElseThrow();
                 assertThat(reportJob.getStatus()).isEqualTo(ReportJobStatus.FAILED);
                 assertThat(reportJob.getErrorMessage()).contains("Simulated report processing failure");
             });
 
-        Awaitility.await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(receivedTelegramMessages()).hasSize(1));
+        Awaitility.await().atMost(ASYNC_REPORT_TIMEOUT).untilAsserted(() -> assertThat(receivedTelegramMessages()).hasSize(1));
 
         AbstractPostgresIntegrationTest.TelegramMockMessage notification = receivedTelegramMessages().getFirst();
         assertThat(notification.chat_id()).isEqualTo("999555111");

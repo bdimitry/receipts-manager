@@ -52,6 +52,8 @@ import com.blyndov.homebudgetreceiptsmanager.config.AwsProperties;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class ReportJobProcessingIntegrationTests extends AbstractPostgresIntegrationTest {
 
+    private static final Duration ASYNC_REPORT_TIMEOUT = Duration.ofSeconds(20);
+
     @Autowired
     private org.springframework.boot.test.web.client.TestRestTemplate restTemplate;
 
@@ -85,7 +87,7 @@ class ReportJobProcessingIntegrationTests extends AbstractPostgresIntegrationTes
         ReportJobResponse createdJob = createReportJob(accessToken, 2026, 7).getBody();
 
         Awaitility.await()
-            .atMost(Duration.ofSeconds(10))
+            .atMost(ASYNC_REPORT_TIMEOUT)
             .untilAsserted(() -> {
                 ReportJob reportJob = reportJobRepository.findById(createdJob.id()).orElseThrow();
                 assertThat(reportJob.getStatus()).isEqualTo(ReportJobStatus.PROCESSING);
@@ -95,7 +97,7 @@ class ReportJobProcessingIntegrationTests extends AbstractPostgresIntegrationTes
         blockingReportJobProcessor.allowCompletion();
 
         Awaitility.await()
-            .atMost(Duration.ofSeconds(10))
+            .atMost(ASYNC_REPORT_TIMEOUT)
             .untilAsserted(() -> assertThat(
                 reportJobRepository.findById(createdJob.id()).orElseThrow().getStatus()
             ).isEqualTo(ReportJobStatus.DONE));

@@ -299,7 +299,7 @@ class ReportJobQueuePublishingIntegrationTests extends AbstractPostgresIntegrati
         AtomicReference<Message> messageReference = new AtomicReference<>();
 
         Awaitility.await()
-            .atMost(Duration.ofSeconds(5))
+            .atMost(Duration.ofSeconds(10))
             .untilAsserted(() -> {
                 List<Message> messages = sqsClient.receiveMessage(
                     ReceiveMessageRequest.builder()

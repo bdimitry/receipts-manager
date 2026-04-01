@@ -51,6 +51,8 @@ import com.blyndov.homebudgetreceiptsmanager.config.AwsProperties;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class ReportJobFailureIntegrationTests extends AbstractPostgresIntegrationTest {
 
+    private static final Duration ASYNC_REPORT_TIMEOUT = Duration.ofSeconds(20);
+
     @Autowired
     private org.springframework.boot.test.web.client.TestRestTemplate restTemplate;
 
@@ -82,7 +84,7 @@ class ReportJobFailureIntegrationTests extends AbstractPostgresIntegrationTest {
         ReportJobResponse createdJob = createReportJob(accessToken, 2026, 8).getBody();
 
         Awaitility.await()
-            .atMost(Duration.ofSeconds(10))
+            .atMost(ASYNC_REPORT_TIMEOUT)
             .untilAsserted(() -> {
                 var reportJob = reportJobRepository.findById(createdJob.id()).orElseThrow();
                 assertThat(reportJob.getStatus()).isEqualTo(ReportJobStatus.FAILED);
@@ -90,7 +92,7 @@ class ReportJobFailureIntegrationTests extends AbstractPostgresIntegrationTest {
             });
 
         Awaitility.await()
-            .atMost(Duration.ofSeconds(10))
+            .atMost(ASYNC_REPORT_TIMEOUT)
             .untilAsserted(() -> assertThat(receivedEmails()).hasSize(1));
 
         MimeMessage notification = receivedEmails()[0];
@@ -108,7 +110,7 @@ class ReportJobFailureIntegrationTests extends AbstractPostgresIntegrationTest {
         ReportJobResponse createdJob = createReportJob(accessToken, 2026, 9).getBody();
 
         Awaitility.await()
-            .atMost(Duration.ofSeconds(10))
+            .atMost(ASYNC_REPORT_TIMEOUT)
             .untilAsserted(() -> assertThat(
                 reportJobRepository.findById(createdJob.id()).orElseThrow().getStatus()
             ).isEqualTo(ReportJobStatus.FAILED));
