@@ -28,6 +28,9 @@ Backend:
 - receipt OCR line item extraction with persisted parsed positions
 - async report and OCR processing
 - CSV, PDF, and XLSX report generation
+- two OCR backend options:
+  - Tesseract helper as the current default path
+  - PaddleOCR helper as an alternative baseline backend for OCR comparison work
 
 Frontend:
 
@@ -77,6 +80,8 @@ Main local URLs:
 - Swagger UI: [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
 - MailHog UI: [http://localhost:8025](http://localhost:8025)
 - Telegram mock: [http://localhost:8082/messages](http://localhost:8082/messages)
+- Tesseract OCR helper: [http://localhost:8081/health](http://localhost:8081/health)
+- PaddleOCR helper: [http://localhost:8083/health](http://localhost:8083/health)
 
 Stop everything:
 
@@ -124,6 +129,37 @@ Both preferences persist after reload.
 
 The application shell keeps the left navigation in place while the right content area scrolls independently.
 
+## OCR Backends
+
+The project now ships with two OCR helper services:
+
+- `ocr-service`: the current Tesseract-based helper used by default
+- `paddleocr-service`: a new PaddleOCR-based baseline helper for OCR quality exploration
+
+The main Spring Boot app chooses the backend through environment configuration:
+
+```env
+OCR_SERVICE_BACKEND=TESSERACT
+OCR_SERVICE_TESSERACT_BASE_URL=http://localhost:8081
+OCR_SERVICE_PADDLE_BASE_URL=http://localhost:8083
+```
+
+Supported values:
+
+- `TESSERACT`
+- `PADDLE`
+
+If `OCR_SERVICE_BACKEND=PADDLE`, the backend sends receipt images to `POST /ocr` on the Paddle helper and maps the response back into the existing receipt OCR flow.
+
+The PaddleOCR helper currently returns:
+
+- `rawText`
+- `lines[]`
+  - `text`
+  - `confidence`
+
+This is intentionally a baseline OCR backend only. It is not yet a final receipt parsing pipeline.
+
 ## Testing
 
 Backend:
@@ -148,6 +184,14 @@ CI runs both layers:
 - frontend unit/integration tests
 - frontend Playwright smoke check
 - frontend production build
+
+To smoke-test the PaddleOCR helper manually:
+
+```powershell
+docker compose up -d --build paddleocr-service
+curl -X POST "http://localhost:8083/ocr" `
+  -F "file=@C:/temp/receipt.png;type=image/png"
+```
 
 ## Demo
 

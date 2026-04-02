@@ -14,4 +14,7 @@ app:
       base-url: ${NOTIFICATION_TELEGRAM_BASE_URL:http://telegram-mock:8082}
   ocr:
     service:
+      backend: ${OCR_SERVICE_BACKEND:TESSERACT}
       base-url: ${OCR_SERVICE_BASE_URL:http://ocr-service:8081}
+      tesseract-base-url: ${OCR_SERVICE_TESSERACT_BASE_URL:}
+      paddle-base-url: ${OCR_SERVICE_PADDLE_BASE_URL:http://paddleocr-service:8083}

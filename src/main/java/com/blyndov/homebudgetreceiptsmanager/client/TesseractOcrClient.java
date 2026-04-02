@@ -1,6 +1,7 @@
 package com.blyndov.homebudgetreceiptsmanager.client;
 
 import com.blyndov.homebudgetreceiptsmanager.config.OcrClientProperties;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
@@ -8,12 +9,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 @Component
+@ConditionalOnProperty(prefix = "app.ocr.service", name = "backend", havingValue = "TESSERACT", matchIfMissing = true)
 public class TesseractOcrClient implements OcrClient {
 
     private final RestClient restClient;
 
     public TesseractOcrClient(RestClient.Builder restClientBuilder, OcrClientProperties ocrClientProperties) {
-        this.restClient = restClientBuilder.baseUrl(ocrClientProperties.getBaseUrl()).build();
+        this.restClient = restClientBuilder.baseUrl(ocrClientProperties.getTesseractBaseUrl()).build();
     }
 
     @Override

@@ -24,7 +24,9 @@ It allows a user to:
 - LocalStack for S3 and SQS
 - MailHog for email verification
 - Telegram mock for local message delivery checks
-- OCR helper container with Tesseract
+- OCR helper containers:
+  - Tesseract as the stable default backend
+  - PaddleOCR as a new baseline alternative backend
 - Flyway migrations
 - Swagger UI and OpenAPI
 - GitHub Actions CI
@@ -59,6 +61,7 @@ It allows a user to:
 - parsed store name, total amount, and purchase date are stored as best-effort fields
 - parsed line items are stored separately and linked to the receipt
 - multilingual OCR runs with `ukr+rus+eng` in the local helper container
+- the main backend can now switch between OCR helper backends through configuration without changing the business parsing flow
 - OCR `DONE` means text extraction succeeded, even if structured parsing is partial
 - OCR `FAILED` means extraction or processing itself failed
 
@@ -166,6 +169,7 @@ Focus on:
 - no push/mobile clients
 - no advanced personalization beyond theme, language, and notification preferences
 - OCR line item parsing remains best-effort for noisy real-world receipts
+- the PaddleOCR helper is currently only a baseline OCR backend and not yet the final receipt understanding pipeline
 
 ## Where To Go Next
 

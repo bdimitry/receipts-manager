@@ -137,6 +137,7 @@ These files define:
 - queue publishing
 - OCR client integration
 - notification provider clients
+- both Tesseract and PaddleOCR adapters live here, while receipt parsing stays in the service layer
 
 ### `security`
 
@@ -150,7 +151,8 @@ These files define:
 Contains helper services and init scripts for:
 
 - LocalStack
-- OCR helper
+- Tesseract OCR helper
+- PaddleOCR helper
 - Telegram mock
 
 ### `docker-compose.yml`
@@ -162,6 +164,7 @@ Starts:
 - `mailhog`
 - `telegram-mock`
 - `ocr-service`
+- `paddleocr-service`
 - `app`
 - `frontend`
 
@@ -232,8 +235,9 @@ Holds:
 3. frontend calls typed API functions
 4. backend controllers delegate to services
 5. services persist to PostgreSQL and interact with S3, SQS, OCR, and notifications
-6. OCR results are stored as receipt summary fields plus `ReceiptLineItem` rows
-7. dashboard and reports format financial data with explicit currency awareness
-8. frontend reflects backend state through TanStack Query and form mutations
+6. the OCR adapter selects Tesseract or PaddleOCR by configuration and normalizes raw text into the existing receipt OCR flow
+7. OCR results are stored as receipt summary fields plus `ReceiptLineItem` rows
+8. dashboard and reports format financial data with explicit currency awareness
+9. frontend reflects backend state through TanStack Query and form mutations
 
 For a deeper view, continue with [architecture-overview.md](architecture-overview.md), [frontend-architecture.md](frontend-architecture.md), and [ocr-flow.md](ocr-flow.md).

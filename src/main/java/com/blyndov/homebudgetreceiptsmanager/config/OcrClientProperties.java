@@ -1,15 +1,22 @@
 package com.blyndov.homebudgetreceiptsmanager.config;
 
-import jakarta.validation.constraints.NotBlank;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.validation.annotation.Validated;
 
-@Validated
 @ConfigurationProperties(prefix = "app.ocr.service")
 public class OcrClientProperties {
 
-    @NotBlank
+    private OcrBackend backend = OcrBackend.TESSERACT;
     private String baseUrl;
+    private String tesseractBaseUrl;
+    private String paddleBaseUrl;
+
+    public OcrBackend getBackend() {
+        return backend;
+    }
+
+    public void setBackend(OcrBackend backend) {
+        this.backend = backend;
+    }
 
     public String getBaseUrl() {
         return baseUrl;
@@ -17,5 +24,28 @@ public class OcrClientProperties {
 
     public void setBaseUrl(String baseUrl) {
         this.baseUrl = baseUrl;
+    }
+
+    public String getTesseractBaseUrl() {
+        if (hasText(tesseractBaseUrl)) {
+            return tesseractBaseUrl;
+        }
+        return baseUrl;
+    }
+
+    public void setTesseractBaseUrl(String tesseractBaseUrl) {
+        this.tesseractBaseUrl = tesseractBaseUrl;
+    }
+
+    public String getPaddleBaseUrl() {
+        return paddleBaseUrl;
+    }
+
+    public void setPaddleBaseUrl(String paddleBaseUrl) {
+        this.paddleBaseUrl = paddleBaseUrl;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 }

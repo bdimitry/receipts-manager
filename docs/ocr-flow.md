@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document explains how receipt OCR works, what is stored, how line items are parsed, and how to verify the flow locally.
+This document explains how receipt OCR works, which OCR backends are available, what is stored, how line items are parsed, and how to verify the flow locally.
 
 ## Why OCR Exists In The Product
 
@@ -28,18 +28,48 @@ Flow:
 4. `ReceiptOcrQueueConsumer` polls the queue
 5. the consumer marks the receipt `PROCESSING`
 6. the consumer downloads the file from S3
-7. `TesseractOcrClient` sends the file to the OCR helper container
+7. the configured OCR client sends the file to the selected OCR helper container
 8. the raw OCR text is stored
 9. `ReceiptOcrParser` performs best-effort parsing for summary fields and line items
 10. the receipt is marked `DONE` or `FAILED`
 
-The local OCR helper uses multilingual Tesseract recognition by default:
+## OCR Backend Options
+
+The project now supports two helper backends behind the same application OCR entry point.
+
+### Tesseract Backend
+
+This is still the stable default backend used by the main local stack.
+
+It uses multilingual Tesseract recognition by default:
 
 - `ukr`
 - `rus`
 - `eng`
 
 The default runtime combination is `ukr+rus+eng`.
+
+### PaddleOCR Backend
+
+This is a new alternative baseline OCR backend designed for OCR-quality experiments.
+
+It runs as a separate helper container and exposes:
+
+- `POST /ocr`
+
+Response contract:
+
+- `rawText`
+- `lines`
+  - `text`
+  - `confidence`
+
+The Spring Boot application can switch to it through:
+
+- `app.ocr.service.backend=PADDLE`
+- `app.ocr.service.paddle-base-url=http://...`
+
+The existing business parsing flow remains unchanged. The Paddle response is normalized into raw text first, then passed to `ReceiptOcrParser`.
 
 ## Storage Model
 
@@ -179,7 +209,15 @@ If queue publication itself fails after upload commit, the receipt is marked `FA
 docker compose up -d --build
 ```
 
-2. upload a PNG or PDF receipt with explicit currency:
+2. optional: switch the main backend to PaddleOCR:
+
+```powershell
+$env:OCR_SERVICE_BACKEND="PADDLE"
+$env:OCR_SERVICE_PADDLE_BASE_URL="http://localhost:8083"
+docker compose up -d --build app paddleocr-service
+```
+
+3. upload a PNG or PDF receipt with explicit currency:
 
 ```powershell
 curl -X POST "http://localhost:8080/api/receipts/upload" `
@@ -188,7 +226,7 @@ curl -X POST "http://localhost:8080/api/receipts/upload" `
   -F "currency=UAH"
 ```
 
-3. poll OCR status:
+4. poll OCR status:
 
 ```powershell
 Invoke-RestMethod -Method Get `
@@ -196,14 +234,14 @@ Invoke-RestMethod -Method Get `
   -Headers @{ Authorization = "Bearer <JWT_TOKEN>" }
 ```
 
-4. verify that the response contains:
+5. verify that the response contains:
 
 - `currency`
 - `parsedTotalAmount`
 - `lineItems`
 - `rawOcrText`
 
-5. inspect queues and logs if needed:
+6. inspect queues and logs if needed:
 
 ```powershell
 docker exec home-budget-localstack awslocal sqs receive-message `
@@ -211,6 +249,7 @@ docker exec home-budget-localstack awslocal sqs receive-message `
 
 docker compose logs -f app
 docker compose logs -f ocr-service
+docker compose logs -f paddleocr-service
 ```
 
 ## Current Limitations
@@ -221,3 +260,4 @@ docker compose logs -f ocr-service
 - no automatic purchase creation
 - no OCR confidence scoring
 - no receipt-template-specific tuning beyond the current `ukr+rus+eng` helper setup
+- the PaddleOCR helper is intentionally baseline-only for now; preprocessing and deeper comparison work come later

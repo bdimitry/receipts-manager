@@ -78,6 +78,22 @@ services:
       timeout: 5s
       retries: 10
 
+  paddleocr-service:
+    build:
+      context: ./docker/paddleocr-service
+      dockerfile: Dockerfile
+    container_name: home-budget-paddleocr-service
+    environment:
+      PADDLE_OCR_LANG: ${PADDLE_OCR_LANG:-cyrillic}
+      PADDLE_OCR_USE_ANGLE_CLS: ${PADDLE_OCR_USE_ANGLE_CLS:-false}
+    ports:
+      - "8083:8083"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8083/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   app:
     build:
       context: .
@@ -96,7 +112,10 @@ services:
       AWS_S3_BUCKET: ${AWS_S3_BUCKET:-home-budget-files}
       AWS_SQS_QUEUE: ${AWS_SQS_QUEUE:-report-generation-queue}
       AWS_SQS_RECEIPT_OCR_QUEUE: ${AWS_SQS_RECEIPT_OCR_QUEUE:-receipt-ocr-queue}
+      OCR_SERVICE_BACKEND: ${OCR_SERVICE_BACKEND:-TESSERACT}
       OCR_SERVICE_BASE_URL: ${OCR_SERVICE_BASE_URL:-http://ocr-service:8081}
+      OCR_SERVICE_TESSERACT_BASE_URL: ${OCR_SERVICE_TESSERACT_BASE_URL:-}
+      OCR_SERVICE_PADDLE_BASE_URL: ${OCR_SERVICE_PADDLE_BASE_URL:-http://paddleocr-service:8083}
       SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-mailhog}
       SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-1025}
       NOTIFICATION_EMAIL_FROM: ${NOTIFICATION_EMAIL_FROM:-noreply@home-budget.local}
@@ -116,6 +135,8 @@ services:
       telegram-mock:
         condition: service_healthy
       ocr-service:
+        condition: service_healthy
+      paddleocr-service:
         condition: service_healthy
 
   frontend:
