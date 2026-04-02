@@ -133,15 +133,15 @@ The application shell keeps the left navigation in place while the right content
 
 The project now ships with two OCR helper services:
 
-- `ocr-service`: the current Tesseract-based helper used by default
-- `paddleocr-service`: a new PaddleOCR-based baseline helper for OCR quality exploration
+- `ocr-service`: the current Tesseract-based helper kept for comparison
+- `paddleocr-service`: a PaddleOCR-based baseline helper for OCR quality exploration
 
 The main Spring Boot app chooses the backend through environment configuration:
 
 ```env
-OCR_SERVICE_BACKEND=TESSERACT
-OCR_SERVICE_TESSERACT_BASE_URL=http://localhost:8081
-OCR_SERVICE_PADDLE_BASE_URL=http://localhost:8083
+OCR_SERVICE_BACKEND=PADDLE
+OCR_SERVICE_TESSERACT_BASE_URL=http://ocr-service:8081
+OCR_SERVICE_PADDLE_BASE_URL=http://paddleocr-service:8083
 ```
 
 Supported values:
@@ -150,6 +150,8 @@ Supported values:
 - `PADDLE`
 
 If `OCR_SERVICE_BACKEND=PADDLE`, the backend sends receipt images to `POST /ocr` on the Paddle helper and maps the response back into the existing receipt OCR flow.
+
+When you run the stack through `docker compose`, `.env` values are injected into containers. For container-to-container traffic, use Docker service names such as `paddleocr-service`, `ocr-service`, `telegram-mock`, `localstack`, and `mailhog`, not `localhost`.
 
 The PaddleOCR helper currently returns:
 

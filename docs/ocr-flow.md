@@ -73,6 +73,8 @@ The existing business parsing flow remains unchanged. The Paddle response is nor
 
 The PaddleOCR helper now warms its baseline models during container startup. This moves the heaviest cold-start initialization away from the first live OCR request in a fresh local environment.
 
+For Docker-based local runs, OCR endpoint values in `.env` must use container service names, not `localhost`. Inside the `app` container, `localhost` points back to the Spring Boot container itself.
+
 ## Storage Model
 
 OCR data is stored in two layers.
@@ -217,7 +219,7 @@ docker compose up -d --build
 
 ```powershell
 $env:OCR_SERVICE_BACKEND="PADDLE"
-$env:OCR_SERVICE_PADDLE_BASE_URL="http://localhost:8083"
+$env:OCR_SERVICE_PADDLE_BASE_URL="http://paddleocr-service:8083"
 docker compose up -d --build app paddleocr-service
 ```
 
