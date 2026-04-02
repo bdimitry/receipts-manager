@@ -35,6 +35,15 @@ function Providers({ children }: { children: ReactNode }) {
 }
 
 export function renderWithProviders(ui: ReactElement, token?: string, language: LanguageCode = "en") {
+  return renderWithProvidersAtEntries(ui, ["/"], token, language);
+}
+
+export function renderWithProvidersAtEntries(
+  ui: ReactElement,
+  initialEntries: string[],
+  token?: string,
+  language: LanguageCode = "en",
+) {
   window.localStorage.setItem("hb.language", JSON.stringify(language));
   window.localStorage.setItem("hb.theme", "\"light\"");
   if (token) {
@@ -43,7 +52,7 @@ export function renderWithProviders(ui: ReactElement, token?: string, language: 
     window.localStorage.removeItem("hb.jwt");
   }
 
-  return render(<Providers><MemoryRouter>{ui}</MemoryRouter></Providers>);
+  return render(<Providers><MemoryRouter initialEntries={initialEntries}>{ui}</MemoryRouter></Providers>);
 }
 
 export function renderWithRouter(

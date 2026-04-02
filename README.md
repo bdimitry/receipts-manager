@@ -160,6 +160,8 @@ The PaddleOCR helper currently returns:
 
 This is intentionally a baseline OCR backend only. It is not yet a final receipt parsing pipeline.
 
+The PaddleOCR helper now warms its baseline models during container startup, so the first live OCR request no longer needs to perform the heaviest model initialization work on the user-facing path.
+
 ## Testing
 
 Backend:
@@ -216,6 +218,13 @@ Then open the receipt detail page and verify:
 - parsed line items are shown
 - parsed total and receipt currency are correct
 - the OCR helper handles multilingual `ukr+rus+eng` text in the current local setup
+
+If you upload a bank transfer slip or payment document instead of a retail receipt, the system now prefers a safe OCR outcome:
+
+- raw OCR text is still stored
+- store-like header text may still appear
+- parsed line items stay empty
+- misleading totals are not guessed from dates or account identifiers
 
 ## Current Limitations
 

@@ -2,26 +2,37 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
+import { Route, Routes, useLocation } from "react-router-dom";
 import { AppLayout } from "../../app/layout/AppLayout";
 import { ProtectedRoute } from "../../app/layout/ProtectedRoute";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { server } from "../../test/server";
-import { renderWithRouter } from "../../test/test-utils";
+import { renderWithProvidersAtEntries } from "../../test/test-utils";
+
+function LocationProbe() {
+  const location = useLocation();
+
+  return <div data-testid="location-display">{location.pathname}</div>;
+}
 
 describe("auth flow", () => {
   it("redirects guests away from protected routes", async () => {
-    const routes = [
-      { path: "/login", element: <div>Login screen</div> },
-      {
-        element: <ProtectedRoute />,
-        children: [{ path: "/", element: <div>Private screen</div> }],
-      },
-    ];
-
-    renderWithRouter(routes, ["/"]);
+    renderWithProvidersAtEntries(
+      <>
+        <Routes>
+          <Route path="/login" element={<div>Login screen</div>} />
+          <Route element={<ProtectedRoute />}>
+            <Route path="/" element={<div>Private screen</div>} />
+          </Route>
+        </Routes>
+        <LocationProbe />
+      </>,
+      ["/"],
+    );
 
     expect(await screen.findByText("Login screen")).toBeInTheDocument();
+    expect(screen.getByTestId("location-display")).toHaveTextContent("/login");
   });
 
   it("registers a user and sends them to login", async () => {
@@ -38,12 +49,17 @@ describe("auth flow", () => {
       ),
     );
 
-    const routes = [
-      { path: "/register", element: <RegisterPage /> },
-      { path: "/login", element: <div>Login route</div> },
-    ];
     const user = userEvent.setup();
-    const { router } = renderWithRouter(routes, ["/register"]);
+    renderWithProvidersAtEntries(
+      <>
+        <Routes>
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/login" element={<div>Login route</div>} />
+        </Routes>
+        <LocationProbe />
+      </>,
+      ["/register"],
+    );
 
     await user.type(screen.getByLabelText("Email"), "new@example.com");
     await user.type(screen.getByLabelText("Password"), "Password123");
@@ -51,7 +67,7 @@ describe("auth flow", () => {
     await user.click(screen.getByRole("button", { name: "Create account" }));
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe("/login");
+      expect(screen.getByTestId("location-display")).toHaveTextContent("/login");
     });
   });
 
@@ -65,19 +81,24 @@ describe("auth flow", () => {
       ),
     );
 
-    const routes = [
-      { path: "/login", element: <LoginPage /> },
-      { path: "/", element: <div>Dashboard route</div> },
-    ];
     const user = userEvent.setup();
-    const { router } = renderWithRouter(routes, ["/login"]);
+    renderWithProvidersAtEntries(
+      <>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/" element={<div>Dashboard route</div>} />
+        </Routes>
+        <LocationProbe />
+      </>,
+      ["/login"],
+    );
 
     await user.type(screen.getByLabelText("Email"), "demo@example.com");
     await user.type(screen.getByLabelText("Password"), "Password123");
     await user.click(screen.getByRole("button", { name: "Login" }));
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe("/");
+      expect(screen.getByTestId("location-display")).toHaveTextContent("/");
     });
     expect(window.localStorage.getItem("hb.jwt")).toBe("jwt-token");
   });
@@ -93,27 +114,28 @@ describe("auth flow", () => {
       ),
     );
 
-    const routes = [
-      { path: "/login", element: <div>Login page</div> },
-      {
-        element: <ProtectedRoute />,
-        children: [
-          {
-            path: "/",
-            element: <AppLayout />,
-            children: [{ index: true, element: <div>Overview page</div> }],
-          },
-        ],
-      },
-    ];
     const user = userEvent.setup();
-    const { router } = renderWithRouter(routes, ["/"], "jwt-token");
+    renderWithProvidersAtEntries(
+      <>
+        <Routes>
+          <Route path="/login" element={<div>Login page</div>} />
+          <Route element={<ProtectedRoute />}>
+            <Route path="/" element={<AppLayout />}>
+              <Route index element={<div>Overview page</div>} />
+            </Route>
+          </Route>
+        </Routes>
+        <LocationProbe />
+      </>,
+      ["/"],
+      "jwt-token",
+    );
 
     expect(await screen.findByText("demo@example.com")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Logout" }));
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe("/login");
+      expect(screen.getByTestId("location-display")).toHaveTextContent("/login");
     });
     expect(window.localStorage.getItem("hb.jwt")).toBeNull();
   });
@@ -134,24 +156,24 @@ describe("auth flow", () => {
       ),
     );
 
-    const routes = [
-      { path: "/login", element: <div>Login page</div> },
-      {
-        element: <ProtectedRoute />,
-        children: [
-          {
-            path: "/",
-            element: <AppLayout />,
-            children: [{ index: true, element: <div>Overview page</div> }],
-          },
-        ],
-      },
-    ];
-
-    const { router } = renderWithRouter(routes, ["/"], "expired-token");
+    renderWithProvidersAtEntries(
+      <>
+        <Routes>
+          <Route path="/login" element={<div>Login page</div>} />
+          <Route element={<ProtectedRoute />}>
+            <Route path="/" element={<AppLayout />}>
+              <Route index element={<div>Overview page</div>} />
+            </Route>
+          </Route>
+        </Routes>
+        <LocationProbe />
+      </>,
+      ["/"],
+      "expired-token",
+    );
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe("/login");
+      expect(screen.getByTestId("location-display")).toHaveTextContent("/login");
     });
     expect(window.localStorage.getItem("hb.jwt")).toBeNull();
   });

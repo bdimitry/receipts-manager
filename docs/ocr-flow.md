@@ -71,6 +71,8 @@ The Spring Boot application can switch to it through:
 
 The existing business parsing flow remains unchanged. The Paddle response is normalized into raw text first, then passed to `ReceiptOcrParser`.
 
+The PaddleOCR helper now warms its baseline models during container startup. This moves the heaviest cold-start initialization away from the first live OCR request in a fresh local environment.
+
 ## Storage Model
 
 OCR data is stored in two layers.
@@ -134,6 +136,7 @@ What it does:
 - extracts multiple item rows when prices appear near the end of lines
 - handles Cyrillic and mixed Cyrillic or Latin receipts through the multilingual helper setup
 - tolerates cases where quantity or unit cannot be determined
+- avoids inventing retail line items and totals for obviously bank-like or payment-style documents
 
 What it stores even when parsing is partial:
 
@@ -147,6 +150,7 @@ What it does not try to do:
 - guarantee ideal quantity detection
 - reconstruct a canonical product catalog
 - create purchases automatically
+- reinterpret banking slips as store receipts
 
 ## Currency Handling
 

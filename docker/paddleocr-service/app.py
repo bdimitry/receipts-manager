@@ -30,6 +30,32 @@ def _engine():
     return _ocr
 
 
+_engine()
+
+
+def _reset_engine():
+    global _ocr
+    with _ocr_lock:
+        _ocr = None
+        _ocr = PaddleOCR(
+            use_angle_cls=PADDLE_OCR_USE_ANGLE_CLS,
+            lang=PADDLE_OCR_LANG,
+            use_gpu=False,
+            show_log=False,
+        )
+        return _ocr
+
+
+def _ocr_image(image_array):
+    try:
+        with _ocr_lock:
+            return _engine().ocr(image_array, cls=PADDLE_OCR_USE_ANGLE_CLS)
+    except Exception:
+        engine = _reset_engine()
+        with _ocr_lock:
+            return engine.ocr(image_array, cls=PADDLE_OCR_USE_ANGLE_CLS)
+
+
 def _page_images(content, content_type):
     if content_type == "application/pdf":
         document = fitz.open(stream=content, filetype="pdf")
@@ -48,7 +74,7 @@ def _page_images(content, content_type):
 def _extract_lines(content, content_type):
     lines = []
     for image in _page_images(content, content_type):
-        result = _engine().ocr(np.array(image), cls=PADDLE_OCR_USE_ANGLE_CLS)
+        result = _ocr_image(np.array(image))
         for page in result or []:
             for entry in page or []:
                 if len(entry) < 2:

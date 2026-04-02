@@ -62,4 +62,31 @@ class ReceiptOcrParserTests {
         assertThat(parsed.lineItems().getFirst().lineTotal()).isEqualByComparingTo("35.50");
         assertThat(parsed.lineItems().getFirst().rawFragment()).contains("ЙОГУРТ 2%", "35.50");
     }
+
+    @Test
+    void parserSkipsLineItemsAndUnsafeTotalsForBankLikeDocuments() {
+        String rawText = """
+            UkRSibBaNK
+            Документ
+            Paribas GRoUp
+            Відправник
+            линдов
+            Микола
+            Вадимович
+            З рахунку
+            UA0851005000002203806360358
+            єдрпоу
+            238482321
+            Отримувач
+            UKRSIB Online
+            02.04.2026
+            """;
+
+        ReceiptOcrParser.ParsedReceiptData parsed = parser.parse(rawText);
+
+        assertThat(parsed.parsedStoreName()).isEqualTo("UkRSibBaNK");
+        assertThat(parsed.parsedPurchaseDate()).isEqualTo(LocalDate.of(2026, 4, 2));
+        assertThat(parsed.parsedTotalAmount()).isNull();
+        assertThat(parsed.lineItems()).isEmpty();
+    }
 }

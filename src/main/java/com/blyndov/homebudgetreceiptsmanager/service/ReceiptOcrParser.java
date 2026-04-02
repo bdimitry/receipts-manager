@@ -106,18 +106,41 @@ public class ReceiptOcrParser {
         "місто",
         "город"
     );
+    private static final Set<String> NON_RETAIL_KEYWORDS = Set.of(
+        "bank",
+        "ukrsib",
+        "privat",
+        "paribas",
+        "iban",
+        "swift",
+        "document",
+        "документ",
+        "рахунок",
+        "рахунку",
+        "рахунків",
+        "отримувач",
+        "одержувач",
+        "платіж",
+        "переказ",
+        "єдрпоу",
+        "edrpou",
+        "invoice",
+        "account",
+        "online"
+    );
 
     public ParsedReceiptData parse(String rawText) {
         List<String> lines = rawText.lines()
             .map(this::normalizeWhitespace)
             .filter(StringUtils::hasText)
             .toList();
+        boolean nonRetailDocument = looksLikeNonRetailDocument(lines, rawText);
 
         return new ParsedReceiptData(
             extractStoreName(lines).orElse(null),
-            extractTotalAmount(lines, rawText).orElse(null),
+            nonRetailDocument ? null : extractTotalAmount(lines, rawText).orElse(null),
             extractPurchaseDate(rawText).orElse(null),
-            extractLineItems(lines)
+            nonRetailDocument ? List.of() : extractLineItems(lines)
         );
     }
 
@@ -393,6 +416,27 @@ public class ReceiptOcrParser {
 
     private boolean isBarcodeLike(String line) {
         return BARCODE_PATTERN.matcher(line.replace('\u00A0', ' ')).matches();
+    }
+
+    private boolean looksLikeNonRetailDocument(List<String> lines, String rawText) {
+        String normalizedText = normalizeForMatching(rawText);
+        long keywordHits = NON_RETAIL_KEYWORDS.stream()
+            .filter(normalizedText::contains)
+            .count();
+
+        long ibanLikeLines = lines.stream()
+            .map(this::normalizeForMatching)
+            .filter(line -> line.contains("ua") && line.chars().filter(Character::isDigit).count() >= 10)
+            .count();
+
+        long candidateItemLines = lines.stream()
+            .filter(line -> !shouldIgnoreForLineItems(line))
+            .filter(line -> containsLetters(line) && containsMoney(line))
+            .count();
+
+        return (keywordHits >= 3 && candidateItemLines <= 1)
+            || (keywordHits >= 2 && ibanLikeLines > 0)
+            || keywordHits >= 4;
     }
 
     private boolean containsMultiplierMarker(String value) {
