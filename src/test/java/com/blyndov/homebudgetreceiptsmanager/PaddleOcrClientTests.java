@@ -55,6 +55,15 @@ class PaddleOcrClientTests {
         byte[] responseBody = """
             {
               "rawText": "STORE\\nTOTAL 123.45",
+              "preprocessingApplied": true,
+              "pages": [
+                {
+                  "pageIndex": 0,
+                  "imageSizeBefore": { "width": 1200, "height": 1800 },
+                  "imageSizeAfter": { "width": 960, "height": 1600 },
+                  "stepsApplied": ["crop_receipt", "deskew", "contrast", "threshold"]
+                }
+              ],
               "lines": [
                 { "text": "STORE", "confidence": 0.9912 },
                 { "text": "TOTAL 123.45", "confidence": 0.9821 }

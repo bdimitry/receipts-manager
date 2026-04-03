@@ -155,6 +155,13 @@ Contains helper services and init scripts for:
 - PaddleOCR helper
 - Telegram mock
 
+Inside `docker/paddleocr-service`:
+
+- `app.py`: HTTP API and OCR orchestration
+- `ocr_engine.py`: PaddleOCR engine lifecycle and retry wrapper
+- `preprocessing.py`: dedicated receipt image preprocessing layer
+- `tests/`: service-side preprocessing and API contract tests
+
 ### `docker-compose.yml`
 
 Starts:

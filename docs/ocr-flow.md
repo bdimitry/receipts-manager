@@ -75,6 +75,48 @@ The PaddleOCR helper now warms its baseline models during container startup. Thi
 
 For Docker-based local runs, OCR endpoint values in `.env` must use container service names, not `localhost`. Inside the `app` container, `localhost` points back to the Spring Boot container itself.
 
+### Paddle Preprocessing Layer
+
+Before OCR, the Paddle helper now runs a dedicated preprocessing layer that is separate from the OCR engine itself.
+
+Current baseline steps:
+
+- upscale small images to an OCR-friendly long edge
+- detect and crop the dominant receipt or document area when possible
+- deskew mild rotation
+- denoise grayscale text regions
+- improve local contrast with CLAHE
+- apply thresholding to separate text from noisy backgrounds
+
+This pipeline is intentionally pragmatic. It is meant to improve typical user photos of receipts without requiring manual edits, while still staying simple enough to extend in later steps.
+
+The preprocessing layer can be turned off for comparison through request override:
+
+```powershell
+curl -X POST "http://localhost:8083/ocr?preprocess=false" `
+  -F "file=@C:/temp/receipt.png;type=image/png"
+```
+
+Default Docker env:
+
+- `PADDLE_OCR_PREPROCESSING_ENABLED=true`
+- `PADDLE_OCR_TARGET_LONG_EDGE=1600`
+
+The Paddle helper response now also includes lightweight debug metadata:
+
+- `preprocessingApplied`
+- `pages[]`
+  - `imageSizeBefore`
+  - `imageSizeAfter`
+  - `stepsApplied`
+
+Service-side preprocessing tests can be run directly with:
+
+```powershell
+docker build -t receipts-manager-paddleocr-service-test docker/paddleocr-service
+docker run --rm -w /app receipts-manager-paddleocr-service-test:latest python -m unittest discover -s tests -v
+```
+
 ## Storage Model
 
 OCR data is stored in two layers.
@@ -221,6 +263,16 @@ docker compose up -d --build
 $env:OCR_SERVICE_BACKEND="PADDLE"
 $env:OCR_SERVICE_PADDLE_BASE_URL="http://paddleocr-service:8083"
 docker compose up -d --build app paddleocr-service
+```
+
+3. compare OCR output with and without preprocessing:
+
+```powershell
+curl -X POST "http://localhost:8083/ocr?preprocess=false" `
+  -F "file=@C:/temp/receipt.png;type=image/png"
+
+curl -X POST "http://localhost:8083/ocr?preprocess=true" `
+  -F "file=@C:/temp/receipt.png;type=image/png"
 ```
 
 3. upload a PNG or PDF receipt with explicit currency:

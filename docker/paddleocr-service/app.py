@@ -1,62 +1,88 @@
+from __future__ import annotations
+
 import io
 import os
-import threading
 
 import fitz
 import numpy as np
-from flask import Flask, jsonify, request
-from paddleocr import PaddleOCR
+from flask import Flask, current_app, jsonify, request
 from PIL import Image
 
+from ocr_engine import PaddleOcrEngine
+from preprocessing import ReceiptImagePreprocessor
 
-app = Flask(__name__)
+
 PADDLE_OCR_LANG = os.getenv("PADDLE_OCR_LANG", "cyrillic")
 PADDLE_OCR_USE_ANGLE_CLS = os.getenv("PADDLE_OCR_USE_ANGLE_CLS", "false").lower() == "true"
-_ocr = None
-_ocr_lock = threading.Lock()
+PADDLE_OCR_PREPROCESSING_ENABLED = os.getenv("PADDLE_OCR_PREPROCESSING_ENABLED", "true").lower() == "true"
+PADDLE_OCR_TARGET_LONG_EDGE = int(os.getenv("PADDLE_OCR_TARGET_LONG_EDGE", "1600"))
+PADDLE_OCR_SKIP_WARMUP = os.getenv("PADDLE_OCR_SKIP_WARMUP", "false").lower() == "true"
 
 
-def _engine():
-    global _ocr
-    if _ocr is None:
-        with _ocr_lock:
-            if _ocr is None:
-                _ocr = PaddleOCR(
-                    use_angle_cls=PADDLE_OCR_USE_ANGLE_CLS,
-                    lang=PADDLE_OCR_LANG,
-                    use_gpu=False,
-                    show_log=False,
-                )
-    return _ocr
+def create_app(
+    ocr_engine: PaddleOcrEngine | None = None,
+    image_preprocessor: ReceiptImagePreprocessor | None = None,
+) -> Flask:
+    application = Flask(__name__)
+    application.config["OCR_ENGINE"] = ocr_engine or PaddleOcrEngine(
+        language=PADDLE_OCR_LANG,
+        use_angle_cls=PADDLE_OCR_USE_ANGLE_CLS,
+    )
+    application.config["IMAGE_PREPROCESSOR"] = image_preprocessor or ReceiptImagePreprocessor(
+        enabled=PADDLE_OCR_PREPROCESSING_ENABLED,
+        target_long_edge=PADDLE_OCR_TARGET_LONG_EDGE,
+    )
+
+    if not PADDLE_OCR_SKIP_WARMUP:
+        application.config["OCR_ENGINE"].warm_up()
+
+    @application.get("/health")
+    def health():
+        return jsonify({"status": "UP", "backend": "PaddleOCR"})
+
+    @application.post("/ocr")
+    def ocr():
+        file = request.files.get("file")
+        if file is None or file.filename == "":
+            return jsonify({"message": "file is required"}), 400
+
+        content = file.read()
+        if not content:
+            return jsonify({"message": "file is empty"}), 400
+
+        content_type = (file.content_type or "").lower()
+        preprocess_enabled = _resolve_preprocess_override(request)
+
+        try:
+            processed_pages = _processed_page_images(content, content_type, preprocess_enabled)
+            lines = _extract_lines(processed_pages)
+            raw_text = "\n".join(line["text"] for line in lines)
+            return jsonify(
+                {
+                    "rawText": raw_text,
+                    "lines": lines,
+                    "preprocessingApplied": any(page.applied for page in processed_pages),
+                    "pages": [page.to_response(index) for index, page in enumerate(processed_pages)],
+                }
+            )
+        except Exception as exception:
+            return jsonify({"message": f"PaddleOCR extraction failed: {exception}"}), 500
+
+    return application
 
 
-_engine()
+def _resolve_preprocess_override(http_request) -> bool | None:
+    raw_value = http_request.args.get("preprocess")
+    if raw_value is None:
+        raw_value = http_request.form.get("preprocess")
+
+    if raw_value is None:
+        return None
+
+    return raw_value.strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _reset_engine():
-    global _ocr
-    with _ocr_lock:
-        _ocr = None
-        _ocr = PaddleOCR(
-            use_angle_cls=PADDLE_OCR_USE_ANGLE_CLS,
-            lang=PADDLE_OCR_LANG,
-            use_gpu=False,
-            show_log=False,
-        )
-        return _ocr
-
-
-def _ocr_image(image_array):
-    try:
-        with _ocr_lock:
-            return _engine().ocr(image_array, cls=PADDLE_OCR_USE_ANGLE_CLS)
-    except Exception:
-        engine = _reset_engine()
-        with _ocr_lock:
-            return engine.ocr(image_array, cls=PADDLE_OCR_USE_ANGLE_CLS)
-
-
-def _page_images(content, content_type):
+def _page_images(content: bytes, content_type: str) -> list[Image.Image]:
     if content_type == "application/pdf":
         document = fitz.open(stream=content, filetype="pdf")
         try:
@@ -71,12 +97,21 @@ def _page_images(content, content_type):
     return [Image.open(io.BytesIO(content)).convert("RGB")]
 
 
-def _extract_lines(content, content_type):
+def _processed_page_images(content: bytes, content_type: str, preprocess_enabled: bool | None):
+    preprocessor: ReceiptImagePreprocessor = current_app.config["IMAGE_PREPROCESSOR"]
+    return [
+        preprocessor.preprocess(image, enabled_override=preprocess_enabled)
+        for image in _page_images(content, content_type)
+    ]
+
+
+def _extract_lines(processed_pages) -> list[dict]:
+    ocr_engine = current_app.config["OCR_ENGINE"]
     lines = []
-    for image in _page_images(content, content_type):
-        result = _ocr_image(np.array(image))
-        for page in result or []:
-            for entry in page or []:
+    for page in processed_pages:
+        result = ocr_engine.extract_lines(np.array(page.image))
+        for ocr_page in result or []:
+            for entry in ocr_page or []:
                 if len(entry) < 2:
                     continue
                 text, confidence = entry[1]
@@ -92,28 +127,7 @@ def _extract_lines(content, content_type):
     return lines
 
 
-@app.get("/health")
-def health():
-    return jsonify({"status": "UP", "backend": "PaddleOCR"})
-
-
-@app.post("/ocr")
-def ocr():
-    file = request.files.get("file")
-    if file is None or file.filename == "":
-        return jsonify({"message": "file is required"}), 400
-
-    content = file.read()
-    if not content:
-        return jsonify({"message": "file is empty"}), 400
-
-    content_type = (file.content_type or "").lower()
-    try:
-        lines = _extract_lines(content, content_type)
-        raw_text = "\n".join(line["text"] for line in lines)
-        return jsonify({"rawText": raw_text, "lines": lines})
-    except Exception as exception:
-        return jsonify({"message": f"PaddleOCR extraction failed: {exception}"}), 500
+app = create_app()
 
 
 if __name__ == "__main__":

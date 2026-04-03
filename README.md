@@ -160,6 +160,40 @@ The PaddleOCR helper currently returns:
   - `text`
   - `confidence`
 
+The Paddle helper now also applies automatic preprocessing before OCR. The baseline preprocessing layer currently:
+
+- upscales smaller images
+- attempts receipt-region crop when a dominant document contour is visible
+- deskews mildly rotated photos
+- denoises grayscale text regions
+- boosts local contrast
+- applies thresholding for OCR-friendly text separation
+
+You can compare OCR output with and without preprocessing:
+
+```powershell
+curl -X POST "http://localhost:8083/ocr?preprocess=false" `
+  -F "file=@C:/temp/receipt.png;type=image/png"
+
+curl -X POST "http://localhost:8083/ocr?preprocess=true" `
+  -F "file=@C:/temp/receipt.png;type=image/png"
+```
+
+The Paddle helper response now also includes lightweight preprocessing metadata:
+
+- `preprocessingApplied`
+- `pages[]`
+  - `imageSizeBefore`
+  - `imageSizeAfter`
+  - `stepsApplied`
+
+To run the Paddle helper service-side tests directly:
+
+```powershell
+docker build -t receipts-manager-paddleocr-service-test docker/paddleocr-service
+docker run --rm -w /app receipts-manager-paddleocr-service-test:latest python -m unittest discover -s tests -v
+```
+
 This is intentionally a baseline OCR backend only. It is not yet a final receipt parsing pipeline.
 
 The PaddleOCR helper now warms its baseline models during container startup, so the first live OCR request no longer needs to perform the heaviest model initialization work on the user-facing path.
