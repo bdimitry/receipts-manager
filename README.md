@@ -159,6 +159,8 @@ The PaddleOCR helper currently returns:
 - `lines[]`
   - `text`
   - `confidence`
+  - `order`
+  - `bbox` as an optional four-point polygon when Paddle exposes coordinates
 
 The Paddle helper now also applies automatic preprocessing before OCR. The baseline preprocessing layer currently:
 
@@ -186,6 +188,13 @@ The Paddle helper response now also includes lightweight preprocessing metadata:
   - `imageSizeBefore`
   - `imageSizeAfter`
   - `stepsApplied`
+
+The `lines[]` collection is now the main structured OCR output for downstream parsing work:
+
+- each line keeps human reading order from top to bottom
+- `order` is explicit and stable across pages
+- `bbox` is included for local diagnostics and future line-aware parsing steps
+- `rawText` remains available for compatibility and quick debugging
 
 To run the Paddle helper service-side tests directly:
 

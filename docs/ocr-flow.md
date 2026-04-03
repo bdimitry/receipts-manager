@@ -63,13 +63,20 @@ Response contract:
 - `lines`
   - `text`
   - `confidence`
+  - `order`
+  - `bbox` when coordinates are available
 
 The Spring Boot application can switch to it through:
 
 - `app.ocr.service.backend=PADDLE`
 - `app.ocr.service.paddle-base-url=http://...`
 
-The existing business parsing flow remains unchanged. The Paddle response is normalized into raw text first, then passed to `ReceiptOcrParser`.
+The existing business parsing flow remains unchanged. The Paddle response is now normalized into both:
+
+- `rawText` for compatibility
+- ordered `lines[]` for future line-aware parsing work
+
+The current Spring flow still uses the text representation for downstream receipt parsing, but the client contract is now ready for the next parser step.
 
 The PaddleOCR helper now warms its baseline models during container startup. This moves the heaviest cold-start initialization away from the first live OCR request in a fresh local environment.
 
@@ -109,6 +116,19 @@ The Paddle helper response now also includes lightweight debug metadata:
   - `imageSizeBefore`
   - `imageSizeAfter`
   - `stepsApplied`
+
+### Paddle Line-Based Output
+
+The Paddle helper no longer treats OCR as only one opaque text block. It now maps raw PaddleOCR output through a dedicated response mapper and returns explicit receipt lines.
+
+Current guarantees:
+
+- lines are sorted in human reading order from top to bottom
+- lines within the same visual row are sorted left to right
+- each line has a stable `order`
+- `rawText` is derived from ordered lines, not from raw engine output order
+
+This gives the next parser step a predictable foundation for normalization, noise filtering, and receipt field extraction.
 
 Service-side preprocessing tests can be run directly with:
 
@@ -298,6 +318,15 @@ Invoke-RestMethod -Method Get `
 - `parsedTotalAmount`
 - `lineItems`
 - `rawOcrText`
+
+For direct helper verification, confirm that `POST /ocr` returns:
+
+- `rawText`
+- `lines[]`
+  - `text`
+  - `confidence`
+  - `order`
+  - optional `bbox`
 
 6. inspect queues and logs if needed:
 

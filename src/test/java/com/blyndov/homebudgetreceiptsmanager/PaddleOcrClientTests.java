@@ -47,6 +47,13 @@ class PaddleOcrClientTests {
         assertThat(response.lines()).hasSize(2);
         assertThat(response.lines().getFirst().text()).isEqualTo("STORE");
         assertThat(response.lines().getFirst().confidence()).isEqualTo(0.9912d);
+        assertThat(response.lines().getFirst().order()).isEqualTo(0);
+        assertThat(response.lines().getFirst().bbox()).containsExactly(
+            java.util.List.of(10.0d, 20.0d),
+            java.util.List.of(220.0d, 20.0d),
+            java.util.List.of(220.0d, 60.0d),
+            java.util.List.of(10.0d, 60.0d)
+        );
         assertThat(client.extractText("receipt.png", "image/png", "fake-image".getBytes(StandardCharsets.UTF_8)))
             .isEqualTo("STORE\nTOTAL 123.45");
     }
@@ -65,8 +72,18 @@ class PaddleOcrClientTests {
                 }
               ],
               "lines": [
-                { "text": "STORE", "confidence": 0.9912 },
-                { "text": "TOTAL 123.45", "confidence": 0.9821 }
+                {
+                  "text": "STORE",
+                  "confidence": 0.9912,
+                  "order": 0,
+                  "bbox": [[10, 20], [220, 20], [220, 60], [10, 60]]
+                },
+                {
+                  "text": "TOTAL 123.45",
+                  "confidence": 0.9821,
+                  "order": 1,
+                  "bbox": [[12, 180], [260, 180], [260, 220], [12, 220]]
+                }
               ]
             }
             """.getBytes(StandardCharsets.UTF_8);

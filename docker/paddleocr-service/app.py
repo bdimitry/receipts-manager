@@ -10,6 +10,7 @@ from PIL import Image
 
 from ocr_engine import PaddleOcrEngine
 from preprocessing import ReceiptImagePreprocessor
+from response_mapping import PaddleOcrResponseMapper
 
 
 PADDLE_OCR_LANG = os.getenv("PADDLE_OCR_LANG", "cyrillic")
@@ -32,6 +33,7 @@ def create_app(
         enabled=PADDLE_OCR_PREPROCESSING_ENABLED,
         target_long_edge=PADDLE_OCR_TARGET_LONG_EDGE,
     )
+    application.config["OCR_RESPONSE_MAPPER"] = PaddleOcrResponseMapper()
 
     if not PADDLE_OCR_SKIP_WARMUP:
         application.config["OCR_ENGINE"].warm_up()
@@ -107,23 +109,14 @@ def _processed_page_images(content: bytes, content_type: str, preprocess_enabled
 
 def _extract_lines(processed_pages) -> list[dict]:
     ocr_engine = current_app.config["OCR_ENGINE"]
+    response_mapper: PaddleOcrResponseMapper = current_app.config["OCR_RESPONSE_MAPPER"]
     lines = []
+    order_offset = 0
     for page in processed_pages:
         result = ocr_engine.extract_lines(np.array(page.image))
-        for ocr_page in result or []:
-            for entry in ocr_page or []:
-                if len(entry) < 2:
-                    continue
-                text, confidence = entry[1]
-                text = (text or "").strip()
-                if not text:
-                    continue
-                lines.append(
-                    {
-                        "text": text,
-                        "confidence": round(float(confidence), 4) if confidence is not None else None,
-                    }
-                )
+        page_lines = response_mapper.map_page_lines(result, order_offset=order_offset)
+        lines.extend(line.to_response() for line in page_lines)
+        order_offset += len(page_lines)
     return lines
 
 

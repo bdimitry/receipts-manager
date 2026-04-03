@@ -160,6 +160,7 @@ Inside `docker/paddleocr-service`:
 - `app.py`: HTTP API and OCR orchestration
 - `ocr_engine.py`: PaddleOCR engine lifecycle and retry wrapper
 - `preprocessing.py`: dedicated receipt image preprocessing layer
+- `response_mapping.py`: line-based mapping from raw PaddleOCR output into ordered OCR rows
 - `tests/`: service-side preprocessing and API contract tests
 
 ### `docker-compose.yml`
@@ -242,7 +243,7 @@ Holds:
 3. frontend calls typed API functions
 4. backend controllers delegate to services
 5. services persist to PostgreSQL and interact with S3, SQS, OCR, and notifications
-6. the OCR adapter selects Tesseract or PaddleOCR by configuration and normalizes raw text into the existing receipt OCR flow
+6. the OCR adapter selects Tesseract or PaddleOCR by configuration and now accepts both raw text and ordered PaddleOCR line rows for the evolving OCR pipeline
 7. OCR results are stored as receipt summary fields plus `ReceiptLineItem` rows
 8. dashboard and reports format financial data with explicit currency awareness
 9. frontend reflects backend state through TanStack Query and form mutations

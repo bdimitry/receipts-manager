@@ -63,6 +63,7 @@ It allows a user to:
 - multilingual OCR runs with `ukr+rus+eng` in the local helper container
 - the main backend can now switch between OCR helper backends through configuration without changing the business parsing flow
 - the PaddleOCR helper now includes a separate preprocessing layer for crop cleanup, deskew, denoise, contrast recovery, and thresholding before OCR
+- the PaddleOCR helper now returns line-based OCR output with stable reading order, so the next parser step can work with explicit receipt rows instead of a single long text blob
 - OCR `DONE` means text extraction succeeded, even if structured parsing is partial
 - OCR `FAILED` means extraction or processing itself failed
 

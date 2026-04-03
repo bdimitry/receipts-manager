@@ -36,9 +36,15 @@ class PaddleOcrAppTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         body = response.get_json()
-        self.assertEqual(body["rawText"], "STORE\nTOTAL 132.60")
+        self.assertEqual(body["rawText"], "STORE\nMILK 42.50\nTOTAL 132.60")
         self.assertTrue(body["preprocessingApplied"])
-        self.assertEqual(len(body["lines"]), 2)
+        self.assertEqual(len(body["lines"]), 3)
+        self.assertEqual(
+            [line["text"] for line in body["lines"]],
+            ["STORE", "MILK 42.50", "TOTAL 132.60"],
+        )
+        self.assertEqual([line["order"] for line in body["lines"]], [0, 1, 2])
+        self.assertEqual(body["lines"][0]["bbox"], [[10.0, 20.0], [220.0, 20.0], [220.0, 60.0], [10.0, 60.0]])
         self.assertGreater(len(body["pages"][0]["stepsApplied"]), 0)
         self.assertGreater(engine.calls, 0)
 
@@ -73,8 +79,9 @@ class FakeEngine:
     def extract_lines(self, image_array):
         self.calls += 1
         return [[
-            [None, ("STORE", 0.9912)],
-            [None, ("TOTAL 132.60", 0.9821)],
+            [[[15, 160], [200, 160], [200, 200], [15, 200]], ("MILK 42.50", 0.9888)],
+            [[[15, 250], [240, 250], [240, 288], [15, 288]], ("TOTAL 132.60", 0.9821)],
+            [[[10, 20], [220, 20], [220, 60], [10, 60]], ("STORE", 0.9912)],
         ]]
 
 
