@@ -158,11 +158,14 @@ Contains helper services and init scripts for:
 Inside `docker/paddleocr-service`:
 
 - `app.py`: HTTP API and OCR orchestration
-- `diagnostics.py`: local comparison script for raw PaddleOCR output across language configs
+- `profiles.py`: explicit OCR profile registry for baseline and comparison runs
+- `corpus.py`: reproducible diagnostic corpus for OCR profile comparison
+- `comparison.py`: scoring and recommendation logic for profile selection
+- `diagnostics.py`: local comparison script for raw PaddleOCR output across OCR profiles
 - `ocr_engine.py`: PaddleOCR engine lifecycle and retry wrapper
 - `preprocessing.py`: dedicated receipt image preprocessing layer
 - `response_mapping.py`: line-based mapping from raw PaddleOCR output into ordered OCR rows
-- `tests/`: service-side preprocessing and API contract tests
+- `tests/`: service-side preprocessing, profile, comparison, and API contract tests
 
 ### `docker-compose.yml`
 

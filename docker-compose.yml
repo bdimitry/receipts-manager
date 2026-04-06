@@ -84,8 +84,8 @@ services:
       dockerfile: Dockerfile
     container_name: home-budget-paddleocr-service
     environment:
-      PADDLE_OCR_LANG: ${PADDLE_OCR_LANG:-cyrillic}
-      PADDLE_OCR_USE_ANGLE_CLS: ${PADDLE_OCR_USE_ANGLE_CLS:-false}
+      PADDLE_OCR_PROFILE: ${PADDLE_OCR_PROFILE:-en}
+      PADDLE_OCR_LANG: ${PADDLE_OCR_LANG:-}
       PADDLE_OCR_PREPROCESSING_ENABLED: ${PADDLE_OCR_PREPROCESSING_ENABLED:-true}
       PADDLE_OCR_TARGET_LONG_EDGE: ${PADDLE_OCR_TARGET_LONG_EDGE:-1600}
     ports:

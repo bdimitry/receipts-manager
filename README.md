@@ -202,10 +202,12 @@ For diagnosis, the helper also exposes:
 - `GET /diagnostics/config`
 - `POST /ocr?debug=true`
 
-The current diagnostic baseline on this branch uses:
+The current diagnostic baseline on this branch uses an explicit OCR profile strategy:
 
-- detector: `Multilingual_PP-OCRv3_det_infer`
-- recognizer: `cyrillic_PP-OCRv3_rec_infer`
+- active profile: `en`
+- compared profiles: `en`, `cyrillic`, `latin`
+- detector: `en_PP-OCRv3_det_infer`
+- recognizer: `en_PP-OCRv4_rec_infer`
 - recognizer algorithm: `SVTR_LCNet`
 - OCR version: `PP-OCRv4`
 
@@ -213,7 +215,7 @@ Current conclusion from the diagnostic step:
 
 - the weakest quality cases mostly originate in the OCR engine itself on script-mismatched inputs
 - `lines[]` mapping preserves engine text fairly closely and mainly affects order and grouping
-- English-heavy synthetic receipts often perform better with `en` than with the current default `cyrillic`
+- the controlled comparison corpus now selects `en` as the strongest default baseline for the standard OCR branch, while `cyrillic` remains available as a comparison profile
 
 To run the Paddle helper service-side tests directly:
 
@@ -225,7 +227,7 @@ docker run --rm -w /app receipts-manager-paddleocr-service-test:latest python -m
 To run the local OCR diagnostic comparison script:
 
 ```powershell
-docker exec home-budget-paddleocr-service python diagnostics.py --langs cyrillic en latin --preprocess true
+docker exec home-budget-paddleocr-service python diagnostics.py --profiles en cyrillic latin --preprocess true
 ```
 
 This is intentionally a baseline OCR backend only. It is not yet a final receipt parsing pipeline.

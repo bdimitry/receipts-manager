@@ -82,15 +82,16 @@ The PaddleOCR helper now warms its baseline models during container startup. Thi
 
 For Docker-based local runs, OCR endpoint values in `.env` must use container service names, not `localhost`. Inside the `app` container, `localhost` points back to the Spring Boot container itself.
 
-Current local diagnostic baseline on this branch uses:
+Current local diagnostic baseline on this branch uses an explicit OCR profile strategy:
 
+- active profile: `en`
+- compared profiles: `en`, `cyrillic`, `latin`
 - OCR version: `PP-OCRv4`
 - detector: `DB`
 - recognizer: `SVTR_LCNet`
-- detector model: `Multilingual_PP-OCRv3_det_infer`
-- recognizer model: `cyrillic_PP-OCRv3_rec_infer`
+- detector model: `en_PP-OCRv3_det_infer`
+- recognizer model: `en_PP-OCRv4_rec_infer`
 - classifier model: `ch_ppocr_mobile_v2.0_cls_infer`
-- default language: `cyrillic`
 - default angle classification: `false`
 
 ### Paddle Preprocessing Layer
@@ -163,7 +164,7 @@ Current diagnostic conclusion:
 
 - the most visible script-mixing issues are already present in raw PaddleOCR output on some inputs
 - the line mapper is mostly preserving engine text and improving row order, not introducing character corruption
-- English-heavy synthetic receipts are a useful warning sign that the default `cyrillic` recognizer may not be the best universal baseline
+- the controlled comparison corpus now selects `en` as the strongest default baseline for the standard OCR branch, while `cyrillic` remains useful as a comparison profile
 
 Service-side preprocessing tests can be run directly with:
 
