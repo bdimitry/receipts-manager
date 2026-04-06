@@ -19,6 +19,23 @@ from tests.test_preprocessing import synthetic_receipt_photo
 
 class PaddleOcrAppTests(unittest.TestCase):
 
+    def test_diagnostics_config_reports_active_engine_setup(self):
+        engine = FakeEngine()
+        app = create_app(
+            ocr_engine=engine,
+            image_preprocessor=ReceiptImagePreprocessor(enabled=True, target_long_edge=1600),
+        )
+        client = app.test_client()
+
+        response = client.get("/diagnostics/config")
+
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertEqual(body["backend"], "PaddleOCR")
+        self.assertEqual(body["defaultConfig"]["language"], "cyrillic")
+        self.assertEqual(body["defaultConfig"]["recModelName"], "cyrillic_PP-OCRv3_rec_infer")
+        self.assertTrue(body["preprocessingEnabled"])
+
     def test_ocr_endpoint_returns_lines_and_preprocessing_metadata(self):
         engine = FakeEngine()
         app = create_app(
@@ -48,6 +65,28 @@ class PaddleOcrAppTests(unittest.TestCase):
         self.assertGreater(len(body["pages"][0]["stepsApplied"]), 0)
         self.assertGreater(engine.calls, 0)
 
+    def test_ocr_debug_mode_exposes_raw_engine_output_and_lang_override(self):
+        engine = FakeEngine()
+        app = create_app(
+            ocr_engine=engine,
+            image_preprocessor=ReceiptImagePreprocessor(enabled=True, target_long_edge=1600),
+        )
+        client = app.test_client()
+
+        payload = image_to_png_bytes(synthetic_receipt_photo())
+        response = client.post(
+            "/ocr?preprocess=true&debug=true&lang=en",
+            data={"file": (io.BytesIO(payload), "receipt.png")},
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertEqual(body["diagnostics"]["engineConfig"]["language"], "en")
+        self.assertEqual(body["diagnostics"]["rawEngineLines"][0]["text"], "MILK 42.50")
+        self.assertEqual(body["diagnostics"]["rawEngineText"], "MILK 42.50\nTOTAL 132.60\nSTORE")
+        self.assertEqual(engine.language_overrides, ["en"])
+
     def test_ocr_endpoint_allows_disabling_preprocessing_for_baseline_comparison(self):
         engine = FakeEngine()
         app = create_app(
@@ -72,12 +111,30 @@ class PaddleOcrAppTests(unittest.TestCase):
 class FakeEngine:
     def __init__(self):
         self.calls = 0
+        self.language_overrides = []
 
     def warm_up(self):
         return None
 
-    def extract_lines(self, image_array):
+    def describe(self, language_override=None):
+        return {
+            "language": language_override or "cyrillic",
+            "useAngleCls": False,
+            "detAlgorithm": "DB",
+            "recAlgorithm": "SVTR_LCNet",
+            "ocrVersion": "PP-OCRv4",
+            "detModelDir": "/models/det",
+            "recModelDir": "/models/cyrillic_PP-OCRv3_rec_infer",
+            "clsModelDir": "/models/cls",
+            "detModelName": "Multilingual_PP-OCRv3_det_infer",
+            "recModelName": "cyrillic_PP-OCRv3_rec_infer",
+            "clsModelName": "ch_ppocr_mobile_v2.0_cls_infer",
+        }
+
+    def extract_lines(self, image_array, language_override=None):
         self.calls += 1
+        if language_override is not None:
+            self.language_overrides.append(language_override)
         return [[
             [[[15, 160], [200, 160], [200, 200], [15, 200]], ("MILK 42.50", 0.9888)],
             [[[15, 250], [240, 250], [240, 288], [15, 288]], ("TOTAL 132.60", 0.9821)],

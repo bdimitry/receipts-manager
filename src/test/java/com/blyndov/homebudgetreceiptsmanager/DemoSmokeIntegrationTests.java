@@ -247,11 +247,7 @@ class DemoSmokeIntegrationTests extends AbstractPostgresIntegrationTest {
         assertThat(receiptsResponse.getBody()).isNotNull();
         assertThat(receiptsResponse.getBody()).hasSize(1);
 
-        Awaitility.await()
-            .atMost(Duration.ofSeconds(10))
-            .untilAsserted(() -> assertThat(receivedEmails()).hasSize(1));
-
-        MimeMessage notification = receivedEmails()[0];
+        MimeMessage notification = awaitEmailForRecipient(email);
         assertThat(notification.getAllRecipients()).hasSize(1);
         assertThat(notification.getAllRecipients()[0].toString()).isEqualTo(email);
         assertThat(notification.getContent().toString()).contains("ready");

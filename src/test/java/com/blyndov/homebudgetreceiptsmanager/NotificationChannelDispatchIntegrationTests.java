@@ -93,8 +93,7 @@ class NotificationChannelDispatchIntegrationTests extends AbstractPostgresIntegr
         ReportJobResponse createdJob = createReport(accessToken, ReportType.MONTHLY_SPENDING, ReportFormat.CSV).getBody();
         ReportJobResponse completedJob = awaitDone(createdJob.id(), accessToken);
 
-        Awaitility.await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(receivedEmails()).hasSize(1));
-        MimeMessage notification = receivedEmails()[0];
+        MimeMessage notification = awaitEmailForRecipient(email);
 
         assertThat(notification.getAllRecipients()[0].toString()).isEqualTo(email);
         assertThat(notification.getSubject()).contains("ready");

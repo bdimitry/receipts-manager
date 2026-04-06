@@ -42,6 +42,18 @@ def create_app(
     def health():
         return jsonify({"status": "UP", "backend": "PaddleOCR"})
 
+    @application.get("/diagnostics/config")
+    def diagnostics_config():
+        ocr_engine: PaddleOcrEngine = current_app.config["OCR_ENGINE"]
+        return jsonify(
+            {
+                "backend": "PaddleOCR",
+                "defaultConfig": ocr_engine.describe(),
+                "preprocessingEnabled": PADDLE_OCR_PREPROCESSING_ENABLED,
+                "targetLongEdge": PADDLE_OCR_TARGET_LONG_EDGE,
+            }
+        )
+
     @application.post("/ocr")
     def ocr():
         file = request.files.get("file")
@@ -54,34 +66,56 @@ def create_app(
 
         content_type = (file.content_type or "").lower()
         preprocess_enabled = _resolve_preprocess_override(request)
+        debug_enabled = _resolve_boolean_flag(request, "debug")
+        language_override = _resolve_language_override(request)
 
         try:
             processed_pages = _processed_page_images(content, content_type, preprocess_enabled)
-            lines = _extract_lines(processed_pages)
+            raw_engine_pages = _raw_engine_pages(processed_pages, language_override)
+            lines = _extract_lines(raw_engine_pages)
             raw_text = "\n".join(line["text"] for line in lines)
-            return jsonify(
-                {
-                    "rawText": raw_text,
-                    "lines": lines,
-                    "preprocessingApplied": any(page.applied for page in processed_pages),
-                    "pages": [page.to_response(index) for index, page in enumerate(processed_pages)],
-                }
-            )
+            payload = {
+                "rawText": raw_text,
+                "lines": lines,
+                "preprocessingApplied": any(page.applied for page in processed_pages),
+                "pages": [page.to_response(index) for index, page in enumerate(processed_pages)],
+            }
+
+            if debug_enabled:
+                payload["diagnostics"] = _build_diagnostics(raw_engine_pages, language_override)
+
+            return jsonify(payload)
         except Exception as exception:
             return jsonify({"message": f"PaddleOCR extraction failed: {exception}"}), 500
 
     return application
 
 
-def _resolve_preprocess_override(http_request) -> bool | None:
-    raw_value = http_request.args.get("preprocess")
+def _resolve_boolean_flag(http_request, parameter_name: str) -> bool | None:
+    raw_value = http_request.args.get(parameter_name)
     if raw_value is None:
-        raw_value = http_request.form.get("preprocess")
+        raw_value = http_request.form.get(parameter_name)
 
     if raw_value is None:
         return None
 
     return raw_value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _resolve_preprocess_override(http_request) -> bool | None:
+    return _resolve_boolean_flag(http_request, "preprocess")
+
+
+def _resolve_language_override(http_request) -> str | None:
+    raw_value = http_request.args.get("lang")
+    if raw_value is None:
+        raw_value = http_request.form.get("lang")
+
+    if raw_value is None:
+        return None
+
+    normalized = raw_value.strip()
+    return normalized or None
 
 
 def _page_images(content: bytes, content_type: str) -> list[Image.Image]:
@@ -107,17 +141,40 @@ def _processed_page_images(content: bytes, content_type: str, preprocess_enabled
     ]
 
 
-def _extract_lines(processed_pages) -> list[dict]:
+def _raw_engine_pages(processed_pages, language_override: str | None):
     ocr_engine = current_app.config["OCR_ENGINE"]
+    return [
+        ocr_engine.extract_lines(np.array(page.image), language_override=language_override)
+        for page in processed_pages
+    ]
+
+
+def _extract_lines(raw_engine_pages) -> list[dict]:
     response_mapper: PaddleOcrResponseMapper = current_app.config["OCR_RESPONSE_MAPPER"]
     lines = []
     order_offset = 0
-    for page in processed_pages:
-        result = ocr_engine.extract_lines(np.array(page.image))
-        page_lines = response_mapper.map_page_lines(result, order_offset=order_offset)
+    for raw_engine_page in raw_engine_pages:
+        page_lines = response_mapper.map_page_lines(raw_engine_page, order_offset=order_offset)
         lines.extend(line.to_response() for line in page_lines)
         order_offset += len(page_lines)
     return lines
+
+
+def _build_diagnostics(raw_engine_pages, language_override: str | None) -> dict:
+    ocr_engine: PaddleOcrEngine = current_app.config["OCR_ENGINE"]
+    response_mapper: PaddleOcrResponseMapper = current_app.config["OCR_RESPONSE_MAPPER"]
+    raw_engine_lines = []
+
+    for page_index, raw_engine_page in enumerate(raw_engine_pages):
+        raw_lines = response_mapper.map_raw_engine_lines(raw_engine_page)
+        for line in raw_lines:
+            raw_engine_lines.append({"pageIndex": page_index, **line})
+
+    return {
+        "engineConfig": ocr_engine.describe(language_override),
+        "rawEngineLines": raw_engine_lines,
+        "rawEngineText": "\n".join(line["text"] for line in raw_engine_lines),
+    }
 
 
 app = create_app()

@@ -82,6 +82,17 @@ The PaddleOCR helper now warms its baseline models during container startup. Thi
 
 For Docker-based local runs, OCR endpoint values in `.env` must use container service names, not `localhost`. Inside the `app` container, `localhost` points back to the Spring Boot container itself.
 
+Current local diagnostic baseline on this branch uses:
+
+- OCR version: `PP-OCRv4`
+- detector: `DB`
+- recognizer: `SVTR_LCNet`
+- detector model: `Multilingual_PP-OCRv3_det_infer`
+- recognizer model: `cyrillic_PP-OCRv3_rec_infer`
+- classifier model: `ch_ppocr_mobile_v2.0_cls_infer`
+- default language: `cyrillic`
+- default angle classification: `false`
+
 ### Paddle Preprocessing Layer
 
 Before OCR, the Paddle helper now runs a dedicated preprocessing layer that is separate from the OCR engine itself.
@@ -129,6 +140,30 @@ Current guarantees:
 - `rawText` is derived from ordered lines, not from raw engine output order
 
 This gives the next parser step a predictable foundation for normalization, noise filtering, and receipt field extraction.
+
+### Paddle Diagnostics
+
+The helper also exposes diagnostic visibility so the OCR baseline can be inspected before business parsing:
+
+- `GET /diagnostics/config`
+- `POST /ocr?debug=true`
+
+`debug=true` adds:
+
+- `diagnostics.engineConfig`
+- `diagnostics.rawEngineLines`
+- `diagnostics.rawEngineText`
+
+This lets you compare the engine's own text with:
+
+- mapped ordered `lines[]`
+- assembled `rawText`
+
+Current diagnostic conclusion:
+
+- the most visible script-mixing issues are already present in raw PaddleOCR output on some inputs
+- the line mapper is mostly preserving engine text and improving row order, not introducing character corruption
+- English-heavy synthetic receipts are a useful warning sign that the default `cyrillic` recognizer may not be the best universal baseline
 
 Service-side preprocessing tests can be run directly with:
 

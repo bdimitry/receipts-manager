@@ -12,6 +12,7 @@ Full-stack demo project for personal budget tracking, receipt OCR, async report 
 - [Reporting system](docs/reporting-system.md)
 - [Notification flow](docs/notification-flow.md)
 - [OCR flow](docs/ocr-flow.md)
+- [OCR diagnostics](docs/ocr-diagnostics.md)
 - [Demo guide](docs/demo-guide.md)
 - [Runbook](docs/runbook.md)
 
@@ -196,11 +197,35 @@ The `lines[]` collection is now the main structured OCR output for downstream pa
 - `bbox` is included for local diagnostics and future line-aware parsing steps
 - `rawText` remains available for compatibility and quick debugging
 
+For diagnosis, the helper also exposes:
+
+- `GET /diagnostics/config`
+- `POST /ocr?debug=true`
+
+The current diagnostic baseline on this branch uses:
+
+- detector: `Multilingual_PP-OCRv3_det_infer`
+- recognizer: `cyrillic_PP-OCRv3_rec_infer`
+- recognizer algorithm: `SVTR_LCNet`
+- OCR version: `PP-OCRv4`
+
+Current conclusion from the diagnostic step:
+
+- the weakest quality cases mostly originate in the OCR engine itself on script-mismatched inputs
+- `lines[]` mapping preserves engine text fairly closely and mainly affects order and grouping
+- English-heavy synthetic receipts often perform better with `en` than with the current default `cyrillic`
+
 To run the Paddle helper service-side tests directly:
 
 ```powershell
 docker build -t receipts-manager-paddleocr-service-test docker/paddleocr-service
 docker run --rm -w /app receipts-manager-paddleocr-service-test:latest python -m unittest discover -s tests -v
+```
+
+To run the local OCR diagnostic comparison script:
+
+```powershell
+docker exec home-budget-paddleocr-service python diagnostics.py --langs cyrillic en latin --preprocess true
 ```
 
 This is intentionally a baseline OCR backend only. It is not yet a final receipt parsing pipeline.

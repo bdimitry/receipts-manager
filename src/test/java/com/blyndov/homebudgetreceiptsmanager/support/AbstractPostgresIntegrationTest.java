@@ -11,7 +11,12 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Paths;
+import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import org.awaitility.Awaitility;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
@@ -131,6 +136,47 @@ public abstract class AbstractPostgresIntegrationTest {
 
     protected static MimeMessage[] receivedEmails() {
         return GREEN_MAIL.getReceivedMessages();
+    }
+
+    protected static MimeMessage awaitEmailForRecipient(String recipient) {
+        return awaitEmail(recipient, null);
+    }
+
+    protected static MimeMessage awaitEmail(String recipient, String subjectFragment) {
+        Awaitility.await().atMost(Duration.ofSeconds(15)).until(() -> findEmail(recipient, subjectFragment).isPresent());
+        return findEmail(recipient, subjectFragment)
+            .orElseThrow(() -> new AssertionError("Expected email was not received for " + recipient));
+    }
+
+    private static Optional<MimeMessage> findEmail(String recipient, String subjectFragment) {
+        return Arrays.stream(receivedEmails())
+            .filter(message -> messageHasRecipient(message, recipient))
+            .filter(message -> messageHasSubject(message, subjectFragment))
+            .reduce((first, second) -> second);
+    }
+
+    private static boolean messageHasRecipient(MimeMessage message, String recipient) {
+        try {
+            return Arrays.stream(message.getAllRecipients())
+                .map(address -> address.toString())
+                .collect(Collectors.toSet())
+                .contains(recipient);
+        } catch (Exception exception) {
+            throw new IllegalStateException("Failed to inspect test email recipients", exception);
+        }
+    }
+
+    private static boolean messageHasSubject(MimeMessage message, String subjectFragment) {
+        if (subjectFragment == null || subjectFragment.isBlank()) {
+            return true;
+        }
+
+        try {
+            String subject = message.getSubject();
+            return subject != null && subject.contains(subjectFragment);
+        } catch (Exception exception) {
+            throw new IllegalStateException("Failed to inspect test email subject", exception);
+        }
     }
 
     protected static void purgeTelegramMessages() {

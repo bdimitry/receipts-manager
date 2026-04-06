@@ -89,11 +89,7 @@ class ReportJobFailureIntegrationTests extends AbstractPostgresIntegrationTest {
                 assertThat(reportJob.getErrorMessage()).contains("Simulated report processing failure");
             });
 
-        Awaitility.await()
-            .atMost(Duration.ofSeconds(10))
-            .untilAsserted(() -> assertThat(receivedEmails()).hasSize(1));
-
-        MimeMessage notification = receivedEmails()[0];
+        MimeMessage notification = awaitEmailForRecipient(ownerEmail);
         assertThat(notification.getAllRecipients()).hasSize(1);
         assertThat(notification.getAllRecipients()[0].toString()).isEqualTo(ownerEmail);
         assertThat(notification.getSubject()).contains("failed");

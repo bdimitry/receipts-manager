@@ -42,6 +42,16 @@ class PaddleOcrResponseMapper:
             for index, candidate in enumerate(ordered_candidates)
         ]
 
+    def map_raw_engine_lines(self, ocr_result) -> list[dict]:
+        return [
+            {
+                "text": candidate.text,
+                "confidence": candidate.confidence,
+                "bbox": [[x, y] for x, y in candidate.bbox] if candidate.bbox else None,
+            }
+            for candidate in self._extract_candidates(ocr_result)
+        ]
+
     def _extract_candidates(self, ocr_result) -> list[_CandidateLine]:
         candidates: list[_CandidateLine] = []
         for ocr_page in ocr_result or []:

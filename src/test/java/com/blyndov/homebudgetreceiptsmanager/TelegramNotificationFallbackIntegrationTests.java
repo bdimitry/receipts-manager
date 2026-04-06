@@ -95,9 +95,7 @@ class TelegramNotificationFallbackIntegrationTests extends AbstractPostgresInteg
                 assertThat(reportJob.getS3Key()).isNotBlank();
             });
 
-        Awaitility.await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(receivedEmails()).hasSize(1));
-
-        MimeMessage notification = receivedEmails()[0];
+        MimeMessage notification = awaitEmailForRecipient(email);
         assertThat(notification.getAllRecipients()[0].toString()).isEqualTo(email);
         assertThat(notification.getSubject()).contains("ready");
         assertThat(receivedTelegramMessages()).isEmpty();

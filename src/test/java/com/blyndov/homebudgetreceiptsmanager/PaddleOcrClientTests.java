@@ -71,6 +71,13 @@ class PaddleOcrClientTests {
                   "stepsApplied": ["crop_receipt", "deskew", "contrast", "threshold"]
                 }
               ],
+              "diagnostics": {
+                "engineConfig": {
+                  "language": "cyrillic",
+                  "recModelName": "cyrillic_PP-OCRv3_rec_infer"
+                },
+                "rawEngineText": "STORE\\nTOTAL 123.45"
+              },
               "lines": [
                 {
                   "text": "STORE",
