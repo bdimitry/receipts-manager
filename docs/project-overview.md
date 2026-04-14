@@ -30,6 +30,9 @@ It allows a user to:
 - Flyway migrations
 - Swagger UI and OpenAPI
 - GitHub Actions CI
+- local project-specific Codex skills for OCR, CI, report delivery, frontend polish, and release verification
+- a documented agent roster for OCR-first task delegation
+- a documented MCP stack plan focused on the connectors that actually accelerate this repo
 
 ### Backend Domain
 
@@ -64,6 +67,7 @@ It allows a user to:
 - the main backend can now switch between OCR helper backends through configuration without changing the business parsing flow
 - the PaddleOCR helper now includes a separate preprocessing layer for crop cleanup, deskew, denoise, contrast recovery, and thresholding before OCR
 - the PaddleOCR helper now returns line-based OCR output with stable reading order, so the next parser step can work with explicit receipt rows instead of a single long text blob
+- the PaddleOCR helper now adds a conservative line normalization layer that preserves `originalText`, emits `normalizedText`, and tags noisy, barcode-like, service-like, price-like, and content-like lines for future parser work
 - the current diagnostic baseline uses explicit OCR profiles and shows that most obvious mixed-script degradation happens in the OCR engine on script-mismatched inputs, not in the line mapper
 - the selected baseline profile for the standard OCR branch is now `en`, based on a controlled comparison corpus across `en`, `cyrillic`, and `latin`
 - OCR `DONE` means text extraction succeeded, even if structured parsing is partial
@@ -102,6 +106,12 @@ The project now covers a realistic end-to-end product story:
 - OCR results are more useful because they preserve multiple item rows
 - dashboard and report outputs avoid incorrect mixed-currency aggregation
 - frontend and backend expose the same financial model consistently
+
+The repo now also has a documented development operating model:
+
+- repeatable work can be routed through local project skills
+- delegation can use stable role boundaries instead of ad hoc prompts
+- MCP adoption is intentionally limited to high-value backend, OCR, CI, and frontend verification surfaces
 
 ## Demo-Ready Scenario
 
@@ -180,5 +190,9 @@ Focus on:
 - [Frontend architecture](frontend-architecture.md)
 - [Architecture overview](architecture-overview.md)
 - [OCR flow](ocr-flow.md)
+- [Skills catalog](skills-catalog.md)
+- [Agent roster](agent-roster.md)
+- [MCP stack](mcp-stack.md)
+- [Development workflow](development-workflow.md)
 - [Demo guide](demo-guide.md)
 - [Runbook](runbook.md)

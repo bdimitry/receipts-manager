@@ -53,16 +53,20 @@ The Paddle helper exposes two diagnostic-friendly entry points:
   - `profile`
   - `rawText`
   - `lines[]`
+  - `normalizedLines[]`
 - diagnostics:
   - `engineConfig`
   - `rawEngineLines[]`
   - `rawEngineText`
+  - `normalizedLines[]`
+  - `normalizedText`
 
 This lets you compare:
 
 1. raw PaddleOCR output
 2. mapped line output
-3. final `rawText` assembly
+3. normalized line output
+4. final `rawText` assembly
 
 ## Diagnostic Corpus
 
@@ -72,6 +76,7 @@ The reproducible comparison corpus is generated inside the helper and currently 
 - `cyrillic-transaction`
 - `mixed-script-receipt`
 - `bank-like-document`
+- `pdf-rendered-payment-page`
 
 The corpus is intentionally diagnostic rather than business-oriented. It focuses on:
 
@@ -160,6 +165,6 @@ The current controlled comparison supports this baseline decision:
 
 Before deeper receipt parsing, the next investigation should focus on one of these paths:
 
-- validating the `en` baseline on a larger real-world receipt corpus
-- deciding whether a simple primary-plus-fallback profile strategy is worth adding
-- then moving into line normalization with the current baseline locked down
+- validating the conservative normalization layer on a larger real-world receipt corpus
+- deciding whether a simple primary-plus-fallback profile strategy is worth adding later
+- then moving into baseline parser work with the current baseline and normalized line stream locked down

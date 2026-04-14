@@ -8,6 +8,11 @@ Full-stack demo project for personal budget tracking, receipt OCR, async report 
 - [Project structure](docs/project-structure.md)
 - [Architecture overview](docs/architecture-overview.md)
 - [Frontend architecture](docs/frontend-architecture.md)
+- [Skills catalog](docs/skills-catalog.md)
+- [Agent roster](docs/agent-roster.md)
+- [Sub-agent playbook](docs/subagent-playbook.md)
+- [MCP stack](docs/mcp-stack.md)
+- [Development workflow](docs/development-workflow.md)
 - [Report generation flow](docs/report-generation-flow.md)
 - [Reporting system](docs/reporting-system.md)
 - [Notification flow](docs/notification-flow.md)
@@ -15,6 +20,16 @@ Full-stack demo project for personal budget tracking, receipt OCR, async report 
 - [OCR diagnostics](docs/ocr-diagnostics.md)
 - [Demo guide](docs/demo-guide.md)
 - [Runbook](docs/runbook.md)
+
+## Developer Operating System
+
+The project now also has a lightweight AI-assisted development operating model:
+
+- local project-specific Codex skills
+- a stable sub-agent role roster
+- a practical MCP adoption plan
+- a home-local Codex plugin shell for project tooling
+- workflow conventions tuned for OCR-first delivery
 
 ## What The Project Includes
 
@@ -190,6 +205,26 @@ The Paddle helper response now also includes lightweight preprocessing metadata:
   - `imageSizeAfter`
   - `stepsApplied`
 
+The Paddle helper now also returns a conservative normalization layer between raw OCR extraction and future receipt parsing:
+
+- `normalizedLines[]`
+  - `originalText`
+  - `normalizedText`
+  - `order`
+  - `confidence`
+  - `bbox`
+  - `tags`
+  - `ignored`
+
+Current normalization is intentionally conservative:
+
+- trims and collapses whitespace
+- cleans punctuation and edge artifacts
+- applies safe OCR confusion cleanup such as normalizing multiplication separators
+- tags lines as `noise`, `barcode_like`, `service_like`, `price_like`, or `content_like`
+
+This keeps the OCR pipeline parser-free while making noisy receipt lines more stable for the next module.
+
 The `lines[]` collection is now the main structured OCR output for downstream parsing work:
 
 - each line keeps human reading order from top to bottom
@@ -306,3 +341,13 @@ If you upload a bank transfer slip or payment document instead of a retail recei
 - OCR parsing remains best-effort and not every receipt layout yields perfect line items
 - notification history and retry orchestration are still out of scope
 - report visuals are practical, not document-design heavy
+
+## Developer Docs
+
+For the development operating model around this repo, see:
+
+- [skills-catalog.md](docs/skills-catalog.md)
+- [agent-roster.md](docs/agent-roster.md)
+- [subagent-playbook.md](docs/subagent-playbook.md)
+- [mcp-stack.md](docs/mcp-stack.md)
+- [development-workflow.md](docs/development-workflow.md)

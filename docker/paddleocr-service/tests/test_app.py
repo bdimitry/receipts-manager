@@ -66,6 +66,14 @@ class PaddleOcrAppTests(unittest.TestCase):
         )
         self.assertEqual([line["order"] for line in body["lines"]], [0, 1, 2])
         self.assertEqual(body["lines"][0]["bbox"], [[10.0, 20.0], [220.0, 20.0], [220.0, 60.0], [10.0, 60.0]])
+        self.assertEqual(
+            [line["normalizedText"] for line in body["normalizedLines"]],
+            ["STORE", "MILK 42.50", "TOTAL 132.60"],
+        )
+        self.assertEqual(body["normalizedLines"][0]["originalText"], "STORE")
+        self.assertIn("header_like", body["normalizedLines"][0]["tags"])
+        self.assertIn("price_like", body["normalizedLines"][1]["tags"])
+        self.assertFalse(body["normalizedLines"][1]["ignored"])
         self.assertGreater(len(body["pages"][0]["stepsApplied"]), 0)
         self.assertGreater(engine.calls, 0)
 
@@ -90,6 +98,8 @@ class PaddleOcrAppTests(unittest.TestCase):
         self.assertEqual(body["diagnostics"]["engineConfig"]["language"], "en")
         self.assertEqual(body["diagnostics"]["rawEngineLines"][0]["text"], "MILK 42.50")
         self.assertEqual(body["diagnostics"]["rawEngineText"], "MILK 42.50\nTOTAL 132.60\nSTORE")
+        self.assertEqual(body["diagnostics"]["normalizedText"], "STORE\nMILK 42.50\nTOTAL 132.60")
+        self.assertEqual(body["diagnostics"]["normalizedLines"][1]["normalizedText"], "MILK 42.50")
         self.assertEqual(engine.language_overrides, ["en"])
 
     def test_ocr_profile_override_uses_requested_profile(self):

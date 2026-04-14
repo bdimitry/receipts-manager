@@ -7,6 +7,7 @@ import numpy as np
 
 from comparison import choose_recommended_profile, evaluate_profile_case, summarize_profile
 from corpus import diagnostic_corpus
+from normalization import ReceiptOcrLineNormalizer
 from ocr_engine import PaddleOcrEngine
 from preprocessing import ReceiptImagePreprocessor
 from response_mapping import PaddleOcrResponseMapper
@@ -20,6 +21,7 @@ def main() -> None:
 
     preprocessor = ReceiptImagePreprocessor(enabled=args.preprocess == "true", target_long_edge=1600)
     mapper = PaddleOcrResponseMapper()
+    normalizer = ReceiptOcrLineNormalizer()
     evaluations = []
 
     for case in diagnostic_corpus():
@@ -42,7 +44,9 @@ def main() -> None:
             engine = PaddleOcrEngine(profile_name=profile_name)
             raw_result = engine.extract_lines(np.array(processed.image))
             raw_lines = mapper.map_raw_engine_lines(raw_result)
-            mapped_lines = [line.to_response() for line in mapper.map_page_lines(raw_result)]
+            mapped_line_models = mapper.map_page_lines(raw_result)
+            mapped_lines = [line.to_response() for line in mapped_line_models]
+            normalized_lines = [line.to_response() for line in normalizer.normalize_lines(mapped_line_models)]
             evaluation = evaluate_profile_case(
                 case,
                 profile_name=profile_name,
@@ -58,6 +62,10 @@ def main() -> None:
                 "rawEngineLines": raw_lines,
                 "mappedLines": mapped_lines,
                 "mappedRawText": "\n".join(line["text"] for line in mapped_lines),
+                "normalizedLines": normalized_lines,
+                "normalizedText": "\n".join(
+                    line["normalizedText"] for line in normalized_lines if not line["ignored"] and line["normalizedText"]
+                ),
                 "evaluation": evaluation.to_response(),
             }
             print(json.dumps(payload, ensure_ascii=False))

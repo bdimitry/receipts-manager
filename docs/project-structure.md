@@ -164,8 +164,9 @@ Inside `docker/paddleocr-service`:
 - `diagnostics.py`: local comparison script for raw PaddleOCR output across OCR profiles
 - `ocr_engine.py`: PaddleOCR engine lifecycle and retry wrapper
 - `preprocessing.py`: dedicated receipt image preprocessing layer
+- `normalization.py`: conservative OCR line normalization and tagging layer between OCR extraction and future parsing
 - `response_mapping.py`: line-based mapping from raw PaddleOCR output into ordered OCR rows
-- `tests/`: service-side preprocessing, profile, comparison, and API contract tests
+- `tests/`: service-side preprocessing, normalization, profile, comparison, and API contract tests
 
 ### `docker-compose.yml`
 
@@ -233,6 +234,16 @@ Holds:
 - frontend architecture guide
 - demo guide
 - runbook
+- skills catalog
+- agent roster
+- MCP stack plan
+- development workflow conventions
+
+Project-specific Codex skills themselves live outside the repo in the local Codex home:
+
+- `C:\Users\dmitr\.codex\skills`
+
+The repo documentation points to those skills and explains when to use them.
 
 ### `scripts`
 

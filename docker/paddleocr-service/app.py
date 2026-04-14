@@ -8,6 +8,7 @@ import numpy as np
 from flask import Flask, current_app, jsonify, request
 from PIL import Image
 
+from normalization import ReceiptOcrLineNormalizer
 from ocr_engine import PaddleOcrEngine
 from preprocessing import ReceiptImagePreprocessor
 from profiles import DEFAULT_OCR_PROFILE, OCR_PROFILES, available_profiles, resolve_profile
@@ -24,6 +25,7 @@ PADDLE_OCR_SKIP_WARMUP = os.getenv("PADDLE_OCR_SKIP_WARMUP", "false").lower() ==
 def create_app(
     ocr_engine: PaddleOcrEngine | None = None,
     image_preprocessor: ReceiptImagePreprocessor | None = None,
+    line_normalizer: ReceiptOcrLineNormalizer | None = None,
 ) -> Flask:
     application = Flask(__name__)
     default_profile_name = _resolve_default_profile_name()
@@ -34,6 +36,7 @@ def create_app(
         target_long_edge=PADDLE_OCR_TARGET_LONG_EDGE,
     )
     application.config["OCR_RESPONSE_MAPPER"] = PaddleOcrResponseMapper()
+    application.config["OCR_LINE_NORMALIZER"] = line_normalizer or ReceiptOcrLineNormalizer()
 
     if not PADDLE_OCR_SKIP_WARMUP:
         application.config["OCR_ENGINE"].warm_up()
@@ -75,11 +78,14 @@ def create_app(
         try:
             processed_pages = _processed_page_images(content, content_type, preprocess_enabled)
             raw_engine_pages = _raw_engine_pages(processed_pages, profile_override, language_override)
-            lines = _extract_lines(raw_engine_pages)
+            mapped_lines = _extract_lines(raw_engine_pages)
+            normalized_lines = _normalize_lines(mapped_lines)
+            lines = [line.to_response() for line in mapped_lines]
             raw_text = "\n".join(line["text"] for line in lines)
             payload = {
                 "rawText": raw_text,
                 "lines": lines,
+                "normalizedLines": [line.to_response() for line in normalized_lines],
                 "profile": profile_override or current_app.config["OCR_DEFAULT_PROFILE"],
                 "preprocessingApplied": any(page.applied for page in processed_pages),
                 "pages": [page.to_response(index) for index, page in enumerate(processed_pages)],
@@ -173,15 +179,20 @@ def _raw_engine_pages(processed_pages, profile_override: str | None, language_ov
     ]
 
 
-def _extract_lines(raw_engine_pages) -> list[dict]:
+def _extract_lines(raw_engine_pages):
     response_mapper: PaddleOcrResponseMapper = current_app.config["OCR_RESPONSE_MAPPER"]
     lines = []
     order_offset = 0
     for raw_engine_page in raw_engine_pages:
         page_lines = response_mapper.map_page_lines(raw_engine_page, order_offset=order_offset)
-        lines.extend(line.to_response() for line in page_lines)
+        lines.extend(page_lines)
         order_offset += len(page_lines)
     return lines
+
+
+def _normalize_lines(mapped_lines):
+    line_normalizer: ReceiptOcrLineNormalizer = current_app.config["OCR_LINE_NORMALIZER"]
+    return line_normalizer.normalize_lines(mapped_lines)
 
 
 def _build_diagnostics(raw_engine_pages, profile_override: str | None, language_override: str | None) -> dict:
@@ -194,10 +205,16 @@ def _build_diagnostics(raw_engine_pages, profile_override: str | None, language_
         for line in raw_lines:
             raw_engine_lines.append({"pageIndex": page_index, **line})
 
+    mapped_lines = _extract_lines(raw_engine_pages)
+    normalized_lines = _normalize_lines(mapped_lines)
     return {
         "engineConfig": ocr_engine.describe(profile_override, language_override),
         "rawEngineLines": raw_engine_lines,
         "rawEngineText": "\n".join(line["text"] for line in raw_engine_lines),
+        "normalizedLines": [line.to_response() for line in normalized_lines],
+        "normalizedText": "\n".join(
+            line.normalized_text for line in normalized_lines if not line.ignored and line.normalized_text
+        ),
     }
 
 

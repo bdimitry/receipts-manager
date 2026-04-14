@@ -129,6 +129,45 @@ The Paddle helper response now also includes lightweight debug metadata:
   - `imageSizeAfter`
   - `stepsApplied`
 
+### Paddle Line Normalization Layer
+
+After line ordering and before any future parser work, the Paddle helper now runs a dedicated line normalization layer.
+
+This layer is intentionally conservative. It does not try to understand the business meaning of the document and it does not guess missing words from a dictionary.
+
+Current normalization responsibilities:
+
+- trim and collapse whitespace
+- normalize punctuation noise inside receipt lines
+- remove obvious trailing amount punctuation such as `0.40,`
+- clean separator artifacts such as `CASH.RECEIPT` into `CASH RECEIPT`
+- keep both original text and normalized text for traceability
+- tag obvious line classes for downstream parsing
+
+Current `normalizedLines[]` shape:
+
+- `originalText`
+- `normalizedText`
+- `order`
+- `confidence`
+- `bbox`
+- `tags[]`
+- `ignored`
+
+Current light tags include:
+
+- `noise`
+- `barcode_like`
+- `price_like`
+- `header_like`
+- `service_like`
+- `content_like`
+
+Current ignore rule:
+
+- obvious barcode-like and junk lines are flagged as `ignored=true`
+- header and service lines are preserved for later parser decisions
+
 ### Paddle Line-Based Output
 
 The Paddle helper no longer treats OCR as only one opaque text block. It now maps raw PaddleOCR output through a dedicated response mapper and returns explicit receipt lines.
@@ -154,6 +193,8 @@ The helper also exposes diagnostic visibility so the OCR baseline can be inspect
 - `diagnostics.engineConfig`
 - `diagnostics.rawEngineLines`
 - `diagnostics.rawEngineText`
+- `diagnostics.normalizedLines`
+- `diagnostics.normalizedText`
 
 This lets you compare the engine's own text with:
 
@@ -363,6 +404,11 @@ For direct helper verification, confirm that `POST /ocr` returns:
   - `confidence`
   - `order`
   - optional `bbox`
+- `normalizedLines[]`
+  - `originalText`
+  - `normalizedText`
+  - `tags`
+  - `ignored`
 
 6. inspect queues and logs if needed:
 
@@ -383,4 +429,5 @@ docker compose logs -f paddleocr-service
 - no automatic purchase creation
 - no OCR confidence scoring
 - no receipt-template-specific tuning beyond the current `ukr+rus+eng` helper setup
-- the PaddleOCR helper is intentionally baseline-only for now; preprocessing and deeper comparison work come later
+- normalization is intentionally conservative and still leaves some noisy mixed-language product names untouched
+- parser work still comes later; `normalizedLines[]` are the bridge into that step

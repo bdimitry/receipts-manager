@@ -54,6 +54,13 @@ def diagnostic_corpus() -> list[DiagnosticCase]:
             expected_numbers=("2026-04-06", "2480.75", "UA123456789012345678901234567"),
             image=_bank_like_document_sample(),
         ),
+        DiagnosticCase(
+            name="pdf-rendered-payment-page",
+            category="pdf-rendered-page",
+            expected_labels=("PAYMENT ORDER", "Date", "Account", "Reference", "Amount"),
+            expected_numbers=("2026-04-06", "1840.25", "UA903052990000026007200123456"),
+            image=_pdf_rendered_payment_page_sample(),
+        ),
     ]
 
 
@@ -135,6 +142,27 @@ def _bank_like_document_sample() -> Image.Image:
         blur=5,
         font_scale=1.0,
         line_gap=145,
+    )
+
+
+def _pdf_rendered_payment_page_sample() -> Image.Image:
+    lines = [
+        "PAYMENT ORDER",
+        "Date 2026-04-06",
+        "Account UA903052990000026007200123456",
+        "Reference Device repair",
+        "Amount 1840.25",
+    ]
+    return _render_document(
+        lines,
+        background=(214, 216, 218),
+        paper=(250, 250, 249),
+        border=(105, 105, 105),
+        rotation=0.8,
+        noise=2,
+        blur=3,
+        font_scale=1.0,
+        line_gap=155,
     )
 
 

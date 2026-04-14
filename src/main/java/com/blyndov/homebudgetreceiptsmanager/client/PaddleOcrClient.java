@@ -57,7 +57,10 @@ public class PaddleOcrClient implements OcrClient {
         }
 
         List<PaddleOcrLineResponse> lines = response.lines() == null ? List.of() : response.lines();
-        return new PaddleOcrServiceResponse(normalize(response.rawText()), lines);
+        List<PaddleOcrNormalizedLineResponse> normalizedLines = response.normalizedLines() == null
+            ? List.of()
+            : response.normalizedLines();
+        return new PaddleOcrServiceResponse(normalize(response.rawText()), lines, normalizedLines);
     }
 
     private String normalize(String value) {
