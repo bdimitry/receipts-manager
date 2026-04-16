@@ -205,25 +205,34 @@ The Paddle helper response now also includes lightweight preprocessing metadata:
   - `imageSizeAfter`
   - `stepsApplied`
 
-The Paddle helper now also returns a conservative normalization layer between raw OCR extraction and future receipt parsing:
+Post-OCR normalization now lives in the Spring backend, not in the Python helper. The responsibility split is now:
 
-- `normalizedLines[]`
-  - `originalText`
-  - `normalizedText`
-  - `order`
-  - `confidence`
-  - `bbox`
-  - `tags`
-  - `ignored`
+- Python helper:
+  - image preprocessing
+  - PaddleOCR invocation
+  - raw ordered OCR line extraction
+  - engine-side diagnostics
+- Java backend:
+  - conservative line normalization
+  - line tagging and lightweight classification
+  - parser-ready `normalizedLines[]` construction
 
-Current normalization is intentionally conservative:
+`GET /api/receipts/{id}/ocr` now includes `normalizedLines[]` with:
+
+- `originalText`
+- `normalizedText`
+- `order`
+- `confidence`
+- `bbox`
+- `tags`
+- `ignored`
+
+Current Java normalization stays intentionally conservative:
 
 - trims and collapses whitespace
 - cleans punctuation and edge artifacts
-- applies safe OCR confusion cleanup such as normalizing multiplication separators
-- tags lines as `noise`, `barcode_like`, `service_like`, `price_like`, or `content_like`
-
-This keeps the OCR pipeline parser-free while making noisy receipt lines more stable for the next module.
+- applies safe OCR confusion cleanup in narrow contexts such as multiplication separators
+- tags lines as `noise`, `barcode_like`, `service_like`, `price_like`, `header_like`, or `content_like`
 
 The `lines[]` collection is now the main structured OCR output for downstream parsing work:
 
@@ -236,6 +245,14 @@ For diagnosis, the helper also exposes:
 
 - `GET /diagnostics/config`
 - `POST /ocr?debug=true`
+
+`debug=true` now shows raw and mapped OCR only:
+
+- `diagnostics.engineConfig`
+- `diagnostics.rawEngineLines`
+- `diagnostics.rawEngineText`
+- `diagnostics.mappedLines`
+- `diagnostics.mappedRawText`
 
 The current diagnostic baseline on this branch uses an explicit OCR profile strategy:
 
@@ -263,6 +280,12 @@ To run the local OCR diagnostic comparison script:
 
 ```powershell
 docker exec home-budget-paddleocr-service python diagnostics.py --profiles en cyrillic latin --preprocess true
+```
+
+To include the local real-check corpus from `C:\Users\dmitr\Pictures\чеки` in the diagnostic printout:
+
+```powershell
+docker exec home-budget-paddleocr-service python diagnostics.py --profiles en cyrillic latin --preprocess true --local-corpus-dir "C:/Users/dmitr/Pictures/чеки"
 ```
 
 This is intentionally a baseline OCR backend only. It is not yet a final receipt parsing pipeline.

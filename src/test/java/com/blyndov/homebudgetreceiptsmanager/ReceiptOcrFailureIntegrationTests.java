@@ -94,7 +94,7 @@ class ReceiptOcrFailureIntegrationTests extends AbstractPostgresIntegrationTest 
         userRepository.deleteAll();
         clearBucket();
         drainOcrQueue();
-        when(ocrClient.extractText(any(), any(), any())).thenThrow(new IllegalStateException("Simulated OCR failure"));
+        when(ocrClient.extractResult(any(), any(), any())).thenThrow(new IllegalStateException("Simulated OCR failure"));
     }
 
     @Test
@@ -131,6 +131,7 @@ class ReceiptOcrFailureIntegrationTests extends AbstractPostgresIntegrationTest 
         assertThat(ocrResponse.getBody().currency()).isEqualTo(CurrencyCode.UAH);
         assertThat(ocrResponse.getBody().ocrStatus()).isEqualTo(ReceiptOcrStatus.FAILED);
         assertThat(ocrResponse.getBody().rawOcrText()).isNull();
+        assertThat(ocrResponse.getBody().normalizedLines()).isEmpty();
         assertThat(ocrResponse.getBody().lineItems()).isEmpty();
         assertThat(ocrResponse.getBody().ocrErrorMessage()).contains("Simulated OCR failure");
     }

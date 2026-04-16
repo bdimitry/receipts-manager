@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+import com.blyndov.homebudgetreceiptsmanager.client.OcrExtractionLine;
+import com.blyndov.homebudgetreceiptsmanager.client.OcrExtractionResult;
 import com.blyndov.homebudgetreceiptsmanager.client.OcrClient;
 import com.blyndov.homebudgetreceiptsmanager.config.AwsProperties;
 import com.blyndov.homebudgetreceiptsmanager.dto.AuthResponse;
@@ -90,9 +92,8 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         userRepository.deleteAll();
         clearBucket();
         drainOcrQueue();
-        when(ocrClient.extractText(any(), any(), any())).thenReturn(
-            new ClassPathResource("fixtures/ocr/receipt-cyrillic-noisy.txt").getContentAsString(StandardCharsets.UTF_8)
-        );
+        String rawText = new ClassPathResource("fixtures/ocr/receipt-cyrillic-noisy.txt").getContentAsString(StandardCharsets.UTF_8);
+        when(ocrClient.extractResult(any(), any(), any())).thenReturn(mapResult(rawText));
     }
 
     @Test
@@ -126,6 +127,8 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         assertThat(ocrResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(ocrResponse.getBody()).isNotNull();
         assertThat(ocrResponse.getBody().currency()).isEqualTo(CurrencyCode.UAH);
+        assertThat(ocrResponse.getBody().normalizedLines()).isNotEmpty();
+        assertThat(ocrResponse.getBody().normalizedLines().stream().anyMatch(line -> line.tags().contains("price_like"))).isTrue();
         assertThat(ocrResponse.getBody().lineItems()).hasSizeGreaterThan(1);
         assertThat(ocrResponse.getBody().lineItems().get(0).title()).isEqualTo("МОЛОКО ЯГОТИНСЬКЕ");
         assertThat(ocrResponse.getBody().lineItems().get(0).lineTotal()).isEqualByComparingTo("85.00");
@@ -244,6 +247,15 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
 
     private String uniqueEmail(String prefix) {
         return prefix + "-" + UUID.randomUUID() + "@example.com";
+    }
+
+    private OcrExtractionResult mapResult(String rawText) {
+        List<OcrExtractionLine> lines = rawText.lines()
+            .map(String::trim)
+            .filter(line -> !line.isBlank())
+            .map(line -> new OcrExtractionLine(line, 0.98d, null, null))
+            .toList();
+        return new OcrExtractionResult(rawText, lines);
     }
 
     private static final class NamedByteArrayResource extends ByteArrayResource {

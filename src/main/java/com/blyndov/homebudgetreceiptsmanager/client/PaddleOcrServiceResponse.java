@@ -6,7 +6,6 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record PaddleOcrServiceResponse(
     String rawText,
-    List<PaddleOcrLineResponse> lines,
-    List<PaddleOcrNormalizedLineResponse> normalizedLines
+    List<PaddleOcrLineResponse> lines
 ) {
 }

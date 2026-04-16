@@ -22,26 +22,30 @@ public class PaddleOcrClient implements OcrClient {
     }
 
     @Override
-    public String extractText(String originalFileName, String contentType, byte[] content) {
-        PaddleOcrServiceResponse response = extractResult(originalFileName, contentType, content);
+    public OcrExtractionResult extractResult(String originalFileName, String contentType, byte[] content) {
+        PaddleOcrServiceResponse response = extractPaddleResponse(originalFileName, contentType, content);
         String rawText = normalize(response.rawText());
-        if (StringUtils.hasText(rawText)) {
-            return rawText;
+        List<OcrExtractionLine> lines = response.lines() == null
+            ? List.of()
+            : response.lines().stream()
+                .map(line -> new OcrExtractionLine(line.text(), line.confidence(), line.order(), line.bbox()))
+                .toList();
+
+        if (!StringUtils.hasText(rawText)) {
+            rawText = lines.stream()
+                .map(OcrExtractionLine::text)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.joining("\n"));
         }
 
-        String joinedText = response.lines().stream()
-            .map(PaddleOcrLineResponse::text)
-            .filter(StringUtils::hasText)
-            .collect(Collectors.joining("\n"));
-
-        if (!StringUtils.hasText(joinedText)) {
+        if (!StringUtils.hasText(rawText)) {
             throw new IllegalStateException("Paddle OCR service returned an empty response");
         }
 
-        return joinedText;
+        return new OcrExtractionResult(rawText, lines);
     }
 
-    public PaddleOcrServiceResponse extractResult(String originalFileName, String contentType, byte[] content) {
+    public PaddleOcrServiceResponse extractPaddleResponse(String originalFileName, String contentType, byte[] content) {
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
         builder.part("file", new NamedByteArrayResource(originalFileName, content), MediaType.parseMediaType(contentType));
 
@@ -57,10 +61,7 @@ public class PaddleOcrClient implements OcrClient {
         }
 
         List<PaddleOcrLineResponse> lines = response.lines() == null ? List.of() : response.lines();
-        List<PaddleOcrNormalizedLineResponse> normalizedLines = response.normalizedLines() == null
-            ? List.of()
-            : response.normalizedLines();
-        return new PaddleOcrServiceResponse(normalize(response.rawText()), lines, normalizedLines);
+        return new PaddleOcrServiceResponse(normalize(response.rawText()), lines);
     }
 
     private String normalize(String value) {

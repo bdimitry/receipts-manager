@@ -2,8 +2,8 @@ package com.blyndov.homebudgetreceiptsmanager;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.blyndov.homebudgetreceiptsmanager.client.OcrExtractionResult;
 import com.blyndov.homebudgetreceiptsmanager.client.PaddleOcrClient;
-import com.blyndov.homebudgetreceiptsmanager.client.PaddleOcrServiceResponse;
 import com.blyndov.homebudgetreceiptsmanager.config.OcrClientProperties;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -37,7 +37,7 @@ class PaddleOcrClientTests {
 
         PaddleOcrClient client = new PaddleOcrClient(RestClient.builder(), properties);
 
-        PaddleOcrServiceResponse response = client.extractResult(
+        OcrExtractionResult response = client.extractResult(
             "receipt.png",
             "image/png",
             "fake-image".getBytes(StandardCharsets.UTF_8)
@@ -54,11 +54,6 @@ class PaddleOcrClientTests {
             java.util.List.of(220.0d, 60.0d),
             java.util.List.of(10.0d, 60.0d)
         );
-        assertThat(response.normalizedLines()).hasSize(2);
-        assertThat(response.normalizedLines().getFirst().originalText()).isEqualTo("STORE");
-        assertThat(response.normalizedLines().getFirst().normalizedText()).isEqualTo("STORE");
-        assertThat(response.normalizedLines().get(1).tags()).contains("price_like");
-        assertThat(response.normalizedLines().get(1).ignored()).isFalse();
         assertThat(client.extractText("receipt.png", "image/png", "fake-image".getBytes(StandardCharsets.UTF_8)))
             .isEqualTo("STORE\nTOTAL 123.45");
     }
@@ -95,26 +90,6 @@ class PaddleOcrClientTests {
                   "confidence": 0.9821,
                   "order": 1,
                   "bbox": [[12, 180], [260, 180], [260, 220], [12, 220]]
-                }
-              ],
-              "normalizedLines": [
-                {
-                  "originalText": "STORE",
-                  "normalizedText": "STORE",
-                  "confidence": 0.9912,
-                  "order": 0,
-                  "bbox": [[10, 20], [220, 20], [220, 60], [10, 60]],
-                  "tags": ["header_like"],
-                  "ignored": false
-                },
-                {
-                  "originalText": "TOTAL 123.45",
-                  "normalizedText": "TOTAL 123.45",
-                  "confidence": 0.9821,
-                  "order": 1,
-                  "bbox": [[12, 180], [260, 180], [260, 220], [12, 220]],
-                  "tags": ["price_like", "content_like"],
-                  "ignored": false
                 }
               ]
             }

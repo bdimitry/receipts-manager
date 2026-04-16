@@ -150,6 +150,8 @@ class ReceiptOcrProcessingIntegrationTests extends AbstractPostgresIntegrationTe
         assertThat(ocrResponse.getBody().currency()).isEqualTo(CurrencyCode.UAH);
         assertThat(ocrResponse.getBody().ocrStatus()).isEqualTo(ReceiptOcrStatus.DONE);
         assertThat(ocrResponse.getBody().rawOcrText()).containsIgnoringCase("FRESH");
+        assertThat(ocrResponse.getBody().normalizedLines()).isNotEmpty();
+        assertThat(ocrResponse.getBody().normalizedLines().stream().anyMatch(line -> line.tags().contains("price_like"))).isTrue();
         assertThat(ocrResponse.getBody().parsedTotalAmount()).isEqualByComparingTo("123.45");
     }
 
@@ -192,6 +194,7 @@ class ReceiptOcrProcessingIntegrationTests extends AbstractPostgresIntegrationTe
         assertThat(ocrResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(ocrResponse.getBody()).isNotNull();
         assertThat(ocrResponse.getBody().rawOcrText()).containsPattern(".*\\p{IsCyrillic}.*");
+        assertThat(ocrResponse.getBody().normalizedLines()).isNotEmpty();
         assertThat(ocrResponse.getBody().lineItems()).hasSizeGreaterThan(1);
     }
 

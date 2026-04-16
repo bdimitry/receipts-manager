@@ -164,9 +164,12 @@ Inside `docker/paddleocr-service`:
 - `diagnostics.py`: local comparison script for raw PaddleOCR output across OCR profiles
 - `ocr_engine.py`: PaddleOCR engine lifecycle and retry wrapper
 - `preprocessing.py`: dedicated receipt image preprocessing layer
-- `normalization.py`: conservative OCR line normalization and tagging layer between OCR extraction and future parsing
 - `response_mapping.py`: line-based mapping from raw PaddleOCR output into ordered OCR rows
-- `tests/`: service-side preprocessing, normalization, profile, comparison, and API contract tests
+- `tests/`: service-side preprocessing, profile, comparison, corpus, and API contract tests
+
+Inside `src/main/java/com/blyndov/homebudgetreceiptsmanager/service`:
+
+- `ReceiptOcrLineNormalizationService`: Java-side conservative line normalization, tagging, and parser-ready `normalizedLines[]` construction after raw OCR extraction
 
 ### `docker-compose.yml`
 
@@ -258,7 +261,7 @@ Holds:
 3. frontend calls typed API functions
 4. backend controllers delegate to services
 5. services persist to PostgreSQL and interact with S3, SQS, OCR, and notifications
-6. the OCR adapter selects Tesseract or PaddleOCR by configuration and now accepts both raw text and ordered PaddleOCR line rows for the evolving OCR pipeline
+6. the OCR adapter selects Tesseract or PaddleOCR by configuration and now accepts both raw text and ordered OCR line rows for the evolving OCR pipeline
 7. OCR results are stored as receipt summary fields plus `ReceiptLineItem` rows
 8. dashboard and reports format financial data with explicit currency awareness
 9. frontend reflects backend state through TanStack Query and form mutations

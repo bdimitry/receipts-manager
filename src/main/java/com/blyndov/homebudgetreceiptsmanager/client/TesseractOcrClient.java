@@ -1,11 +1,15 @@
 package com.blyndov.homebudgetreceiptsmanager.client;
 
 import com.blyndov.homebudgetreceiptsmanager.config.OcrClientProperties;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 
 @Component
@@ -19,7 +23,7 @@ public class TesseractOcrClient implements OcrClient {
     }
 
     @Override
-    public String extractText(String originalFileName, String contentType, byte[] content) {
+    public OcrExtractionResult extractResult(String originalFileName, String contentType, byte[] content) {
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
         builder.part("file", new NamedByteArrayResource(originalFileName, content), MediaType.parseMediaType(contentType));
 
@@ -34,7 +38,15 @@ public class TesseractOcrClient implements OcrClient {
             throw new IllegalStateException("OCR service returned an empty response");
         }
 
-        return response.text();
+        String rawText = response.text().trim();
+        AtomicInteger order = new AtomicInteger();
+        List<OcrExtractionLine> lines = Arrays.stream(rawText.split("\\R"))
+            .map(String::trim)
+            .filter(StringUtils::hasText)
+            .map(text -> new OcrExtractionLine(text, null, order.getAndIncrement(), null))
+            .toList();
+
+        return new OcrExtractionResult(rawText, lines);
     }
 
     private static final class NamedByteArrayResource extends ByteArrayResource {

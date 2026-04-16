@@ -53,20 +53,20 @@ The Paddle helper exposes two diagnostic-friendly entry points:
   - `profile`
   - `rawText`
   - `lines[]`
-  - `normalizedLines[]`
 - diagnostics:
   - `engineConfig`
   - `rawEngineLines[]`
   - `rawEngineText`
-  - `normalizedLines[]`
-  - `normalizedText`
+  - `mappedLines[]`
+  - `mappedRawText`
 
 This lets you compare:
 
 1. raw PaddleOCR output
 2. mapped line output
-3. normalized line output
-4. final `rawText` assembly
+3. helper `rawText` assembly
+
+Post-OCR normalization is now intentionally outside the helper. Java/Spring owns `normalizedLines[]` so that parser-facing text cleanup, tagging, and future business integration all live on the backend side.
 
 ## Diagnostic Corpus
 
@@ -136,6 +136,12 @@ curl -X POST "http://localhost:8083/ocr?preprocess=true&debug=true" `
 
 ```powershell
 docker exec home-budget-paddleocr-service python diagnostics.py --profiles en cyrillic latin --preprocess true
+```
+
+5. Optionally include the local real-check corpus from `C:\Users\dmitr\Pictures\чеки`:
+
+```powershell
+docker exec home-budget-paddleocr-service python diagnostics.py --profiles en cyrillic latin --preprocess true --local-corpus-dir "C:/Users/dmitr/Pictures/чеки"
 ```
 
 The script runs the full diagnostic corpus and, for each profile, prints:

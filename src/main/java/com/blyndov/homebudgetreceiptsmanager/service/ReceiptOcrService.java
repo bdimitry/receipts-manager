@@ -1,6 +1,7 @@
 package com.blyndov.homebudgetreceiptsmanager.service;
 
 import com.blyndov.homebudgetreceiptsmanager.client.OcrClient;
+import com.blyndov.homebudgetreceiptsmanager.client.OcrExtractionResult;
 import com.blyndov.homebudgetreceiptsmanager.dto.ReceiptLineItemResponse;
 import com.blyndov.homebudgetreceiptsmanager.dto.ReceiptOcrResponse;
 import com.blyndov.homebudgetreceiptsmanager.entity.Receipt;
@@ -25,17 +26,20 @@ public class ReceiptOcrService {
     private final S3StorageService s3StorageService;
     private final OcrClient ocrClient;
     private final ReceiptOcrParser receiptOcrParser;
+    private final ReceiptOcrLineNormalizationService lineNormalizationService;
 
     public ReceiptOcrService(
         ReceiptRepository receiptRepository,
         S3StorageService s3StorageService,
         OcrClient ocrClient,
-        ReceiptOcrParser receiptOcrParser
+        ReceiptOcrParser receiptOcrParser,
+        ReceiptOcrLineNormalizationService lineNormalizationService
     ) {
         this.receiptRepository = receiptRepository;
         this.s3StorageService = s3StorageService;
         this.ocrClient = ocrClient;
         this.receiptOcrParser = receiptOcrParser;
+        this.lineNormalizationService = lineNormalizationService;
     }
 
     @Transactional
@@ -56,11 +60,14 @@ public class ReceiptOcrService {
     public void process(Long receiptId) {
         Receipt receipt = getReceiptEntity(receiptId);
         byte[] content = s3StorageService.download(receipt.getS3Key());
-        String rawText = ocrClient.extractText(receipt.getOriginalFileName(), receipt.getContentType(), content);
+        OcrExtractionResult extractionResult = ocrClient.extractResult(receipt.getOriginalFileName(), receipt.getContentType(), content);
+        String rawText = extractionResult.rawText();
 
         if (!StringUtils.hasText(rawText)) {
             throw new IllegalStateException("OCR returned empty text");
         }
+
+        int normalizedLineCount = lineNormalizationService.normalizeLines(extractionResult.lines()).size();
 
         ReceiptOcrParser.ParsedReceiptData parsedData = receiptOcrParser.parse(rawText);
 
@@ -75,13 +82,14 @@ public class ReceiptOcrService {
         receiptRepository.save(receipt);
 
         log.info(
-            "Receipt OCR completed successfully for receiptId={}, userId={}, parsedStoreName={}, parsedTotalAmount={}, parsedPurchaseDate={}, lineItemCount={}",
+            "Receipt OCR completed successfully for receiptId={}, userId={}, parsedStoreName={}, parsedTotalAmount={}, parsedPurchaseDate={}, lineItemCount={}, normalizedLineCount={}",
             receipt.getId(),
             receipt.getUser().getId(),
             receipt.getParsedStoreName(),
             receipt.getParsedTotalAmount(),
             receipt.getParsedPurchaseDate(),
-            receipt.getLineItems().size()
+            receipt.getLineItems().size(),
+            normalizedLineCount
         );
     }
 
@@ -132,6 +140,7 @@ public class ReceiptOcrService {
             receipt.getCurrency(),
             receipt.getOcrStatus(),
             receipt.getRawOcrText(),
+            lineNormalizationService.normalizeRawText(receipt.getRawOcrText()),
             receipt.getParsedStoreName(),
             receipt.getParsedTotalAmount(),
             receipt.getParsedPurchaseDate(),

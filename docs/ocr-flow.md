@@ -129,22 +129,38 @@ The Paddle helper response now also includes lightweight debug metadata:
   - `imageSizeAfter`
   - `stepsApplied`
 
-### Paddle Line Normalization Layer
+### Java Line Normalization Layer
 
-After line ordering and before any future parser work, the Paddle helper now runs a dedicated line normalization layer.
+After raw OCR extraction, normalization now happens in Spring, not in the Paddle helper.
 
-This layer is intentionally conservative. It does not try to understand the business meaning of the document and it does not guess missing words from a dictionary.
+Responsibility split:
 
-Current normalization responsibilities:
+- Python helper:
+  - preprocessing
+  - PaddleOCR invocation
+  - raw ordered line extraction
+  - engine-side diagnostics
+- Java backend:
+  - line normalization
+  - punctuation and whitespace cleanup
+  - edge artifact cleanup
+  - safe OCR confusion cleanup in narrow contexts
+  - line tagging and lightweight classification
+  - parser-ready `normalizedLines[]`
+
+The Java normalization layer is intentionally conservative. It does not try to infer store names, totals, dates, or items.
+
+Current Java normalization responsibilities:
 
 - trim and collapse whitespace
 - normalize punctuation noise inside receipt lines
 - remove obvious trailing amount punctuation such as `0.40,`
 - clean separator artifacts such as `CASH.RECEIPT` into `CASH RECEIPT`
+- normalize multiplication separators like `х`, `Х`, `×` into `x`
 - keep both original text and normalized text for traceability
 - tag obvious line classes for downstream parsing
 
-Current `normalizedLines[]` shape:
+Current `normalizedLines[]` shape on `GET /api/receipts/{id}/ocr`:
 
 - `originalText`
 - `normalizedText`
@@ -166,7 +182,7 @@ Current light tags include:
 Current ignore rule:
 
 - obvious barcode-like and junk lines are flagged as `ignored=true`
-- header and service lines are preserved for later parser decisions
+- price, header, and service lines are preserved for later parser decisions
 
 ### Paddle Line-Based Output
 
@@ -193,13 +209,18 @@ The helper also exposes diagnostic visibility so the OCR baseline can be inspect
 - `diagnostics.engineConfig`
 - `diagnostics.rawEngineLines`
 - `diagnostics.rawEngineText`
-- `diagnostics.normalizedLines`
-- `diagnostics.normalizedText`
+- `diagnostics.mappedLines`
+- `diagnostics.mappedRawText`
 
 This lets you compare the engine's own text with:
 
 - mapped ordered `lines[]`
-- assembled `rawText`
+- assembled helper `rawText`
+
+Java-side normalization should now be inspected through the main backend OCR response:
+
+- `GET /api/receipts/{id}/ocr`
+- `normalizedLines[]`
 
 Current diagnostic conclusion:
 
@@ -320,6 +341,7 @@ Use:
 `ReceiptOcrResponse` now includes:
 
 - `currency`
+- `normalizedLines`
 - `parsedStoreName`
 - `parsedTotalAmount`
 - `parsedPurchaseDate`
@@ -392,6 +414,7 @@ Invoke-RestMethod -Method Get `
 5. verify that the response contains:
 
 - `currency`
+- `normalizedLines`
 - `parsedTotalAmount`
 - `lineItems`
 - `rawOcrText`
@@ -404,6 +427,9 @@ For direct helper verification, confirm that `POST /ocr` returns:
   - `confidence`
   - `order`
   - optional `bbox`
+
+For Java-side normalization verification, confirm that `GET /api/receipts/{id}/ocr` returns:
+
 - `normalizedLines[]`
   - `originalText`
   - `normalizedText`
@@ -429,5 +455,5 @@ docker compose logs -f paddleocr-service
 - no automatic purchase creation
 - no OCR confidence scoring
 - no receipt-template-specific tuning beyond the current `ukr+rus+eng` helper setup
-- normalization is intentionally conservative and still leaves some noisy mixed-language product names untouched
+- Java normalization is intentionally conservative and still leaves some noisy mixed-language product names untouched
 - parser work still comes later; `normalizedLines[]` are the bridge into that step

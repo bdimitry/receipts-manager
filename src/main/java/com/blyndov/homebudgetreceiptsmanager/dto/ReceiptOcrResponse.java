@@ -12,6 +12,7 @@ public record ReceiptOcrResponse(
     CurrencyCode currency,
     ReceiptOcrStatus ocrStatus,
     String rawOcrText,
+    List<NormalizedOcrLineResponse> normalizedLines,
     String parsedStoreName,
     BigDecimal parsedTotalAmount,
     LocalDate parsedPurchaseDate,

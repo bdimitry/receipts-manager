@@ -85,11 +85,22 @@ export interface ReceiptLineItemResponse {
   rawFragment: string | null;
 }
 
+export interface NormalizedOcrLineResponse {
+  originalText: string;
+  normalizedText: string;
+  order: number;
+  confidence: number | null;
+  bbox: number[][] | null;
+  tags: string[];
+  ignored: boolean;
+}
+
 export interface ReceiptOcrResponse {
   receiptId: number;
   currency: CurrencyCode;
   ocrStatus: ReceiptOcrStatus;
   rawOcrText: string | null;
+  normalizedLines?: NormalizedOcrLineResponse[];
   parsedStoreName: string | null;
   parsedTotalAmount: number | null;
   parsedPurchaseDate: string | null;
