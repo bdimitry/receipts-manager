@@ -73,6 +73,26 @@ class ReceiptOcrLineNormalizationServiceTests {
         assertThat(normalized.get(2).order()).isEqualTo(2);
     }
 
+    @Test
+    void normalizationBuildsParserReadyStreamFromNonIgnoredNormalizedLines() {
+        var document = normalizationService.normalizeDocument(
+            new com.blyndov.homebudgetreceiptsmanager.client.OcrExtractionResult(
+                "RECEIPT\n1234567890123\nTOTAL.. 210.40,\nTHANK.YOU",
+                List.of(
+                    rawLine("RECEIPT", 0),
+                    rawLine("1234567890123", 1),
+                    rawLine("TOTAL.. 210.40,", 2),
+                    rawLine("THANK.YOU", 3)
+                )
+            )
+        );
+
+        assertThat(document.normalizedLines()).hasSize(4);
+        assertThat(document.parserReadyLines()).extracting(NormalizedOcrLineResponse::normalizedText)
+            .containsExactly("RECEIPT", "TOTAL. 210.40", "THANK YOU");
+        assertThat(document.parserReadyText()).isEqualTo("RECEIPT\nTOTAL. 210.40\nTHANK YOU");
+    }
+
     private OcrExtractionLine rawLine(String text, int order) {
         return new OcrExtractionLine(text, 0.98d, order, null);
     }

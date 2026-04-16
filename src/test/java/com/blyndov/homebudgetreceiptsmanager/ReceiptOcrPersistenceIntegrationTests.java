@@ -136,6 +136,46 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         assertThat(ocrResponse.getBody().parsedTotalAmount()).isEqualByComparingTo("212.31");
     }
 
+    @Test
+    void realOcrFlowUsesJavaNormalizedStreamAsParserInput() {
+        when(ocrClient.extractResult(any(), any(), any())).thenReturn(
+            new OcrExtractionResult(
+                "FRESH.MARKET\n1234567890123456\nTOTAL.. 210.40,\nTHANK.YOU",
+                List.of(
+                    new OcrExtractionLine("FRESH.MARKET", 0.99d, 0, null),
+                    new OcrExtractionLine("1234567890123456", 0.98d, 1, null),
+                    new OcrExtractionLine("TOTAL.. 210.40,", 0.98d, 2, null),
+                    new OcrExtractionLine("THANK.YOU", 0.97d, 3, null)
+                )
+            )
+        );
+
+        String accessToken = registerAndLogin(uniqueEmail("ocr-normalized"), "P@ssword123");
+
+        ResponseEntity<ReceiptResponse> uploadResponse = restTemplate.exchange(
+            "/api/receipts/upload",
+            HttpMethod.POST,
+            multipartEntity("normalized.png", MediaType.IMAGE_PNG, "png".getBytes(StandardCharsets.UTF_8), CurrencyCode.UAH, accessToken),
+            ReceiptResponse.class
+        );
+
+        Receipt processedReceipt = awaitReceiptStatus(uploadResponse.getBody().id(), ReceiptOcrStatus.DONE);
+        assertThat(processedReceipt.getParsedStoreName()).isEqualTo("FRESH MARKET");
+        assertThat(processedReceipt.getParsedTotalAmount()).isEqualByComparingTo("210.40");
+
+        ResponseEntity<ReceiptOcrResponse> ocrResponse = restTemplate.exchange(
+            "/api/receipts/" + processedReceipt.getId() + "/ocr",
+            HttpMethod.GET,
+            authorizedEntity(accessToken),
+            ReceiptOcrResponse.class
+        );
+
+        assertThat(ocrResponse.getBody()).isNotNull();
+        assertThat(ocrResponse.getBody().normalizedLines()).extracting(line -> line.normalizedText())
+            .contains("FRESH MARKET", "TOTAL. 210.40", "THANK YOU");
+        assertThat(ocrResponse.getBody().normalizedLines().stream().anyMatch(line -> line.ignored())).isTrue();
+    }
+
     private Receipt awaitReceiptStatus(Long receiptId, ReceiptOcrStatus expectedStatus) {
         Awaitility.await()
             .atMost(Duration.ofSeconds(20))

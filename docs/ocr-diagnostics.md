@@ -68,6 +68,8 @@ This lets you compare:
 
 Post-OCR normalization is now intentionally outside the helper. Java/Spring owns `normalizedLines[]` so that parser-facing text cleanup, tagging, and future business integration all live on the backend side.
 
+That ownership is now active in the real OCR flow as well: Spring builds a parser-ready normalized line stream from helper `lines[]`, and downstream OCR parsing already consumes that Java-prepared text rather than the raw helper blob.
+
 ## Diagnostic Corpus
 
 The reproducible comparison corpus is generated inside the helper and currently contains:

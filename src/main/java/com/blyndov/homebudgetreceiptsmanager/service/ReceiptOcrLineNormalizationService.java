@@ -1,6 +1,7 @@
 package com.blyndov.homebudgetreceiptsmanager.service;
 
 import com.blyndov.homebudgetreceiptsmanager.client.OcrExtractionLine;
+import com.blyndov.homebudgetreceiptsmanager.client.OcrExtractionResult;
 import com.blyndov.homebudgetreceiptsmanager.dto.NormalizedOcrLineResponse;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -41,6 +42,18 @@ public class ReceiptOcrLineNormalizationService {
         "(receipt|cash|date|document|thank|store|market|дата|чек|документ|магазин|маркет)",
         Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
     );
+
+    public NormalizedOcrDocument normalizeDocument(OcrExtractionResult extractionResult) {
+        String rawText = extractionResult == null ? null : extractionResult.rawText();
+        List<NormalizedOcrLineResponse> normalizedLines = extractionResult == null
+            ? List.of()
+            : normalizeLines(extractionResult.lines());
+        return buildDocument(rawText, normalizedLines);
+    }
+
+    public NormalizedOcrDocument normalizeRawTextDocument(String rawText) {
+        return buildDocument(rawText, normalizeRawText(rawText));
+    }
 
     public List<NormalizedOcrLineResponse> normalizeLines(List<OcrExtractionLine> lines) {
         if (lines == null || lines.isEmpty()) {
@@ -87,6 +100,32 @@ public class ReceiptOcrLineNormalizationService {
             .map(text -> new OcrExtractionLine(text, null, order.getAndIncrement(), null))
             .toList();
         return normalizeLines(rawLines);
+    }
+
+    private NormalizedOcrDocument buildDocument(String rawText, List<NormalizedOcrLineResponse> normalizedLines) {
+        List<NormalizedOcrLineResponse> parserReadyLines = normalizedLines.stream()
+            .filter(line -> !line.ignored())
+            .filter(line -> StringUtils.hasText(line.normalizedText()))
+            .toList();
+
+        if (parserReadyLines.isEmpty()) {
+            parserReadyLines = normalizedLines.stream()
+                .filter(line -> StringUtils.hasText(line.normalizedText()))
+                .toList();
+        }
+
+        String parserReadyText = parserReadyLines.stream()
+            .map(NormalizedOcrLineResponse::normalizedText)
+            .filter(StringUtils::hasText)
+            .reduce((left, right) -> left + "\n" + right)
+            .orElse("");
+
+        return new NormalizedOcrDocument(
+            rawText,
+            normalizedLines,
+            parserReadyLines,
+            parserReadyText
+        );
     }
 
     private String normalizeText(String text) {

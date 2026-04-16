@@ -67,9 +67,8 @@ public class ReceiptOcrService {
             throw new IllegalStateException("OCR returned empty text");
         }
 
-        int normalizedLineCount = lineNormalizationService.normalizeLines(extractionResult.lines()).size();
-
-        ReceiptOcrParser.ParsedReceiptData parsedData = receiptOcrParser.parse(rawText);
+        NormalizedOcrDocument normalizedDocument = lineNormalizationService.normalizeDocument(extractionResult);
+        ReceiptOcrParser.ParsedReceiptData parsedData = receiptOcrParser.parse(normalizedDocument.parserReadyText());
 
         receipt.setRawOcrText(rawText);
         receipt.setParsedStoreName(parsedData.parsedStoreName());
@@ -82,14 +81,15 @@ public class ReceiptOcrService {
         receiptRepository.save(receipt);
 
         log.info(
-            "Receipt OCR completed successfully for receiptId={}, userId={}, parsedStoreName={}, parsedTotalAmount={}, parsedPurchaseDate={}, lineItemCount={}, normalizedLineCount={}",
+            "Receipt OCR completed successfully for receiptId={}, userId={}, parsedStoreName={}, parsedTotalAmount={}, parsedPurchaseDate={}, lineItemCount={}, normalizedLineCount={}, parserReadyLineCount={}",
             receipt.getId(),
             receipt.getUser().getId(),
             receipt.getParsedStoreName(),
             receipt.getParsedTotalAmount(),
             receipt.getParsedPurchaseDate(),
             receipt.getLineItems().size(),
-            normalizedLineCount
+            normalizedDocument.normalizedLines().size(),
+            normalizedDocument.parserReadyLines().size()
         );
     }
 
@@ -135,12 +135,13 @@ public class ReceiptOcrService {
 
     @Transactional(readOnly = true)
     public ReceiptOcrResponse mapToOcrResponse(Receipt receipt) {
+        NormalizedOcrDocument normalizedDocument = lineNormalizationService.normalizeRawTextDocument(receipt.getRawOcrText());
         return new ReceiptOcrResponse(
             receipt.getId(),
             receipt.getCurrency(),
             receipt.getOcrStatus(),
             receipt.getRawOcrText(),
-            lineNormalizationService.normalizeRawText(receipt.getRawOcrText()),
+            normalizedDocument.normalizedLines(),
             receipt.getParsedStoreName(),
             receipt.getParsedTotalAmount(),
             receipt.getParsedPurchaseDate(),

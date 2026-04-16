@@ -148,6 +148,13 @@ Responsibility split:
   - line tagging and lightweight classification
   - parser-ready `normalizedLines[]`
 
+The real OCR processing path now uses Java normalization as an active downstream step, not just as response decoration:
+
+- `OcrClient` returns raw ordered lines from the helper
+- `ReceiptOcrLineNormalizationService` builds a normalized document artifact in Java
+- non-ignored normalized lines become the parser-ready stream
+- current parser invocation already consumes that parser-ready text instead of raw helper text
+
 The Java normalization layer is intentionally conservative. It does not try to infer store names, totals, dates, or items.
 
 Current Java normalization responsibilities:
@@ -183,6 +190,14 @@ Current ignore rule:
 
 - obvious barcode-like and junk lines are flagged as `ignored=true`
 - price, header, and service lines are preserved for later parser decisions
+
+Current downstream artifact:
+
+- `NormalizedOcrDocument` in Spring holds:
+  - `normalizedLines[]`
+  - `parserReadyLines[]`
+  - `parserReadyText`
+- this is the bridge into Sprint 3 parser work
 
 ### Paddle Line-Based Output
 

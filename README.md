@@ -217,6 +217,12 @@ Post-OCR normalization now lives in the Spring backend, not in the Python helper
   - line tagging and lightweight classification
   - parser-ready `normalizedLines[]` construction
 
+In the live OCR processing path, Spring now treats the Java-normalized stream as the primary post-OCR artifact:
+
+- raw helper `lines[]` are normalized in `ReceiptOcrLineNormalizationService`
+- a parser-ready line stream is built from non-ignored normalized lines
+- current downstream parsing already consumes that Java-built parser-ready text instead of the raw OCR blob
+
 `GET /api/receipts/{id}/ocr` now includes `normalizedLines[]` with:
 
 - `originalText`
