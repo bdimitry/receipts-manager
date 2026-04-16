@@ -68,7 +68,8 @@ It allows a user to:
 - the PaddleOCR helper now includes a separate preprocessing layer for crop cleanup, deskew, denoise, contrast recovery, and thresholding before OCR
 - the PaddleOCR helper now returns line-based OCR output with stable reading order, so the next parser step can work with explicit receipt rows instead of a single long text blob
 - the PaddleOCR helper now stops at raw ordered line extraction, while the Spring backend owns conservative line normalization, line tagging, and parser-ready `normalizedLines[]`
-- the live OCR processing path now uses that Java-normalized stream as the main post-OCR artifact, and current parser preparation already runs on parser-ready normalized text instead of raw helper text
+- the live OCR processing path now uses that Java-normalized stream as the main post-OCR artifact, and the baseline parser now runs on parser-ready normalized lines instead of raw helper text
+- the baseline parser now returns a first structured Java document result with merchant, date, total, parsed currency, and best-effort line items
 - the current diagnostic baseline uses explicit OCR profiles and shows that most obvious mixed-script degradation happens in the OCR engine on script-mismatched inputs, not in the line mapper
 - the selected baseline profile for the standard OCR branch is now `en`, based on a controlled comparison corpus across `en`, `cyrillic`, and `latin`
 - OCR `DONE` means text extraction succeeded, even if structured parsing is partial
@@ -149,6 +150,7 @@ Focus on:
 - same-origin proxy approach in Docker
 - UI integration over existing async backend contracts
 - OCR parsing model with persisted line items
+- baseline OCR parser model with structured document extraction over normalized lines
 - currency-safe reporting and dashboard behavior
 - test coverage across backend and frontend layers
 

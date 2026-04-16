@@ -70,6 +70,12 @@ Post-OCR normalization is now intentionally outside the helper. Java/Spring owns
 
 That ownership is now active in the real OCR flow as well: Spring builds a parser-ready normalized line stream from helper `lines[]`, and downstream OCR parsing already consumes that Java-prepared text rather than the raw helper blob.
 
+The next layer after diagnostics now also lives in Java:
+
+- `ReceiptOcrParser` consumes `normalizedLines[]`
+- it returns a baseline `ParsedReceiptDocument`
+- no parser logic lives in the Python helper anymore
+
 ## Diagnostic Corpus
 
 The reproducible comparison corpus is generated inside the helper and currently contains:
@@ -171,8 +177,8 @@ The current controlled comparison supports this baseline decision:
 - line-based output is good enough to continue toward normalization and parser experiments
 - future modules should still validate the chosen baseline on more real receipts, especially local-language retail documents
 
-Before deeper receipt parsing, the next investigation should focus on one of these paths:
+Before deeper validation work, the next investigation should focus on one of these paths:
 
-- validating the conservative normalization layer on a larger real-world receipt corpus
+- validating the current baseline parser on a larger real-world receipt corpus
 - deciding whether a simple primary-plus-fallback profile strategy is worth adding later
-- then moving into baseline parser work with the current baseline and normalized line stream locked down
+- then moving into validation and sanity-check layers on top of the current normalized line stream and baseline parser

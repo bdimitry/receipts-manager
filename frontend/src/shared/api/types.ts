@@ -103,6 +103,7 @@ export interface ReceiptOcrResponse {
   normalizedLines?: NormalizedOcrLineResponse[];
   parsedStoreName: string | null;
   parsedTotalAmount: number | null;
+  parsedCurrency?: CurrencyCode | null;
   parsedPurchaseDate: string | null;
   lineItems: ReceiptLineItemResponse[];
   ocrErrorMessage: string | null;

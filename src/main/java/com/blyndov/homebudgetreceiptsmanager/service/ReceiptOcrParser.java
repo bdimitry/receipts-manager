@@ -1,5 +1,7 @@
 package com.blyndov.homebudgetreceiptsmanager.service;
 
+import com.blyndov.homebudgetreceiptsmanager.dto.NormalizedOcrLineResponse;
+import com.blyndov.homebudgetreceiptsmanager.entity.CurrencyCode;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -7,6 +9,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -25,14 +28,18 @@ public class ReceiptOcrParser {
     private static final Pattern DATE_PATTERN = Pattern.compile(
         "\\b(\\d{4}-\\d{2}-\\d{2}|\\d{2}[./-]\\d{2}[./-]\\d{2,4})\\b"
     );
-    private static final Pattern LETTER_PATTERN = Pattern.compile(".*\\p{L}.*");
+    private static final Pattern LETTER_PATTERN = Pattern.compile("\\p{L}");
     private static final Pattern BARCODE_PATTERN = Pattern.compile("^[\\d\\s-]{8,}$");
     private static final Pattern QUANTITY_WITH_UNIT_PATTERN = Pattern.compile(
         "(?iu)(\\d+(?:[\\.,]\\d+)?)\\s*(шт|кг|kg|гр|g|г|л|ml|мл|уп|упак|pcs|pc|pack|бут|btl|pkg)(?=\\s|$)"
     );
     private static final Pattern MULTIPLIER_PATTERN = Pattern.compile(
-        "(?iu)(\\d+(?:[\\.,]\\d+)?)\\s*[xх×*]\\s*(\\d+[\\.,]\\d{2})"
+        "(?iu)(\\d+(?:[\\.,]\\d+)?)\\s*[xхХ×*]\\s*(\\d+[\\.,]\\d{2})"
     );
+    private static final Pattern CURRENCY_UAH_PATTERN = Pattern.compile("(?iu)(uah|грн|₴)");
+    private static final Pattern CURRENCY_USD_PATTERN = Pattern.compile("(?iu)(usd|\\$)");
+    private static final Pattern CURRENCY_EUR_PATTERN = Pattern.compile("(?iu)(eur|€)");
+    private static final Pattern CURRENCY_RUB_PATTERN = Pattern.compile("(?iu)(rub|₽)");
     private static final List<DateTimeFormatter> DATE_FORMATTERS = List.of(
         DateTimeFormatter.ISO_LOCAL_DATE,
         DateTimeFormatter.ofPattern("dd.MM.yyyy"),
@@ -46,224 +53,228 @@ public class ReceiptOcrParser {
         "total",
         "amount due",
         "sum",
-        "subtotal",
         "итого",
         "сумма",
         "сума",
         "всього",
+        "разом",
         "до сплати",
-        "к оплате"
+        "к оплате",
+        "оплата"
+    );
+    private static final Set<String> GENERIC_HEADER_LINES = Set.of(
+        "receipt",
+        "cash receipt",
+        "document",
+        "thank you",
+        "дякуємо",
+        "спасибо"
     );
     private static final Set<String> SERVICE_KEYWORDS = Set.of(
         "barcode",
-        "bar code",
+        "ean",
         "штрих",
         "штрихкод",
-        "штрих код",
-        "касса",
-        "каса",
-        "кассир",
-        "касир",
         "cashier",
         "terminal",
-        "терминал",
-        "термінал",
         "address",
-        "адрес",
         "www",
         "http",
         "qr",
-        "receipt",
-        "чек",
-        "фискал",
-        "фіскал",
         "thank",
-        "дякуємо",
-        "спасибо",
-        "card",
-        "payment",
         "discount",
-        "зниж",
-        "скид",
         "vat",
         "tax",
         "пдв",
         "phone",
-        "тел"
+        "тел",
+        "касса",
+        "каса",
+        "кассир",
+        "касир",
+        "терминал",
+        "термінал"
     );
-    private static final Set<String> ADDRESS_KEYWORDS = Set.of(
-        "вул",
-        "ул",
-        "улица",
-        "street",
-        "st.",
-        "avenue",
-        "ave",
-        "просп",
-        "пр-т",
-        "буд",
-        "дом",
-        "місто",
-        "город"
-    );
-    private static final Set<String> NON_RETAIL_KEYWORDS = Set.of(
-        "bank",
-        "ukrsib",
-        "privat",
-        "paribas",
+    private static final Set<String> ACCOUNT_KEYWORDS = Set.of(
         "iban",
         "swift",
-        "document",
-        "документ",
+        "edrpou",
+        "єдрпоу",
         "рахунок",
         "рахунку",
         "рахунків",
+        "account",
+        "invoice",
         "отримувач",
         "одержувач",
+        "відправник",
         "платіж",
-        "переказ",
-        "єдрпоу",
-        "edrpou",
-        "invoice",
-        "account",
-        "online"
+        "переказ"
     );
 
-    public ParsedReceiptData parse(String rawText) {
-        List<String> lines = rawText.lines()
-            .map(this::normalizeWhitespace)
-            .filter(StringUtils::hasText)
-            .toList();
-        boolean nonRetailDocument = looksLikeNonRetailDocument(lines, rawText);
+    public ParsedReceiptDocument parse(NormalizedOcrDocument document) {
+        if (document == null) {
+            return new ParsedReceiptDocument(null, null, null, null, List.of());
+        }
 
-        return new ParsedReceiptData(
-            extractStoreName(lines).orElse(null),
-            nonRetailDocument ? null : extractTotalAmount(lines, rawText).orElse(null),
-            extractPurchaseDate(rawText).orElse(null),
-            nonRetailDocument ? List.of() : extractLineItems(lines)
+        List<NormalizedOcrLineResponse> orderedLines = document.normalizedLines().stream()
+            .sorted(Comparator.comparing(line -> line.order() == null ? Integer.MAX_VALUE : line.order()))
+            .toList();
+        List<NormalizedOcrLineResponse> parserReadyLines = document.parserReadyLines().isEmpty()
+            ? orderedLines.stream().filter(line -> StringUtils.hasText(line.normalizedText())).toList()
+            : document.parserReadyLines();
+
+        return new ParsedReceiptDocument(
+            extractMerchant(orderedLines).orElse(null),
+            extractPurchaseDate(orderedLines).orElse(null),
+            extractTotalAmount(orderedLines).orElse(null),
+            extractCurrency(orderedLines).orElse(null),
+            extractLineItems(parserReadyLines)
         );
     }
 
-    private Optional<String> extractStoreName(List<String> lines) {
+    private Optional<String> extractMerchant(List<NormalizedOcrLineResponse> lines) {
         return lines.stream()
             .limit(8)
-            .filter(this::containsLetters)
-            .filter(line -> !isServiceLine(line))
-            .filter(line -> !containsMoney(line))
-            .filter(line -> !isBarcodeLike(line))
-            .filter(line -> !containsDateOrTimeMetadata(line))
-            .map(this::sanitizeTitle)
-            .filter(StringUtils::hasText)
+            .filter(line -> !line.ignored())
+            .map(line -> new MerchantCandidate(line, sanitizeTitle(line.normalizedText())))
+            .filter(candidate -> StringUtils.hasText(candidate.title()))
+            .filter(candidate -> containsLetters(candidate.title()))
+            .filter(candidate -> !containsMoney(candidate.title()))
+            .filter(candidate -> !containsDateOrTimeMetadata(candidate.title()))
+            .filter(candidate -> !containsTotalKeyword(candidate.title()))
+            .filter(candidate -> !isAccountLike(candidate.title()))
+            .filter(candidate -> !GENERIC_HEADER_LINES.contains(normalizeForMatching(candidate.title())))
+            .sorted(
+                Comparator.comparingInt((MerchantCandidate candidate) -> merchantScore(candidate.line(), candidate.title()))
+                    .thenComparingInt(candidate -> candidate.line().order() == null ? Integer.MAX_VALUE : candidate.line().order())
+                    .thenComparingInt(candidate -> candidate.title().length())
+            )
+            .map(MerchantCandidate::title)
             .findFirst();
     }
 
-    private Optional<BigDecimal> extractTotalAmount(List<String> lines, String rawText) {
-        for (String line : lines) {
-            if (!containsTotalKeyword(line) || line.toLowerCase(Locale.ROOT).contains("subtotal")) {
-                continue;
-            }
-
-            List<BigDecimal> amounts = extractAllDecimals(line);
-            if (!amounts.isEmpty()) {
-                return Optional.of(amounts.getLast());
-            }
-        }
-
-        List<BigDecimal> allDecimals = extractAllDecimals(rawText);
-        return allDecimals.stream().max(Comparator.naturalOrder());
-    }
-
-    private Optional<LocalDate> extractPurchaseDate(String rawText) {
-        Matcher matcher = DATE_PATTERN.matcher(rawText);
-        while (matcher.find()) {
-            String candidate = matcher.group(1);
-            for (DateTimeFormatter formatter : DATE_FORMATTERS) {
-                try {
-                    LocalDate date = LocalDate.parse(candidate, formatter);
-                    if (candidate.matches("\\d{2}[./-]\\d{2}[./-]\\d{2}$")) {
-                        date = date.withYear(adjustTwoDigitYear(date.getYear()));
-                    }
-                    return Optional.of(date);
-                } catch (DateTimeParseException ignored) {
-                    // Try the next supported format.
-                }
+    private Optional<LocalDate> extractPurchaseDate(List<NormalizedOcrLineResponse> lines) {
+        for (NormalizedOcrLineResponse line : lines) {
+            Optional<LocalDate> parsedDate = extractDateFromText(line.normalizedText());
+            if (parsedDate.isPresent()) {
+                return parsedDate;
             }
         }
 
         return Optional.empty();
     }
 
-    private List<ParsedReceiptLineItem> extractLineItems(List<String> lines) {
-        List<ParsedReceiptLineItem> items = new ArrayList<>();
-        String pendingTitle = null;
-        String pendingRawFragment = null;
-        int lineIndex = 0;
-        boolean catalogStarted = false;
-
-        for (String line : lines) {
+    private Optional<BigDecimal> extractTotalAmount(List<NormalizedOcrLineResponse> lines) {
+        for (int index = lines.size() - 1; index >= 0; index--) {
+            String line = lines.get(index).normalizedText();
             if (!StringUtils.hasText(line)) {
                 continue;
             }
 
             if (containsTotalKeyword(line)) {
+                List<BigDecimal> amounts = extractAllDecimals(line);
+                if (!amounts.isEmpty()) {
+                    return Optional.of(amounts.getLast());
+                }
+            }
+        }
+
+        for (int index = lines.size() - 1; index >= 0; index--) {
+            NormalizedOcrLineResponse line = lines.get(index);
+            if (line.ignored()) {
+                continue;
+            }
+            if (!line.tags().contains("price_like")) {
+                continue;
+            }
+            if (looksLikeItemLine(line)) {
+                continue;
+            }
+
+            List<BigDecimal> amounts = extractAllDecimals(line.normalizedText());
+            if (!amounts.isEmpty()) {
+                return Optional.of(amounts.getLast());
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    private Optional<CurrencyCode> extractCurrency(List<NormalizedOcrLineResponse> lines) {
+        for (int index = lines.size() - 1; index >= 0; index--) {
+            String line = lines.get(index).normalizedText();
+            if (!StringUtils.hasText(line)) {
+                continue;
+            }
+
+            Optional<CurrencyCode> explicitCurrency = extractCurrencyFromText(line);
+            if (explicitCurrency.isPresent()) {
+                return explicitCurrency;
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    private List<ParsedReceiptLineItem> extractLineItems(List<NormalizedOcrLineResponse> lines) {
+        List<ParsedReceiptLineItem> items = new ArrayList<>();
+        String pendingTitle = null;
+        List<String> pendingSourceLines = new ArrayList<>();
+        int lineIndex = 0;
+
+        for (NormalizedOcrLineResponse line : lines) {
+            String text = line.normalizedText();
+            if (!StringUtils.hasText(text) || line.ignored()) {
                 pendingTitle = null;
-                pendingRawFragment = null;
+                pendingSourceLines = new ArrayList<>();
+                continue;
+            }
+
+            if (containsTotalKeyword(text)) {
+                pendingTitle = null;
+                pendingSourceLines = new ArrayList<>();
                 break;
             }
 
             if (shouldIgnoreForLineItems(line)) {
                 pendingTitle = null;
-                pendingRawFragment = null;
+                pendingSourceLines = new ArrayList<>();
                 continue;
             }
 
-            List<DecimalMatch> matches = extractDecimalMatches(line);
-            boolean hasLetters = containsLetters(line);
-
-            if (!catalogStarted) {
-                if (!matches.isEmpty() && hasLetters && !containsDateOrTimeMetadata(line)) {
-                    catalogStarted = true;
-                } else if (looksLikePotentialItemTitle(line)) {
-                    catalogStarted = true;
-                    pendingTitle = sanitizeTitle(line);
-                    pendingRawFragment = line;
-                    continue;
-                } else {
-                    continue;
-                }
-            }
+            List<DecimalMatch> matches = extractDecimalMatches(text);
+            boolean hasLetters = containsLetters(text);
 
             if (!matches.isEmpty() && hasLetters) {
-                ParsedReceiptLineItem item = parseInlineLineItem(line, matches, pendingTitle, pendingRawFragment, ++lineIndex);
+                ParsedReceiptLineItem item = parseInlineLineItem(line, matches, pendingTitle, pendingSourceLines, ++lineIndex);
                 if (item != null) {
                     items.add(item);
                     pendingTitle = null;
-                    pendingRawFragment = null;
+                    pendingSourceLines = new ArrayList<>();
                     continue;
                 }
             }
 
             if (!matches.isEmpty() && !hasLetters && StringUtils.hasText(pendingTitle)) {
-                ParsedReceiptLineItem item = parsePendingAmountLine(line, matches, pendingTitle, pendingRawFragment, ++lineIndex);
+                ParsedReceiptLineItem item = parsePendingAmountLine(line, matches, pendingTitle, pendingSourceLines, ++lineIndex);
                 if (item != null) {
                     items.add(item);
                 }
                 pendingTitle = null;
-                pendingRawFragment = null;
+                pendingSourceLines = new ArrayList<>();
                 continue;
             }
 
             if (looksLikePotentialItemTitle(line)) {
-                String normalizedTitle = sanitizeTitle(line);
+                String normalizedTitle = sanitizeTitle(text);
                 pendingTitle = StringUtils.hasText(pendingTitle)
                     ? sanitizeTitle(pendingTitle + " " + normalizedTitle)
                     : normalizedTitle;
-                pendingRawFragment = StringUtils.hasText(pendingRawFragment)
-                    ? pendingRawFragment + " | " + line
-                    : line;
+                pendingSourceLines.add(sourceText(line));
             } else {
                 pendingTitle = null;
-                pendingRawFragment = null;
+                pendingSourceLines = new ArrayList<>();
             }
         }
 
@@ -271,13 +282,14 @@ public class ReceiptOcrParser {
     }
 
     private ParsedReceiptLineItem parseInlineLineItem(
-        String line,
+        NormalizedOcrLineResponse line,
         List<DecimalMatch> matches,
         String pendingTitle,
-        String pendingRawFragment,
+        List<String> pendingSourceLines,
         int lineIndex
     ) {
-        String titlePart = sanitizeTitle(line.substring(0, matches.getFirst().start()));
+        String text = line.normalizedText();
+        String titlePart = sanitizeTitle(text.substring(0, matches.getFirst().start()));
         String title = StringUtils.hasText(pendingTitle)
             ? sanitizeTitle(pendingTitle + " " + titlePart)
             : titlePart;
@@ -286,7 +298,7 @@ public class ReceiptOcrParser {
             return null;
         }
 
-        QuantityDetails quantityDetails = detectQuantity(title, line, matches);
+        QuantityDetails quantityDetails = detectQuantity(title, text, matches);
         BigDecimal lineTotal = matches.getLast().value();
         BigDecimal unitPrice = quantityDetails.unitPrice() != null
             ? quantityDetails.unitPrice()
@@ -296,7 +308,8 @@ public class ReceiptOcrParser {
             unitPrice = lineTotal.divide(quantityDetails.quantity(), 2, RoundingMode.HALF_UP);
         }
 
-        String rawFragment = StringUtils.hasText(pendingRawFragment) ? pendingRawFragment + " | " + line : line;
+        List<String> sourceLines = new ArrayList<>(pendingSourceLines);
+        sourceLines.add(sourceText(line));
 
         return new ParsedReceiptLineItem(
             lineIndex,
@@ -305,15 +318,16 @@ public class ReceiptOcrParser {
             quantityDetails.unit(),
             unitPrice,
             lineTotal,
-            rawFragment
+            String.join(" | ", sourceLines),
+            List.copyOf(sourceLines)
         );
     }
 
     private ParsedReceiptLineItem parsePendingAmountLine(
-        String line,
+        NormalizedOcrLineResponse line,
         List<DecimalMatch> matches,
         String pendingTitle,
-        String pendingRawFragment,
+        List<String> pendingSourceLines,
         int lineIndex
     ) {
         String title = sanitizeTitle(pendingTitle);
@@ -331,6 +345,9 @@ public class ReceiptOcrParser {
             unitPrice = lineTotal.divide(quantityDetails.quantity(), 2, RoundingMode.HALF_UP);
         }
 
+        List<String> sourceLines = new ArrayList<>(pendingSourceLines);
+        sourceLines.add(sourceText(line));
+
         return new ParsedReceiptLineItem(
             lineIndex,
             title,
@@ -338,7 +355,8 @@ public class ReceiptOcrParser {
             quantityDetails.unit(),
             unitPrice,
             lineTotal,
-            StringUtils.hasText(pendingRawFragment) ? pendingRawFragment + " | " + line : line
+            String.join(" | ", sourceLines),
+            List.copyOf(sourceLines)
         );
     }
 
@@ -370,22 +388,102 @@ public class ReceiptOcrParser {
         return new QuantityDetails(null, null, null);
     }
 
-    private boolean shouldIgnoreForLineItems(String line) {
-        return !StringUtils.hasText(line)
-            || isBarcodeLike(line)
-            || isServiceLine(line)
-            || containsDateOrTimeMetadata(line)
-            || line.length() < 2;
+    private boolean shouldIgnoreForLineItems(NormalizedOcrLineResponse line) {
+        String text = line.normalizedText();
+        return !StringUtils.hasText(text)
+            || line.ignored()
+            || isBarcodeLike(text)
+            || containsDateOrTimeMetadata(text)
+            || containsTotalKeyword(text)
+            || isAccountLike(text)
+            || (line.tags().contains("service_like") && !looksLikeItemLine(line))
+            || (line.tags().contains("header_like") && isEarlyHeader(line) && !line.tags().contains("price_like"))
+            || text.length() < 2;
     }
 
-    private boolean looksLikePotentialItemTitle(String line) {
-        if (!containsLetters(line) || containsMoney(line) || containsDateOrTimeMetadata(line) || isServiceLine(line) || isBarcodeLike(line)) {
+    private boolean looksLikePotentialItemTitle(NormalizedOcrLineResponse line) {
+        String text = line.normalizedText();
+        if (!containsLetters(text) || containsMoney(text) || containsDateOrTimeMetadata(text) || containsTotalKeyword(text) || isAccountLike(text)) {
+            return false;
+        }
+        if ((line.tags().contains("header_like") && isEarlyHeader(line))
+            || (line.tags().contains("service_like") && !line.tags().contains("content_like"))) {
             return false;
         }
 
-        long letterCount = line.codePoints().filter(Character::isLetter).count();
-        long digitCount = line.codePoints().filter(Character::isDigit).count();
-        return letterCount >= 3 && digitCount <= Math.max(6, letterCount * 2);
+        long letterCount = text.codePoints().filter(Character::isLetter).count();
+        long digitCount = text.codePoints().filter(Character::isDigit).count();
+        return letterCount >= 3 && digitCount <= Math.max(6, letterCount * 2L);
+    }
+
+    private boolean looksLikeItemLine(NormalizedOcrLineResponse line) {
+        String text = line.normalizedText();
+        return StringUtils.hasText(text)
+            && !line.ignored()
+            && containsLetters(text)
+            && containsMoney(text)
+            && !containsTotalKeyword(text)
+            && !containsDateOrTimeMetadata(text)
+            && !isAccountLike(text)
+            && !(line.tags().contains("header_like") && isEarlyHeader(line));
+    }
+
+    private boolean isEarlyHeader(NormalizedOcrLineResponse line) {
+        return line.order() != null && line.order() <= 1;
+    }
+
+    private int merchantScore(NormalizedOcrLineResponse line, String title) {
+        int score = 0;
+        if (!line.tags().contains("header_like")) {
+            score += 10;
+        }
+        if (line.tags().contains("service_like")) {
+            score += 10;
+        }
+        if (title.chars().anyMatch(Character::isDigit)) {
+            score += 10;
+        }
+        if (title.length() > 40) {
+            score += 5;
+        }
+        return score;
+    }
+
+    private Optional<LocalDate> extractDateFromText(String value) {
+        Matcher matcher = DATE_PATTERN.matcher(value);
+        while (matcher.find()) {
+            String candidate = matcher.group(1);
+            for (DateTimeFormatter formatter : DATE_FORMATTERS) {
+                try {
+                    LocalDate date = LocalDate.parse(candidate, formatter);
+                    if (candidate.matches("\\d{2}[./-]\\d{2}[./-]\\d{2}$")) {
+                        date = date.withYear(adjustTwoDigitYear(date.getYear()));
+                    }
+                    return Optional.of(date);
+                } catch (DateTimeParseException ignored) {
+                    // Continue with the next supported format.
+                }
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    private Optional<CurrencyCode> extractCurrencyFromText(String value) {
+        if (CURRENCY_UAH_PATTERN.matcher(value).find()) {
+            return Optional.of(CurrencyCode.UAH);
+        }
+        if (CURRENCY_USD_PATTERN.matcher(value).find()) {
+            return Optional.of(CurrencyCode.USD);
+        }
+        if (CURRENCY_EUR_PATTERN.matcher(value).find()) {
+            return Optional.of(CurrencyCode.EUR);
+        }
+        if (CURRENCY_RUB_PATTERN.matcher(value).find()) {
+            return Optional.of(CurrencyCode.RUB);
+        }
+
+        return Optional.empty();
     }
 
     private boolean containsMoney(String line) {
@@ -393,20 +491,11 @@ public class ReceiptOcrParser {
     }
 
     private boolean containsLetters(String line) {
-        return LETTER_PATTERN.matcher(line).matches();
+        return LETTER_PATTERN.matcher(line).find();
     }
 
     private boolean containsDateOrTimeMetadata(String line) {
         return DATE_PATTERN.matcher(line).find() || line.matches(".*\\b\\d{2}:\\d{2}\\b.*");
-    }
-
-    private boolean isServiceLine(String line) {
-        String normalized = normalizeForMatching(line);
-        return SERVICE_KEYWORDS.stream().anyMatch(normalized::contains) || isAddressLike(normalized);
-    }
-
-    private boolean isAddressLike(String normalizedLine) {
-        return ADDRESS_KEYWORDS.stream().anyMatch(normalizedLine::contains) && normalizedLine.chars().anyMatch(Character::isDigit);
     }
 
     private boolean containsTotalKeyword(String line) {
@@ -414,29 +503,15 @@ public class ReceiptOcrParser {
         return TOTAL_KEYWORDS.stream().anyMatch(normalized::contains);
     }
 
-    private boolean isBarcodeLike(String line) {
-        return BARCODE_PATTERN.matcher(line.replace('\u00A0', ' ')).matches();
+    private boolean isAccountLike(String line) {
+        String normalized = normalizeForMatching(line);
+        long digitCount = normalized.chars().filter(Character::isDigit).count();
+        boolean ibanLike = normalized.contains("ua") && digitCount >= 10;
+        return ibanLike || ACCOUNT_KEYWORDS.stream().anyMatch(normalized::contains);
     }
 
-    private boolean looksLikeNonRetailDocument(List<String> lines, String rawText) {
-        String normalizedText = normalizeForMatching(rawText);
-        long keywordHits = NON_RETAIL_KEYWORDS.stream()
-            .filter(normalizedText::contains)
-            .count();
-
-        long ibanLikeLines = lines.stream()
-            .map(this::normalizeForMatching)
-            .filter(line -> line.contains("ua") && line.chars().filter(Character::isDigit).count() >= 10)
-            .count();
-
-        long candidateItemLines = lines.stream()
-            .filter(line -> !shouldIgnoreForLineItems(line))
-            .filter(line -> containsLetters(line) && containsMoney(line))
-            .count();
-
-        return (keywordHits >= 3 && candidateItemLines <= 1)
-            || (keywordHits >= 2 && ibanLikeLines > 0)
-            || keywordHits >= 4;
+    private boolean isBarcodeLike(String line) {
+        return BARCODE_PATTERN.matcher(line.replace('\u00A0', ' ')).matches();
     }
 
     private boolean containsMultiplierMarker(String value) {
@@ -460,9 +535,13 @@ public class ReceiptOcrParser {
     private String sanitizeTitle(String value) {
         String normalized = normalizeWhitespace(value);
         return normalized
-            .replaceAll("(?iu)\\s+\\d+(?:[\\.,]\\d+)?\\s*[xх×*]$", "")
-            .replaceAll("(?iu)\\s*[xх×*]$", "")
+            .replaceAll("(?iu)\\s+\\d+(?:[\\.,]\\d+)?\\s*[xхХ×*]$", "")
+            .replaceAll("(?iu)\\s*[xхХ×*]$", "")
             .replaceAll("[\\s,;:/\\\\|.-]+$", "");
+    }
+
+    private String sourceText(NormalizedOcrLineResponse line) {
+        return StringUtils.hasText(line.originalText()) ? line.originalText() : line.normalizedText();
     }
 
     private int adjustTwoDigitYear(int parsedYear) {
@@ -508,25 +587,6 @@ public class ReceiptOcrParser {
         return new MultiplierDetails(parseNumber(matcher.group(1)), parseMoney(matcher.group(2)));
     }
 
-    public record ParsedReceiptData(
-        String parsedStoreName,
-        BigDecimal parsedTotalAmount,
-        LocalDate parsedPurchaseDate,
-        List<ParsedReceiptLineItem> lineItems
-    ) {
-    }
-
-    public record ParsedReceiptLineItem(
-        Integer lineIndex,
-        String title,
-        BigDecimal quantity,
-        String unit,
-        BigDecimal unitPrice,
-        BigDecimal lineTotal,
-        String rawFragment
-    ) {
-    }
-
     private record DecimalMatch(BigDecimal value, int start, int end) {
     }
 
@@ -537,5 +597,8 @@ public class ReceiptOcrParser {
     }
 
     private record MultiplierDetails(BigDecimal quantity, BigDecimal unitPrice) {
+    }
+
+    private record MerchantCandidate(NormalizedOcrLineResponse line, String title) {
     }
 }

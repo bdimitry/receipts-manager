@@ -216,12 +216,19 @@ Post-OCR normalization now lives in the Spring backend, not in the Python helper
   - conservative line normalization
   - line tagging and lightweight classification
   - parser-ready `normalizedLines[]` construction
+  - baseline rule-based document parsing over normalized lines
 
 In the live OCR processing path, Spring now treats the Java-normalized stream as the primary post-OCR artifact:
 
 - raw helper `lines[]` are normalized in `ReceiptOcrLineNormalizationService`
 - a parser-ready line stream is built from non-ignored normalized lines
-- current downstream parsing already consumes that Java-built parser-ready text instead of the raw OCR blob
+- the baseline Java parser now consumes that normalized downstream stream instead of the raw OCR blob
+- the structured parser result now includes:
+  - merchant/store
+  - purchase date
+  - total
+  - parsed currency when explicit markers are present
+  - best-effort line items with source fragments
 
 `GET /api/receipts/{id}/ocr` now includes `normalizedLines[]` with:
 
@@ -232,6 +239,8 @@ In the live OCR processing path, Spring now treats the Java-normalized stream as
 - `bbox`
 - `tags`
 - `ignored`
+
+The OCR response also exposes `parsedCurrency` so the baseline parser result is easier to inspect without any UI work.
 
 Current Java normalization stays intentionally conservative:
 

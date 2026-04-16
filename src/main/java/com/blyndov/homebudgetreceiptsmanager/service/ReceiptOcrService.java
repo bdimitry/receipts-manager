@@ -68,12 +68,12 @@ public class ReceiptOcrService {
         }
 
         NormalizedOcrDocument normalizedDocument = lineNormalizationService.normalizeDocument(extractionResult);
-        ReceiptOcrParser.ParsedReceiptData parsedData = receiptOcrParser.parse(normalizedDocument.parserReadyText());
+        ParsedReceiptDocument parsedData = receiptOcrParser.parse(normalizedDocument);
 
         receipt.setRawOcrText(rawText);
-        receipt.setParsedStoreName(parsedData.parsedStoreName());
-        receipt.setParsedTotalAmount(parsedData.parsedTotalAmount());
-        receipt.setParsedPurchaseDate(parsedData.parsedPurchaseDate());
+        receipt.setParsedStoreName(parsedData.merchantName());
+        receipt.setParsedTotalAmount(parsedData.totalAmount());
+        receipt.setParsedPurchaseDate(parsedData.purchaseDate());
         receipt.setLineItems(parsedData.lineItems().stream().map(item -> mapLineItem(receipt, item)).toList());
         receipt.setOcrStatus(ReceiptOcrStatus.DONE);
         receipt.setOcrErrorMessage(null);
@@ -81,12 +81,13 @@ public class ReceiptOcrService {
         receiptRepository.save(receipt);
 
         log.info(
-            "Receipt OCR completed successfully for receiptId={}, userId={}, parsedStoreName={}, parsedTotalAmount={}, parsedPurchaseDate={}, lineItemCount={}, normalizedLineCount={}, parserReadyLineCount={}",
+            "Receipt OCR completed successfully for receiptId={}, userId={}, parsedStoreName={}, parsedTotalAmount={}, parsedPurchaseDate={}, parsedCurrency={}, lineItemCount={}, normalizedLineCount={}, parserReadyLineCount={}",
             receipt.getId(),
             receipt.getUser().getId(),
             receipt.getParsedStoreName(),
             receipt.getParsedTotalAmount(),
             receipt.getParsedPurchaseDate(),
+            parsedData.currency(),
             receipt.getLineItems().size(),
             normalizedDocument.normalizedLines().size(),
             normalizedDocument.parserReadyLines().size()
@@ -136,6 +137,7 @@ public class ReceiptOcrService {
     @Transactional(readOnly = true)
     public ReceiptOcrResponse mapToOcrResponse(Receipt receipt) {
         NormalizedOcrDocument normalizedDocument = lineNormalizationService.normalizeRawTextDocument(receipt.getRawOcrText());
+        ParsedReceiptDocument parsedDocument = receiptOcrParser.parse(normalizedDocument);
         return new ReceiptOcrResponse(
             receipt.getId(),
             receipt.getCurrency(),
@@ -144,6 +146,7 @@ public class ReceiptOcrService {
             normalizedDocument.normalizedLines(),
             receipt.getParsedStoreName(),
             receipt.getParsedTotalAmount(),
+            parsedDocument.currency(),
             receipt.getParsedPurchaseDate(),
             receipt.getLineItems().stream().map(this::mapLineItemResponse).toList(),
             receipt.getOcrErrorMessage(),
@@ -151,7 +154,7 @@ public class ReceiptOcrService {
         );
     }
 
-    private ReceiptLineItem mapLineItem(Receipt receipt, ReceiptOcrParser.ParsedReceiptLineItem parsedLineItem) {
+    private ReceiptLineItem mapLineItem(Receipt receipt, ParsedReceiptLineItem parsedLineItem) {
         ReceiptLineItem lineItem = new ReceiptLineItem();
         lineItem.setReceipt(receipt);
         lineItem.setLineIndex(parsedLineItem.lineIndex());

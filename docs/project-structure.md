@@ -171,6 +171,9 @@ Inside `src/main/java/com/blyndov/homebudgetreceiptsmanager/service`:
 
 - `ReceiptOcrLineNormalizationService`: Java-side conservative line normalization, tagging, and parser-ready `normalizedLines[]` construction after raw OCR extraction
 - `NormalizedOcrDocument`: internal Spring-side downstream OCR artifact that carries `normalizedLines[]`, `parserReadyLines[]`, and `parserReadyText`
+- `ReceiptOcrParser`: line-oriented baseline parser that consumes `normalizedLines[]`
+- `ParsedReceiptDocument`: structured parser result model for merchant/date/total/currency/items
+- `ParsedReceiptLineItem`: structured parser line item model with raw fragment and source lines
 
 ### `docker-compose.yml`
 

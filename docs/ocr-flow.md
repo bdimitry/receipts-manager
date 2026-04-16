@@ -30,7 +30,7 @@ Flow:
 6. the consumer downloads the file from S3
 7. the configured OCR client sends the file to the selected OCR helper container
 8. the raw OCR text is stored
-9. `ReceiptOcrParser` performs best-effort parsing for summary fields and line items
+9. `ReceiptOcrParser` performs best-effort baseline parsing for summary fields, parsed currency, and line items
 10. the receipt is marked `DONE` or `FAILED`
 
 ## OCR Backend Options
@@ -197,7 +197,61 @@ Current downstream artifact:
   - `normalizedLines[]`
   - `parserReadyLines[]`
   - `parserReadyText`
-- this is the bridge into Sprint 3 parser work
+- this is the bridge into the baseline parser layer
+
+## Java Baseline Parser Layer
+
+Sprint 3 adds a dedicated Java parser layer on top of `NormalizedOcrDocument`.
+
+Responsibility split now becomes:
+
+- Python helper:
+  - preprocess image
+  - run PaddleOCR
+  - return raw ordered OCR lines
+- Java backend:
+  - normalize lines
+  - tag/classify lines
+  - build parser-ready line stream
+  - parse merchant/date/total/currency/items from normalized lines
+
+Current parser characteristics:
+
+- rule-based
+- line-oriented
+- explainable
+- best-effort
+- no document-type routing
+- no business validation layer yet
+
+Current parser output model in Spring:
+
+- `ParsedReceiptDocument`
+  - `merchantName`
+  - `purchaseDate`
+  - `totalAmount`
+  - `currency`
+  - `lineItems[]`
+- `ParsedReceiptLineItem`
+  - `title`
+  - `lineTotal`
+  - `quantity`
+  - `unit`
+  - `unitPrice`
+  - `rawFragment`
+  - `sourceLines[]`
+
+Current parser rules focus on:
+
+- extracting merchant/store from early header-like lines
+- extracting dates from line-level date matches
+- extracting totals from total-like lines near the bottom of the document
+- extracting explicit currency markers such as `UAH`, `грн`, `USD`, `EUR`, `RUB`
+- building item-like lines from `content_like` / `price_like` lines
+- pairing title lines with following amount-only lines
+- ignoring barcode/service/noise lines as item candidates
+
+The parser uses `normalizedLines[]` as its primary input. Raw OCR text remains stored for diagnostics and compatibility, but it is no longer the main parsing artifact.
 
 ### Paddle Line-Based Output
 
@@ -236,6 +290,7 @@ Java-side normalization should now be inspected through the main backend OCR res
 
 - `GET /api/receipts/{id}/ocr`
 - `normalizedLines[]`
+- `parsedCurrency`
 
 Current diagnostic conclusion:
 
