@@ -96,7 +96,7 @@ class ReceiptOcrProcessingIntegrationTests extends AbstractPostgresIntegrationTe
     void uploadReceiptTriggersRealOcrAndPersistsParsedFields() throws Exception {
         String accessToken = registerAndLogin(uniqueEmail("ocr"), "P@ssword123");
         byte[] image = createReceiptImage(
-            List.of("FRESH MARKET", "TOTAL 123.45", "DATE 2026-03-14")
+            List.of("FRESH MARKET", "TOTAL 123.45 UAH", "DATE 2026-03-14")
         );
 
         ResponseEntity<ReceiptResponse> uploadResponse = restTemplate.exchange(
@@ -119,8 +119,11 @@ class ReceiptOcrProcessingIntegrationTests extends AbstractPostgresIntegrationTe
         Receipt processedReceipt = awaitReceiptStatus(uploadResponse.getBody().id(), ReceiptOcrStatus.DONE);
         assertThat(processedReceipt.getRawOcrText()).isNotBlank();
         assertThat(processedReceipt.getRawOcrText().toUpperCase()).contains("FRESH");
+        assertThat(processedReceipt.getNormalizedOcrLinesJson()).isNotBlank();
+        assertThat(processedReceipt.getParserReadyText()).contains("FRESH MARKET");
         assertThat(processedReceipt.getParsedStoreName()).isEqualTo("FRESH MARKET");
         assertThat(processedReceipt.getParsedTotalAmount()).isEqualByComparingTo(new BigDecimal("123.45"));
+        assertThat(processedReceipt.getParsedCurrency()).isEqualTo(CurrencyCode.UAH);
         assertThat(processedReceipt.getParsedPurchaseDate()).isEqualTo(LocalDate.of(2026, 3, 14));
         assertThat(processedReceipt.getOcrErrorMessage()).isNull();
         assertThat(processedReceipt.getOcrProcessedAt()).isNotNull();
@@ -153,6 +156,7 @@ class ReceiptOcrProcessingIntegrationTests extends AbstractPostgresIntegrationTe
         assertThat(ocrResponse.getBody().normalizedLines()).isNotEmpty();
         assertThat(ocrResponse.getBody().normalizedLines().stream().anyMatch(line -> line.tags().contains("price_like"))).isTrue();
         assertThat(ocrResponse.getBody().parsedTotalAmount()).isEqualByComparingTo("123.45");
+        assertThat(ocrResponse.getBody().parsedCurrency()).isEqualTo(CurrencyCode.UAH);
     }
 
     @Test

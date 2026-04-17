@@ -70,8 +70,18 @@ public class Receipt {
     @Column(name = "parsed_total_amount", precision = 19, scale = 2)
     private BigDecimal parsedTotalAmount;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "parsed_currency", length = 3)
+    private CurrencyCode parsedCurrency;
+
     @Column(name = "parsed_purchase_date")
     private LocalDate parsedPurchaseDate;
+
+    @Column(name = "normalized_ocr_lines_json", columnDefinition = "TEXT")
+    private String normalizedOcrLinesJson;
+
+    @Column(name = "parser_ready_text", columnDefinition = "TEXT")
+    private String parserReadyText;
 
     @Column(name = "ocr_error_message", columnDefinition = "TEXT")
     private String ocrErrorMessage;
@@ -187,12 +197,36 @@ public class Receipt {
         this.parsedTotalAmount = parsedTotalAmount;
     }
 
+    public CurrencyCode getParsedCurrency() {
+        return parsedCurrency;
+    }
+
+    public void setParsedCurrency(CurrencyCode parsedCurrency) {
+        this.parsedCurrency = parsedCurrency;
+    }
+
     public LocalDate getParsedPurchaseDate() {
         return parsedPurchaseDate;
     }
 
     public void setParsedPurchaseDate(LocalDate parsedPurchaseDate) {
         this.parsedPurchaseDate = parsedPurchaseDate;
+    }
+
+    public String getNormalizedOcrLinesJson() {
+        return normalizedOcrLinesJson;
+    }
+
+    public void setNormalizedOcrLinesJson(String normalizedOcrLinesJson) {
+        this.normalizedOcrLinesJson = normalizedOcrLinesJson;
+    }
+
+    public String getParserReadyText() {
+        return parserReadyText;
+    }
+
+    public void setParserReadyText(String parserReadyText) {
+        this.parserReadyText = parserReadyText;
     }
 
     public String getOcrErrorMessage() {

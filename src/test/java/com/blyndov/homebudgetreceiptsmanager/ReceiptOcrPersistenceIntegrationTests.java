@@ -112,6 +112,8 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         assertThat(uploadResponse.getBody().currency()).isEqualTo(CurrencyCode.UAH);
 
         Receipt processedReceipt = awaitReceiptStatus(uploadResponse.getBody().id(), ReceiptOcrStatus.DONE);
+        assertThat(processedReceipt.getNormalizedOcrLinesJson()).isNotBlank();
+        assertThat(processedReceipt.getParserReadyText()).isNotBlank();
         assertThat(processedReceipt.getLineItems()).hasSizeGreaterThan(1);
         assertThat(processedReceipt.getLineItems())
             .extracting(item -> item.getTitle())
@@ -134,6 +136,7 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         assertThat(ocrResponse.getBody().lineItems().get(0).lineTotal()).isEqualByComparingTo("85.00");
         assertThat(ocrResponse.getBody().lineItems().get(1).title()).isEqualTo("ХЛІБ БОРОДИНСЬКИЙ");
         assertThat(ocrResponse.getBody().parsedTotalAmount()).isEqualByComparingTo("212.31");
+        assertThat(ocrResponse.getBody().parsedCurrency()).isEqualTo(processedReceipt.getParsedCurrency());
     }
 
     @Test
@@ -160,6 +163,8 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         );
 
         Receipt processedReceipt = awaitReceiptStatus(uploadResponse.getBody().id(), ReceiptOcrStatus.DONE);
+        assertThat(processedReceipt.getNormalizedOcrLinesJson()).contains("FRESH MARKET");
+        assertThat(processedReceipt.getParserReadyText()).contains("FRESH MARKET");
         assertThat(processedReceipt.getParsedStoreName()).isEqualTo("FRESH MARKET");
         assertThat(processedReceipt.getParsedTotalAmount()).isEqualByComparingTo("210.40");
 
@@ -174,6 +179,8 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         assertThat(ocrResponse.getBody().normalizedLines()).extracting(line -> line.normalizedText())
             .contains("FRESH MARKET", "TOTAL. 210.40", "THANK YOU");
         assertThat(ocrResponse.getBody().normalizedLines().stream().anyMatch(line -> line.ignored())).isTrue();
+        assertThat(ocrResponse.getBody().parsedStoreName()).isEqualTo("FRESH MARKET");
+        assertThat(ocrResponse.getBody().parsedTotalAmount()).isEqualByComparingTo("210.40");
     }
 
     private Receipt awaitReceiptStatus(Long receiptId, ReceiptOcrStatus expectedStatus) {

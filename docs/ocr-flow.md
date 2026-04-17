@@ -30,8 +30,9 @@ Flow:
 6. the consumer downloads the file from S3
 7. the configured OCR client sends the file to the selected OCR helper container
 8. the raw OCR text is stored
-9. `ReceiptOcrParser` performs best-effort baseline parsing for summary fields, parsed currency, and line items
-10. the receipt is marked `DONE` or `FAILED`
+9. `ReceiptOcrLineNormalizationService` builds Java `normalizedLines[]` and parser-ready text
+10. `ReceiptOcrParser` performs best-effort baseline parsing for summary fields, parsed currency, and line items
+11. the receipt persists those OCR artifacts and is marked `DONE` or `FAILED`
 
 ## OCR Backend Options
 
@@ -76,7 +77,7 @@ The existing business parsing flow remains unchanged. The Paddle response is now
 - `rawText` for compatibility
 - ordered `lines[]` for future line-aware parsing work
 
-The current Spring flow still uses the text representation for downstream receipt parsing, but the client contract is now ready for the next parser step.
+The current Spring flow keeps both raw OCR text and ordered raw lines, but downstream parsing now runs on Java-normalized lines and parser-ready text instead of using the raw OCR blob as the primary parsing source.
 
 The PaddleOCR helper now warms its baseline models during container startup. This moves the heaviest cold-start initialization away from the first live OCR request in a fresh local environment.
 
@@ -257,6 +258,27 @@ Current parser rules focus on:
 
 The parser uses `normalizedLines[]` as its primary input. Raw OCR text remains stored for diagnostics and compatibility, but it is no longer the main parsing artifact.
 
+## Persisted OCR Artifacts
+
+When OCR processing succeeds, the receipt now stores the same downstream OCR artifacts that the product later uses during retrieval:
+
+- `rawOcrText`
+- `normalizedOcrLinesJson`
+- `parserReadyText`
+- `parsedStoreName`
+- `parsedTotalAmount`
+- `parsedCurrency`
+- `parsedPurchaseDate`
+- persisted `ReceiptLineItem` rows
+
+This means receipt detail and `GET /api/receipts/{id}/ocr` now prefer the product-integrated OCR result instead of rebuilding most of it from raw OCR text on every read.
+
+Retrieval behavior:
+
+- if persisted normalized OCR JSON exists, Spring restores it and returns it directly
+- if an older receipt does not have the new persisted fields yet, Spring falls back to conservative reconstruction from `rawOcrText`
+- raw OCR text still remains available for diagnostics
+
 ### Paddle Line-Based Output
 
 The Paddle helper no longer treats OCR as only one opaque text block. It now maps raw PaddleOCR output through a dedicated response mapper and returns explicit receipt lines.
@@ -320,8 +342,11 @@ Stored directly on `Receipt`:
 - `currency`
 - `ocrStatus`
 - `rawOcrText`
+- `normalizedOcrLinesJson`
+- `parserReadyText`
 - `parsedStoreName`
 - `parsedTotalAmount`
+- `parsedCurrency`
 - `parsedPurchaseDate`
 - `ocrErrorMessage`
 - `ocrProcessedAt`
@@ -420,6 +445,7 @@ Use:
 - `normalizedLines`
 - `parsedStoreName`
 - `parsedTotalAmount`
+- `parsedCurrency`
 - `parsedPurchaseDate`
 - `rawOcrText`
 - `lineItems`
@@ -492,6 +518,7 @@ Invoke-RestMethod -Method Get `
 - `currency`
 - `normalizedLines`
 - `parsedTotalAmount`
+- `parsedCurrency`
 - `lineItems`
 - `rawOcrText`
 

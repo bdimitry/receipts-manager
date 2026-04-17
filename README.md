@@ -223,12 +223,26 @@ In the live OCR processing path, Spring now treats the Java-normalized stream as
 - raw helper `lines[]` are normalized in `ReceiptOcrLineNormalizationService`
 - a parser-ready line stream is built from non-ignored normalized lines
 - the baseline Java parser now consumes that normalized downstream stream instead of the raw OCR blob
+- the receipt persistence layer now stores the same downstream OCR artifacts that power retrieval and receipt detail
 - the structured parser result now includes:
   - merchant/store
   - purchase date
   - total
   - parsed currency when explicit markers are present
   - best-effort line items with source fragments
+
+Persisted receipt OCR artifacts now include:
+
+- raw OCR text
+- Java `normalizedLines[]` as JSON
+- Java parser-ready text
+- parsed store name
+- parsed total amount
+- parsed currency
+- parsed purchase date
+- persisted parsed line items
+
+`GET /api/receipts/{id}/ocr` now prefers those persisted OCR artifacts during retrieval, so receipt detail reflects the same product-integrated pipeline that ran during async processing instead of depending on a legacy partial recompute path.
 
 `GET /api/receipts/{id}/ocr` now includes `normalizedLines[]` with:
 

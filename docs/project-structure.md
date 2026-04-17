@@ -125,6 +125,7 @@ These files define:
   - `ReceiptLineItem`
   - `ReportJob`
   - `CurrencyCode`
+- `Receipt` now persists both summary OCR fields and downstream standard-OCR artifacts such as `normalizedOcrLinesJson`, `parserReadyText`, and `parsedCurrency`
 
 ### `dto`
 
@@ -174,6 +175,7 @@ Inside `src/main/java/com/blyndov/homebudgetreceiptsmanager/service`:
 - `ReceiptOcrParser`: line-oriented baseline parser that consumes `normalizedLines[]`
 - `ParsedReceiptDocument`: structured parser result model for merchant/date/total/currency/items
 - `ParsedReceiptLineItem`: structured parser line item model with raw fragment and source lines
+- `ReceiptOcrService`: orchestration layer that now persists the product OCR artifacts produced by extraction, normalization, and parsing, and restores them on retrieval
 
 ### `docker-compose.yml`
 
@@ -197,6 +199,7 @@ Backend coverage includes:
 - auth
 - purchases with currency validation
 - receipts and OCR
+- receipt OCR persistence and retrieval coverage for raw OCR, normalized lines, parser-ready text, parsed currency, and parsed items
 - realistic OCR parser fixtures with noisy Cyrillic text
 - reports and downloads
 - mixed-currency reporting safety

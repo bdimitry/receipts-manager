@@ -119,6 +119,10 @@ class ReceiptOcrFailureIntegrationTests extends AbstractPostgresIntegrationTest 
                 receiptRepository.findById(uploadResponse.getBody().id()).orElseThrow().getOcrStatus()
             ).isEqualTo(ReceiptOcrStatus.FAILED));
 
+        assertThat(receiptRepository.findById(uploadResponse.getBody().id()).orElseThrow().getParsedCurrency()).isNull();
+        assertThat(receiptRepository.findById(uploadResponse.getBody().id()).orElseThrow().getNormalizedOcrLinesJson()).isNull();
+        assertThat(receiptRepository.findById(uploadResponse.getBody().id()).orElseThrow().getParserReadyText()).isNull();
+
         ResponseEntity<ReceiptOcrResponse> ocrResponse = restTemplate.exchange(
             "/api/receipts/" + uploadResponse.getBody().id() + "/ocr",
             HttpMethod.GET,
@@ -132,6 +136,7 @@ class ReceiptOcrFailureIntegrationTests extends AbstractPostgresIntegrationTest 
         assertThat(ocrResponse.getBody().ocrStatus()).isEqualTo(ReceiptOcrStatus.FAILED);
         assertThat(ocrResponse.getBody().rawOcrText()).isNull();
         assertThat(ocrResponse.getBody().normalizedLines()).isEmpty();
+        assertThat(ocrResponse.getBody().parsedCurrency()).isNull();
         assertThat(ocrResponse.getBody().lineItems()).isEmpty();
         assertThat(ocrResponse.getBody().ocrErrorMessage()).contains("Simulated OCR failure");
     }

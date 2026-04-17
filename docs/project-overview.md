@@ -61,7 +61,9 @@ It allows a user to:
 ### OCR And Parsing Model
 
 - raw OCR text is always stored when extraction succeeds
+- Java-normalized OCR lines and parser-ready text are now persisted on the receipt as first-class downstream OCR artifacts
 - parsed store name, total amount, and purchase date are stored as best-effort fields
+- parsed currency is stored when explicit markers are found
 - parsed line items are stored separately and linked to the receipt
 - multilingual OCR runs with `ukr+rus+eng` in the local helper container
 - the main backend can now switch between OCR helper backends through configuration without changing the business parsing flow
@@ -70,6 +72,7 @@ It allows a user to:
 - the PaddleOCR helper now stops at raw ordered line extraction, while the Spring backend owns conservative line normalization, line tagging, and parser-ready `normalizedLines[]`
 - the live OCR processing path now uses that Java-normalized stream as the main post-OCR artifact, and the baseline parser now runs on parser-ready normalized lines instead of raw helper text
 - the baseline parser now returns a first structured Java document result with merchant, date, total, parsed currency, and best-effort line items
+- receipt detail and OCR retrieval now read those persisted OCR artifacts back through the product API instead of depending on a legacy partial recompute path
 - the current diagnostic baseline uses explicit OCR profiles and shows that most obvious mixed-script degradation happens in the OCR engine on script-mismatched inputs, not in the line mapper
 - the selected baseline profile for the standard OCR branch is now `en`, based on a controlled comparison corpus across `en`, `cyrillic`, and `latin`
 - OCR `DONE` means text extraction succeeded, even if structured parsing is partial
@@ -140,7 +143,7 @@ Understand:
 - how a React frontend integrates with a Spring Boot API
 - how JWT flows into a protected SPA
 - how typed API calls, forms, and query state are organized
-- how receipt OCR results are persisted beyond raw text
+- how receipt OCR results are persisted beyond raw text, including normalized lines and parser-ready text
 
 ### Middle Or Senior Developer
 
@@ -150,6 +153,7 @@ Focus on:
 - same-origin proxy approach in Docker
 - UI integration over existing async backend contracts
 - OCR parsing model with persisted line items
+- persisted OCR downstream artifacts used for retrieval, not just processing-time parsing
 - baseline OCR parser model with structured document extraction over normalized lines
 - currency-safe reporting and dashboard behavior
 - test coverage across backend and frontend layers

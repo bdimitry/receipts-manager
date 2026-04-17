@@ -67,6 +67,8 @@ export function ReceiptDetailPage() {
     return <ErrorState title={t("errorTitle")} message={t("noData")} />;
   }
 
+  const displayCurrency = ocr.parsedCurrency ?? ocr.currency;
+
   return (
     <div className="page-grid">
       <PageIntro
@@ -97,7 +99,7 @@ export function ReceiptDetailPage() {
           </div>
           <div>
             <dt>{t("amount")}</dt>
-            <dd>{ocr.parsedTotalAmount ? formatCurrency(ocr.parsedTotalAmount, language, ocr.currency) : "-"}</dd>
+            <dd>{ocr.parsedTotalAmount ? formatCurrency(ocr.parsedTotalAmount, language, displayCurrency) : "-"}</dd>
           </div>
           <div>
             <dt>{t("purchaseDate")}</dt>
@@ -143,7 +145,7 @@ export function ReceiptDetailPage() {
                       ? `${formatQuantity(lineItem.quantity, language)}${lineItem.unit ? ` ${lineItem.unit}` : ""}`
                       : t("quantityUnavailable")}
                     {lineItem.unitPrice != null
-                      ? ` / ${formatCurrency(lineItem.unitPrice, language, ocr.currency)}`
+                      ? ` / ${formatCurrency(lineItem.unitPrice, language, displayCurrency)}`
                       : ""}
                   </span>
                   {lineItem.rawFragment ? <span>{lineItem.rawFragment}</span> : null}
@@ -152,7 +154,7 @@ export function ReceiptDetailPage() {
                   <span>{t("lineTotal")}</span>
                   <strong>
                     {lineItem.lineTotal != null
-                      ? formatCurrency(lineItem.lineTotal, language, ocr.currency)
+                      ? formatCurrency(lineItem.lineTotal, language, displayCurrency)
                       : "-"}
                   </strong>
                 </div>
