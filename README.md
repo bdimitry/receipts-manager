@@ -217,6 +217,7 @@ Post-OCR normalization now lives in the Spring backend, not in the Python helper
   - line tagging and lightweight classification
   - parser-ready `normalizedLines[]` construction
   - baseline rule-based document parsing over normalized lines
+  - post-parse validation and sanity checks
 
 In the live OCR processing path, Spring now treats the Java-normalized stream as the primary post-OCR artifact:
 
@@ -224,6 +225,7 @@ In the live OCR processing path, Spring now treats the Java-normalized stream as
 - a parser-ready line stream is built from non-ignored normalized lines
 - the baseline Java parser now consumes that normalized downstream stream instead of the raw OCR blob
 - the receipt persistence layer now stores the same downstream OCR artifacts that power retrieval and receipt detail
+- the validation layer now marks suspicious parse results instead of silently treating them as fully trustworthy
 - the structured parser result now includes:
   - merchant/store
   - purchase date
@@ -240,9 +242,16 @@ Persisted receipt OCR artifacts now include:
 - parsed total amount
 - parsed currency
 - parsed purchase date
+- persisted parse warnings
+- weak parse quality flag
 - persisted parsed line items
 
 `GET /api/receipts/{id}/ocr` now prefers those persisted OCR artifacts during retrieval, so receipt detail reflects the same product-integrated pipeline that ran during async processing instead of depending on a legacy partial recompute path.
+
+The same OCR response now also exposes validation output:
+
+- `parseWarnings[]`
+- `weakParseQuality`
 
 `GET /api/receipts/{id}/ocr` now includes `normalizedLines[]` with:
 
@@ -270,6 +279,14 @@ Current Java baseline parser hardening on noisy receipts additionally:
 - extracts totals only from summary-context lines instead of late standalone amounts
 - keeps payment, promo, card, and barcode/service fragments out of parsed line items
 - pairs split item title and amount lines more safely for real-world OCR output
+
+Current Java validation and sanity checks now additionally:
+
+- flag suspicious merchant candidates that still look noisy after parsing
+- flag totals that look like date fragments or that conflict with item sums
+- flag suspicious line items when payment or service fragments leak into parsed goods
+- flag noisy item titles and inconsistent quantity or unit-price math
+- keep the best-effort parsed result instead of hard-failing OCR processing
 
 The `lines[]` collection is now the main structured OCR output for downstream parsing work:
 

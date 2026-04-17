@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { getReceipt, getReceiptOcr } from "../api";
 import { useI18n } from "../../../shared/i18n/I18nContext";
+import type { TranslationKey } from "../../../shared/i18n/translations";
 import { getOcrStatusLabel } from "../../../shared/lib/domain";
 import { formatCurrency, formatDate, formatDateTime } from "../../../shared/lib/format";
 import { Button } from "../../../shared/ui/Button";
@@ -28,6 +29,29 @@ function formatQuantity(value: number, language: string) {
   return new Intl.NumberFormat(language, {
     maximumFractionDigits: 3,
   }).format(value);
+}
+
+function getValidationWarningLabel(code: string, t: (key: TranslationKey) => string) {
+  switch (code) {
+    case "SUSPICIOUS_MERCHANT":
+      return t("ocrWarningSuspiciousMerchant");
+    case "SUSPICIOUS_TOTAL":
+      return t("ocrWarningSuspiciousTotal");
+    case "SUSPICIOUS_DATE":
+      return t("ocrWarningSuspiciousDate");
+    case "SUSPICIOUS_LINE_ITEMS":
+      return t("ocrWarningSuspiciousLineItems");
+    case "ITEM_TOTAL_MISMATCH":
+      return t("ocrWarningItemTotalMismatch");
+    case "PAYMENT_CONTENT_IN_ITEMS":
+      return t("ocrWarningPaymentContentInItems");
+    case "NOISY_ITEM_TITLES":
+      return t("ocrWarningNoisyItemTitles");
+    case "INCONSISTENT_ITEM_MATH":
+      return t("ocrWarningInconsistentItemMath");
+    default:
+      return code;
+  }
 }
 
 export function ReceiptDetailPage() {
@@ -68,6 +92,8 @@ export function ReceiptDetailPage() {
   }
 
   const displayCurrency = ocr.parsedCurrency ?? ocr.currency;
+  const parseWarnings = ocr.parseWarnings ?? [];
+  const weakParseQuality = ocr.weakParseQuality ?? false;
 
   return (
     <div className="page-grid">
@@ -131,6 +157,26 @@ export function ReceiptDetailPage() {
             <dd>{receipt.purchaseId ?? t("noLinkedPurchase")}</dd>
           </div>
         </dl>
+      </Card>
+      <Card>
+        <h2>{t("parseQuality")}</h2>
+        {parseWarnings.length ? (
+          <>
+            {weakParseQuality ? <p className="field-hint">{t("weakParseQualityHint")}</p> : null}
+            <div className="table-like-list">
+              {parseWarnings.map((warningCode) => (
+                <article className="list-row" key={warningCode}>
+                  <div className="list-row__main">
+                    <strong>{getValidationWarningLabel(warningCode, t)}</strong>
+                    <span>{warningCode}</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </>
+        ) : (
+          <EmptyState message={t("noValidationWarnings")} />
+        )}
       </Card>
       <Card>
         <h2>{t("parsedLineItems")}</h2>

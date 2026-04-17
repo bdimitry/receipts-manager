@@ -32,7 +32,8 @@ Flow:
 8. the raw OCR text is stored
 9. `ReceiptOcrLineNormalizationService` builds Java `normalizedLines[]` and parser-ready text
 10. `ReceiptOcrParser` performs best-effort baseline parsing for summary fields, parsed currency, and line items
-11. the receipt persists those OCR artifacts and is marked `DONE` or `FAILED`
+11. `ReceiptOcrValidationService` runs sanity checks on the parsed result
+12. the receipt persists those OCR artifacts and validation warnings and is marked `DONE` or `FAILED`
 
 ## OCR Backend Options
 
@@ -223,7 +224,7 @@ Current parser characteristics:
 - explainable
 - best-effort
 - no document-type routing
-- no business validation layer yet
+- no hard-fail validation gate; suspicious results are flagged instead
 
 Current parser output model in Spring:
 
@@ -272,6 +273,35 @@ When OCR processing succeeds, the receipt now stores the same downstream OCR art
 - persisted `ReceiptLineItem` rows
 
 This means receipt detail and `GET /api/receipts/{id}/ocr` now prefer the product-integrated OCR result instead of rebuilding most of it from raw OCR text on every read.
+
+## Java Validation Layer
+
+After parsing, Spring now runs a separate validation and sanity-check layer.
+
+Responsibility split:
+
+- parser:
+  - best-effort extraction of merchant, date, total, currency, and items
+- validation:
+  - detects suspicious or contradictory parse results
+  - keeps the parse result available
+  - surfaces warnings for diagnostics and product retrieval
+
+Current validation checks include:
+
+- suspicious merchant candidates
+- suspicious totals
+- suspicious dates
+- suspicious line items
+- item-total mismatch against document total
+- payment or service content leaking into items
+- noisy item titles
+- inconsistent quantity, unit price, and line total math
+
+Current persisted validation artifacts:
+
+- `parseWarningsJson`
+- `weakParseQuality`
 
 Retrieval behavior:
 
@@ -348,6 +378,8 @@ Stored directly on `Receipt`:
 - `parsedTotalAmount`
 - `parsedCurrency`
 - `parsedPurchaseDate`
+- `parseWarningsJson`
+- `weakParseQuality`
 - `ocrErrorMessage`
 - `ocrProcessedAt`
 
@@ -447,6 +479,8 @@ Use:
 - `parsedTotalAmount`
 - `parsedCurrency`
 - `parsedPurchaseDate`
+- `parseWarnings`
+- `weakParseQuality`
 - `rawOcrText`
 - `lineItems`
 - `ocrStatus`
@@ -519,6 +553,8 @@ Invoke-RestMethod -Method Get `
 - `normalizedLines`
 - `parsedTotalAmount`
 - `parsedCurrency`
+- `parseWarnings`
+- `weakParseQuality`
 - `lineItems`
 - `rawOcrText`
 

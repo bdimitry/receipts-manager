@@ -83,6 +83,12 @@ public class Receipt {
     @Column(name = "parser_ready_text", columnDefinition = "TEXT")
     private String parserReadyText;
 
+    @Column(name = "parse_warnings_json", columnDefinition = "TEXT")
+    private String parseWarningsJson;
+
+    @Column(name = "weak_parse_quality", nullable = false)
+    private boolean weakParseQuality;
+
     @Column(name = "ocr_error_message", columnDefinition = "TEXT")
     private String ocrErrorMessage;
 
@@ -227,6 +233,22 @@ public class Receipt {
 
     public void setParserReadyText(String parserReadyText) {
         this.parserReadyText = parserReadyText;
+    }
+
+    public String getParseWarningsJson() {
+        return parseWarningsJson;
+    }
+
+    public void setParseWarningsJson(String parseWarningsJson) {
+        this.parseWarningsJson = parseWarningsJson;
+    }
+
+    public boolean isWeakParseQuality() {
+        return weakParseQuality;
+    }
+
+    public void setWeakParseQuality(boolean weakParseQuality) {
+        this.weakParseQuality = weakParseQuality;
     }
 
     public String getOcrErrorMessage() {

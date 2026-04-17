@@ -106,6 +106,8 @@ export interface ReceiptOcrResponse {
   parsedCurrency?: CurrencyCode | null;
   parsedPurchaseDate: string | null;
   lineItems: ReceiptLineItemResponse[];
+  parseWarnings?: string[];
+  weakParseQuality?: boolean;
   ocrErrorMessage: string | null;
   ocrProcessedAt: string | null;
 }

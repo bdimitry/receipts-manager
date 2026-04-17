@@ -140,7 +140,10 @@ describe("receipts flow", () => {
           rawOcrText: "FRESH MARKET\nTOTAL 42.75",
           parsedStoreName: "Fresh Market",
           parsedTotalAmount: 42.75,
+          parsedCurrency: "UAH",
           parsedPurchaseDate: "2026-03-30",
+          parseWarnings: [],
+          weakParseQuality: false,
           lineItems: [
             {
               id: 1,

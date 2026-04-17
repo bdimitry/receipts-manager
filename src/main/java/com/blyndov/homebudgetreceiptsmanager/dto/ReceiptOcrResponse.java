@@ -18,6 +18,8 @@ public record ReceiptOcrResponse(
     CurrencyCode parsedCurrency,
     LocalDate parsedPurchaseDate,
     List<ReceiptLineItemResponse> lineItems,
+    List<String> parseWarnings,
+    boolean weakParseQuality,
     String ocrErrorMessage,
     Instant ocrProcessedAt
 ) {

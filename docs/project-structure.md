@@ -125,12 +125,12 @@ These files define:
   - `ReceiptLineItem`
   - `ReportJob`
   - `CurrencyCode`
-- `Receipt` now persists both summary OCR fields and downstream standard-OCR artifacts such as `normalizedOcrLinesJson`, `parserReadyText`, and `parsedCurrency`
+- `Receipt` now persists both summary OCR fields and downstream standard-OCR artifacts such as `normalizedOcrLinesJson`, `parserReadyText`, `parsedCurrency`, `parseWarningsJson`, and `weakParseQuality`
 
 ### `dto`
 
 - stable request and response contracts
-- OCR responses include parsed line items
+- OCR responses include parsed line items and validation warnings
 - purchase and receipt responses include currency
 
 ### `client`
@@ -175,7 +175,8 @@ Inside `src/main/java/com/blyndov/homebudgetreceiptsmanager/service`:
 - `ReceiptOcrParser`: line-oriented baseline parser that consumes `normalizedLines[]`
 - `ParsedReceiptDocument`: structured parser result model for merchant/date/total/currency/items
 - `ParsedReceiptLineItem`: structured parser line item model with raw fragment and source lines
-- `ReceiptOcrService`: orchestration layer that now persists the product OCR artifacts produced by extraction, normalization, and parsing, and restores them on retrieval
+- `ReceiptOcrValidationService`: post-parser sanity checks for suspicious merchant, total, date, and line-item results
+- `ReceiptOcrService`: orchestration layer that now persists the product OCR artifacts produced by extraction, normalization, parsing, and validation, and restores them on retrieval
 
 ### `docker-compose.yml`
 
@@ -199,7 +200,7 @@ Backend coverage includes:
 - auth
 - purchases with currency validation
 - receipts and OCR
-- receipt OCR persistence and retrieval coverage for raw OCR, normalized lines, parser-ready text, parsed currency, and parsed items
+- receipt OCR persistence and retrieval coverage for raw OCR, normalized lines, parser-ready text, parsed currency, parsed items, and validation warnings
 - realistic OCR parser fixtures with noisy Cyrillic text
 - reports and downloads
 - mixed-currency reporting safety

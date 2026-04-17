@@ -12,4 +12,8 @@ public record ParsedReceiptDocument(
     CurrencyCode currency,
     List<ParsedReceiptLineItem> lineItems
 ) {
+
+    public ParsedReceiptDocument {
+        lineItems = List.copyOf(lineItems);
+    }
 }

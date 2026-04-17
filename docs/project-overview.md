@@ -72,6 +72,7 @@ It allows a user to:
 - the PaddleOCR helper now stops at raw ordered line extraction, while the Spring backend owns conservative line normalization, line tagging, and parser-ready `normalizedLines[]`
 - the live OCR processing path now uses that Java-normalized stream as the main post-OCR artifact, and the baseline parser now runs on parser-ready normalized lines instead of raw helper text
 - the baseline parser now returns a first structured Java document result with merchant, date, total, parsed currency, and best-effort line items
+- a dedicated Java validation layer now marks suspicious merchant, total, date, and line-item results instead of pretending every parse is equally trustworthy
 - receipt detail and OCR retrieval now read those persisted OCR artifacts back through the product API instead of depending on a legacy partial recompute path
 - the current diagnostic baseline uses explicit OCR profiles and shows that most obvious mixed-script degradation happens in the OCR engine on script-mismatched inputs, not in the line mapper
 - the selected baseline profile for the standard OCR branch is now `en`, based on a controlled comparison corpus across `en`, `cyrillic`, and `latin`
@@ -144,6 +145,7 @@ Understand:
 - how JWT flows into a protected SPA
 - how typed API calls, forms, and query state are organized
 - how receipt OCR results are persisted beyond raw text, including normalized lines and parser-ready text
+- how parse warnings and weak-quality flags now travel through the product flow
 
 ### Middle Or Senior Developer
 
@@ -155,6 +157,7 @@ Focus on:
 - OCR parsing model with persisted line items
 - persisted OCR downstream artifacts used for retrieval, not just processing-time parsing
 - baseline OCR parser model with structured document extraction over normalized lines
+- post-parse validation warnings that keep noisy results honest in the product
 - currency-safe reporting and dashboard behavior
 - test coverage across backend and frontend layers
 

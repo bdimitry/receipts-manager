@@ -114,6 +114,8 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         Receipt processedReceipt = awaitReceiptStatus(uploadResponse.getBody().id(), ReceiptOcrStatus.DONE);
         assertThat(processedReceipt.getNormalizedOcrLinesJson()).isNotBlank();
         assertThat(processedReceipt.getParserReadyText()).isNotBlank();
+        assertThat(processedReceipt.getParseWarningsJson()).isEqualTo("[]");
+        assertThat(processedReceipt.isWeakParseQuality()).isFalse();
         assertThat(processedReceipt.getLineItems()).hasSizeGreaterThan(1);
         assertThat(processedReceipt.getLineItems())
             .extracting(item -> item.getTitle())
@@ -137,6 +139,8 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         assertThat(ocrResponse.getBody().lineItems().get(1).title()).isEqualTo("ХЛІБ БОРОДИНСЬКИЙ");
         assertThat(ocrResponse.getBody().parsedTotalAmount()).isEqualByComparingTo("212.31");
         assertThat(ocrResponse.getBody().parsedCurrency()).isEqualTo(processedReceipt.getParsedCurrency());
+        assertThat(ocrResponse.getBody().parseWarnings()).isEmpty();
+        assertThat(ocrResponse.getBody().weakParseQuality()).isFalse();
     }
 
     @Test
@@ -165,6 +169,8 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         Receipt processedReceipt = awaitReceiptStatus(uploadResponse.getBody().id(), ReceiptOcrStatus.DONE);
         assertThat(processedReceipt.getNormalizedOcrLinesJson()).contains("FRESH MARKET");
         assertThat(processedReceipt.getParserReadyText()).contains("FRESH MARKET");
+        assertThat(processedReceipt.getParseWarningsJson()).isEqualTo("[]");
+        assertThat(processedReceipt.isWeakParseQuality()).isFalse();
         assertThat(processedReceipt.getParsedStoreName()).isEqualTo("FRESH MARKET");
         assertThat(processedReceipt.getParsedTotalAmount()).isEqualByComparingTo("210.40");
 
@@ -181,6 +187,38 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         assertThat(ocrResponse.getBody().normalizedLines().stream().anyMatch(line -> line.ignored())).isTrue();
         assertThat(ocrResponse.getBody().parsedStoreName()).isEqualTo("FRESH MARKET");
         assertThat(ocrResponse.getBody().parsedTotalAmount()).isEqualByComparingTo("210.40");
+        assertThat(ocrResponse.getBody().parseWarnings()).isEmpty();
+        assertThat(ocrResponse.getBody().weakParseQuality()).isFalse();
+    }
+
+    @Test
+    void noisyReceiptPersistsValidationWarningsAndReturnsThemViaApi() throws Exception {
+        String rawText = new ClassPathResource("fixtures/ocr/real-receipt-4-lines.txt").getContentAsString(StandardCharsets.UTF_8);
+        when(ocrClient.extractResult(any(), any(), any())).thenReturn(mapResult(rawText));
+        String accessToken = registerAndLogin(uniqueEmail("ocr-warn"), "P@ssword123");
+
+        ResponseEntity<ReceiptResponse> uploadResponse = restTemplate.exchange(
+            "/api/receipts/upload",
+            HttpMethod.POST,
+            multipartEntity("receipt4.png", MediaType.IMAGE_PNG, "png".getBytes(StandardCharsets.UTF_8), CurrencyCode.UAH, accessToken),
+            ReceiptResponse.class
+        );
+
+        Receipt processedReceipt = awaitReceiptStatus(uploadResponse.getBody().id(), ReceiptOcrStatus.DONE);
+        assertThat(processedReceipt.getParseWarningsJson()).contains("SUSPICIOUS_TOTAL");
+        assertThat(processedReceipt.isWeakParseQuality()).isTrue();
+
+        ResponseEntity<ReceiptOcrResponse> ocrResponse = restTemplate.exchange(
+            "/api/receipts/" + processedReceipt.getId() + "/ocr",
+            HttpMethod.GET,
+            authorizedEntity(accessToken),
+            ReceiptOcrResponse.class
+        );
+
+        assertThat(ocrResponse.getBody()).isNotNull();
+        assertThat(ocrResponse.getBody().parseWarnings())
+            .contains("SUSPICIOUS_TOTAL", "SUSPICIOUS_LINE_ITEMS");
+        assertThat(ocrResponse.getBody().weakParseQuality()).isTrue();
     }
 
     private Receipt awaitReceiptStatus(Long receiptId, ReceiptOcrStatus expectedStatus) {

@@ -74,6 +74,7 @@ The next layer after diagnostics now also lives in Java:
 
 - `ReceiptOcrParser` consumes `normalizedLines[]`
 - it returns a baseline `ParsedReceiptDocument`
+- `ReceiptOcrValidationService` marks suspicious parse results with warnings and a weak-quality flag
 - no parser logic lives in the Python helper anymore
 
 ## Diagnostic Corpus
@@ -177,8 +178,8 @@ The current controlled comparison supports this baseline decision:
 - line-based output is good enough to continue toward normalization and parser experiments
 - future modules should still validate the chosen baseline on more real receipts, especially local-language retail documents
 
-Before deeper validation work, the next investigation should focus on one of these paths:
+The current branch has now started that validation work. The practical next investigation should focus on one of these paths:
 
-- validating the current baseline parser on a larger real-world receipt corpus
+- hardening validation heuristics on a larger real-world receipt corpus
 - deciding whether a simple primary-plus-fallback profile strategy is worth adding later
-- then moving into validation and sanity-check layers on top of the current normalized line stream and baseline parser
+- then moving into parser refinement and stronger sanity checks on top of the current normalized line stream

@@ -16,6 +16,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -29,12 +30,15 @@ public class ReceiptOcrService {
     private static final Logger log = LoggerFactory.getLogger(ReceiptOcrService.class);
     private static final TypeReference<List<NormalizedOcrLineResponse>> NORMALIZED_LINES_TYPE = new TypeReference<>() {
     };
+    private static final TypeReference<List<String>> WARNING_CODES_TYPE = new TypeReference<>() {
+    };
 
     private final ReceiptRepository receiptRepository;
     private final S3StorageService s3StorageService;
     private final OcrClient ocrClient;
     private final ReceiptOcrParser receiptOcrParser;
     private final ReceiptOcrLineNormalizationService lineNormalizationService;
+    private final ReceiptOcrValidationService receiptOcrValidationService;
     private final ObjectMapper objectMapper;
 
     public ReceiptOcrService(
@@ -43,6 +47,7 @@ public class ReceiptOcrService {
         OcrClient ocrClient,
         ReceiptOcrParser receiptOcrParser,
         ReceiptOcrLineNormalizationService lineNormalizationService,
+        ReceiptOcrValidationService receiptOcrValidationService,
         ObjectMapper objectMapper
     ) {
         this.receiptRepository = receiptRepository;
@@ -50,6 +55,7 @@ public class ReceiptOcrService {
         this.ocrClient = ocrClient;
         this.receiptOcrParser = receiptOcrParser;
         this.lineNormalizationService = lineNormalizationService;
+        this.receiptOcrValidationService = receiptOcrValidationService;
         this.objectMapper = objectMapper;
     }
 
@@ -64,6 +70,8 @@ public class ReceiptOcrService {
         receipt.setParsedPurchaseDate(null);
         receipt.setNormalizedOcrLinesJson(null);
         receipt.setParserReadyText(null);
+        receipt.setParseWarningsJson(null);
+        receipt.setWeakParseQuality(false);
         receipt.clearLineItems();
         receipt.setOcrErrorMessage(null);
         receipt.setOcrProcessedAt(null);
@@ -83,10 +91,13 @@ public class ReceiptOcrService {
 
         NormalizedOcrDocument normalizedDocument = lineNormalizationService.normalizeDocument(extractionResult);
         ParsedReceiptDocument parsedData = receiptOcrParser.parse(normalizedDocument);
+        ParsedReceiptValidationResult validationResult = receiptOcrValidationService.validate(normalizedDocument, parsedData);
 
         receipt.setRawOcrText(rawText);
         receipt.setNormalizedOcrLinesJson(serializeNormalizedLines(normalizedDocument.normalizedLines()));
         receipt.setParserReadyText(normalizedDocument.parserReadyText());
+        receipt.setParseWarningsJson(serializeWarningCodes(validationResult.warnings()));
+        receipt.setWeakParseQuality(validationResult.weakParseQuality());
         receipt.setParsedStoreName(parsedData.merchantName());
         receipt.setParsedTotalAmount(parsedData.totalAmount());
         receipt.setParsedCurrency(parsedData.currency());
@@ -98,7 +109,7 @@ public class ReceiptOcrService {
         receiptRepository.save(receipt);
 
         log.info(
-            "Receipt OCR completed successfully for receiptId={}, userId={}, parsedStoreName={}, parsedTotalAmount={}, parsedPurchaseDate={}, parsedCurrency={}, lineItemCount={}, normalizedLineCount={}, parserReadyLineCount={}",
+            "Receipt OCR completed successfully for receiptId={}, userId={}, parsedStoreName={}, parsedTotalAmount={}, parsedPurchaseDate={}, parsedCurrency={}, lineItemCount={}, normalizedLineCount={}, parserReadyLineCount={}, warnings={}",
             receipt.getId(),
             receipt.getUser().getId(),
             receipt.getParsedStoreName(),
@@ -107,7 +118,8 @@ public class ReceiptOcrService {
             parsedData.currency(),
             receipt.getLineItems().size(),
             normalizedDocument.normalizedLines().size(),
-            normalizedDocument.parserReadyLines().size()
+            normalizedDocument.parserReadyLines().size(),
+            validationResult.warnings().stream().map(Enum::name).collect(Collectors.joining(","))
         );
     }
 
@@ -122,6 +134,8 @@ public class ReceiptOcrService {
         receipt.setParsedPurchaseDate(null);
         receipt.setNormalizedOcrLinesJson(null);
         receipt.setParserReadyText(null);
+        receipt.setParseWarningsJson(null);
+        receipt.setWeakParseQuality(false);
         receipt.clearLineItems();
         receipt.setOcrErrorMessage(errorMessage);
         receipt.setOcrProcessedAt(Instant.now());
@@ -139,6 +153,8 @@ public class ReceiptOcrService {
         receipt.setParsedPurchaseDate(null);
         receipt.setNormalizedOcrLinesJson(null);
         receipt.setParserReadyText(null);
+        receipt.setParseWarningsJson(null);
+        receipt.setWeakParseQuality(false);
         receipt.clearLineItems();
         receipt.setOcrErrorMessage(errorMessage);
         receipt.setOcrProcessedAt(Instant.now());
@@ -160,9 +176,11 @@ public class ReceiptOcrService {
     @Transactional(readOnly = true)
     public ReceiptOcrResponse mapToOcrResponse(Receipt receipt) {
         NormalizedOcrDocument normalizedDocument = restoreNormalizedDocument(receipt);
-        ParsedReceiptDocument fallbackParsedDocument = shouldReparseForResponse(receipt, normalizedDocument)
+        ParsedReceiptDocument persistedParsedDocument = restoreParsedDocument(receipt);
+        ParsedReceiptDocument fallbackParsedDocument = shouldReparseForResponse(receipt, normalizedDocument, persistedParsedDocument)
             ? receiptOcrParser.parse(normalizedDocument)
-            : null;
+            : persistedParsedDocument;
+        ParsedReceiptValidationResult validationResult = restoreValidationResult(receipt, normalizedDocument, fallbackParsedDocument);
         CurrencyCode parsedCurrency = receipt.getParsedCurrency() != null
             ? receipt.getParsedCurrency()
             : fallbackParsedDocument != null ? fallbackParsedDocument.currency() : null;
@@ -177,6 +195,8 @@ public class ReceiptOcrService {
             parsedCurrency,
             receipt.getParsedPurchaseDate(),
             receipt.getLineItems().stream().map(this::mapLineItemResponse).toList(),
+            validationResult.warnings().stream().map(Enum::name).toList(),
+            validationResult.weakParseQuality(),
             receipt.getOcrErrorMessage(),
             receipt.getOcrProcessedAt()
         );
@@ -213,6 +233,14 @@ public class ReceiptOcrService {
             return objectMapper.writeValueAsString(normalizedLines);
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Failed to persist normalized OCR lines", exception);
+        }
+    }
+
+    private String serializeWarningCodes(List<ReceiptParseWarningCode> warnings) {
+        try {
+            return objectMapper.writeValueAsString(warnings.stream().map(Enum::name).toList());
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Failed to persist OCR parse warnings", exception);
         }
     }
 
@@ -256,8 +284,59 @@ public class ReceiptOcrService {
         }
     }
 
-    private boolean shouldReparseForResponse(Receipt receipt, NormalizedOcrDocument normalizedDocument) {
-        return receipt.getParsedCurrency() == null
+    private ParsedReceiptValidationResult restoreValidationResult(
+        Receipt receipt,
+        NormalizedOcrDocument normalizedDocument,
+        ParsedReceiptDocument parsedDocument
+    ) {
+        if (receipt.getOcrStatus() != ReceiptOcrStatus.DONE || !StringUtils.hasText(receipt.getRawOcrText())) {
+            return new ParsedReceiptValidationResult(List.of(), false);
+        }
+
+        if (StringUtils.hasText(receipt.getParseWarningsJson())) {
+            try {
+                List<ReceiptParseWarningCode> warnings = objectMapper.readValue(receipt.getParseWarningsJson(), WARNING_CODES_TYPE).stream()
+                    .map(ReceiptParseWarningCode::valueOf)
+                    .toList();
+                return new ParsedReceiptValidationResult(warnings, receipt.isWeakParseQuality());
+            } catch (JsonProcessingException | IllegalArgumentException exception) {
+                log.warn("Failed to deserialize persisted OCR parse warnings for receiptId={}, recomputing validation", receipt.getId(), exception);
+            }
+        }
+
+        return receiptOcrValidationService.validate(normalizedDocument, parsedDocument);
+    }
+
+    private ParsedReceiptDocument restoreParsedDocument(Receipt receipt) {
+        return new ParsedReceiptDocument(
+            receipt.getParsedStoreName(),
+            receipt.getParsedPurchaseDate(),
+            receipt.getParsedTotalAmount(),
+            receipt.getParsedCurrency(),
+            receipt.getLineItems().stream()
+                .map(item -> new ParsedReceiptLineItem(
+                    item.getLineIndex(),
+                    item.getTitle(),
+                    item.getQuantity(),
+                    item.getUnit(),
+                    item.getUnitPrice(),
+                    item.getLineTotal(),
+                    item.getRawFragment(),
+                    item.getRawFragment() == null
+                        ? List.of()
+                        : List.of(item.getRawFragment().split("\\s*\\|\\s*"))
+                ))
+                .toList()
+        );
+    }
+
+    private boolean shouldReparseForResponse(
+        Receipt receipt,
+        NormalizedOcrDocument normalizedDocument,
+        ParsedReceiptDocument parsedDocument
+    ) {
+        return (receipt.getParsedCurrency() == null
+            || (parsedDocument.lineItems().isEmpty() && !normalizedDocument.parserReadyLines().isEmpty()))
             && !normalizedDocument.parserReadyLines().isEmpty()
             && StringUtils.hasText(normalizedDocument.parserReadyText());
     }
