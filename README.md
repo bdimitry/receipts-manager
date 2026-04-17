@@ -249,6 +249,14 @@ Current Java normalization stays intentionally conservative:
 - applies safe OCR confusion cleanup in narrow contexts such as multiplication separators
 - tags lines as `noise`, `barcode_like`, `service_like`, `price_like`, `header_like`, or `content_like`
 
+Current Java baseline parser hardening on noisy receipts additionally:
+
+- rejects weak short merchant candidates such as broken header fragments
+- prefers explicit merchant aliases like `NOVUS` and `UkrsibBank` over noisier header fallbacks
+- extracts totals only from summary-context lines instead of late standalone amounts
+- keeps payment, promo, card, and barcode/service fragments out of parsed line items
+- pairs split item title and amount lines more safely for real-world OCR output
+
 The `lines[]` collection is now the main structured OCR output for downstream parsing work:
 
 - each line keeps human reading order from top to bottom

@@ -250,6 +250,10 @@ Current parser rules focus on:
 - building item-like lines from `content_like` / `price_like` lines
 - pairing title lines with following amount-only lines
 - ignoring barcode/service/noise lines as item candidates
+- rejecting weak short merchant fragments before they can become parsed store names
+- preferring explicit merchant aliases like `NOVUS` and `UkrsibBank` when OCR noise breaks header candidates
+- treating plain late amount lines as totals only when they are connected to summary context, not as a global fallback
+- filtering payment/card/promo fragments out of item extraction so they do not pollute parsed line items
 
 The parser uses `normalizedLines[]` as its primary input. Raw OCR text remains stored for diagnostics and compatibility, but it is no longer the main parsing artifact.
 
@@ -366,6 +370,8 @@ What it does:
 - filters out barcode-like lines and service lines
 - ignores address, register, cashier, and technical fragments where possible
 - extracts multiple item rows when prices appear near the end of lines
+- keeps amount-only lines available for pairing with nearby item titles
+- avoids using obvious date or promo fragments as total candidates
 - handles Cyrillic and mixed Cyrillic or Latin receipts through the multilingual helper setup
 - tolerates cases where quantity or unit cannot be determined
 - avoids inventing retail line items and totals for obviously bank-like or payment-style documents

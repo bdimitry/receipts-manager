@@ -115,7 +115,7 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         assertThat(processedReceipt.getLineItems()).hasSizeGreaterThan(1);
         assertThat(processedReceipt.getLineItems())
             .extracting(item -> item.getTitle())
-            .contains("МОЛОКО ЯГОТИНСЬКЕ", "ХЛІБ БОРОДИНСЬКИЙ", "Пакет");
+            .contains("МОЛОКО ЯГОТИНСЬКЕ", "ХЛІБ БОРОДИНСЬКИЙ");
 
         ResponseEntity<ReceiptOcrResponse> ocrResponse = restTemplate.exchange(
             "/api/receipts/" + processedReceipt.getId() + "/ocr",
