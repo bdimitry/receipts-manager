@@ -118,7 +118,13 @@ What we observed:
 - mapped `lines[]` and assembled `rawText` mostly preserve the engine text faithfully
 - the mapper mainly changes ordering and line grouping, not character identity
 
-That means the current risk is not "post-processing corrupts good OCR," but rather "the baseline recognizer choice determines whether mixed-script transactional documents start from a usable OCR result at all."
+That means the current risk is not only "post-processing corrupts good OCR," but also "preprocessing can damage a clean receipt before OCR even starts."
+
+The current preprocessing baseline on this branch now treats that as a first-class defect:
+
+- clean baseline receipts should stay on a soft preprocessing path
+- PDF-like pages should avoid destructive thresholding
+- threshold-guided processing should be reserved for noisy receipt photos where it actually helps
 
 ## Reproducible Local Scenario
 
@@ -140,6 +146,23 @@ Invoke-RestMethod -Method Get -Uri "http://localhost:8083/diagnostics/config"
 curl -X POST "http://localhost:8083/ocr?preprocess=true&debug=true" `
   -F "file=@C:/temp/receipt.png;type=image/png"
 ```
+
+For preprocessing regression checks, run the same file twice:
+
+```powershell
+curl -X POST "http://localhost:8083/ocr?preprocess=false&debug=true" `
+  -F "file=@C:/temp/receipt.png;type=image/png"
+
+curl -X POST "http://localhost:8083/ocr?preprocess=true&debug=true" `
+  -F "file=@C:/temp/receipt.png;type=image/png"
+```
+
+Compare:
+
+- `pages[].strategy`
+- `pages[].stepsApplied`
+- `diagnostics.rawEngineText`
+- `diagnostics.mappedRawText`
 
 4. Run the bundled comparison script across OCR profiles:
 
@@ -181,5 +204,6 @@ The current controlled comparison supports this baseline decision:
 The current branch has now started that validation work. The practical next investigation should focus on one of these paths:
 
 - hardening validation heuristics on a larger real-world receipt corpus
+- continuing preprocessing tuning with the mandatory corpus when a clean receipt starts to degrade visually
 - deciding whether a simple primary-plus-fallback profile strategy is worth adding later
 - then moving into parser refinement and stronger sanity checks on top of the current normalized line stream

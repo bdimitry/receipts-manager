@@ -164,7 +164,7 @@ Inside `docker/paddleocr-service`:
 - `comparison.py`: scoring and recommendation logic for profile selection
 - `diagnostics.py`: local comparison script for raw PaddleOCR output across OCR profiles
 - `ocr_engine.py`: PaddleOCR engine lifecycle and retry wrapper
-- `preprocessing.py`: dedicated receipt image preprocessing layer
+- `preprocessing.py`: dedicated adaptive receipt image preprocessing layer with soft and strong paths
 - `response_mapping.py`: line-based mapping from raw PaddleOCR output into ordered OCR rows
 - `tests/`: service-side preprocessing, profile, comparison, corpus, and API contract tests
 

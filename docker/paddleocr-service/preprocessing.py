@@ -15,11 +15,25 @@ class ImageSize:
 
 
 @dataclass(frozen=True)
+class ImageQualityProfile:
+    contrast_std: float
+    laplacian_variance: float
+    dark_ratio: float
+    bright_ratio: float
+    edge_ratio: float
+    entropy: float
+    looks_clean: bool
+    looks_like_white_page: bool
+    visual_classification: str
+
+
+@dataclass(frozen=True)
 class PreprocessedReceiptImage:
     image: Image.Image
     applied: bool
     size_before: ImageSize
     size_after: ImageSize
+    strategy: str
     steps_applied: tuple[str, ...]
 
     def to_response(self, page_index: int) -> dict:
@@ -33,6 +47,7 @@ class PreprocessedReceiptImage:
                 "width": self.size_after.width,
                 "height": self.size_after.height,
             },
+            "strategy": self.strategy,
             "stepsApplied": list(self.steps_applied),
         }
 
@@ -53,13 +68,15 @@ class ReceiptImagePreprocessor:
                 applied=False,
                 size_before=size_before,
                 size_after=size_before,
+                strategy="disabled",
                 steps_applied=tuple(),
             )
 
         working = _pil_to_bgr(normalized)
         steps: list[str] = []
+        initial_quality = self._analyze_image(working)
 
-        working, upscaled = self._upscale_if_needed(working)
+        working, upscaled = self._upscale_if_needed(working, initial_quality)
         if upscaled:
             steps.append("upscale")
 
@@ -71,7 +88,8 @@ class ReceiptImagePreprocessor:
         if deskewed:
             steps.append("deskew")
 
-        working, enhanced_steps = self._enhance_for_ocr(working)
+        quality = self._analyze_image(working)
+        working, strategy, enhanced_steps = self._enhance_for_ocr(working, quality)
         steps.extend(enhanced_steps)
 
         processed_image = _bgr_to_pil(working)
@@ -82,23 +100,30 @@ class ReceiptImagePreprocessor:
             applied=bool(steps),
             size_before=size_before,
             size_after=size_after,
+            strategy=strategy,
             steps_applied=tuple(steps),
         )
 
-    def _upscale_if_needed(self, image: np.ndarray) -> tuple[np.ndarray, bool]:
+    def _upscale_if_needed(self, image: np.ndarray, quality: ImageQualityProfile) -> tuple[np.ndarray, bool]:
         height, width = image.shape[:2]
         long_edge = max(width, height)
         if long_edge >= self.target_long_edge:
             return image, False
 
-        scale = self.target_long_edge / float(long_edge)
-        if scale < 1.1:
+        target_long_edge = self.target_long_edge
+        if quality.looks_clean:
+            target_long_edge = min(target_long_edge, 900)
+
+        scale = target_long_edge / float(long_edge)
+        max_scale = 2.25 if quality.looks_clean else 2.0
+        scale = min(scale, max_scale)
+        if scale < 1.15:
             return image, False
 
         resized = cv2.resize(
             image,
             (int(round(width * scale)), int(round(height * scale))),
-            interpolation=cv2.INTER_CUBIC,
+            interpolation=cv2.INTER_LANCZOS4,
         )
         return resized, True
 
@@ -156,22 +181,75 @@ class ReceiptImagePreprocessor:
         rotated = _rotate_bound(image, angle)
         return rotated, True
 
-    def _enhance_for_ocr(self, image: np.ndarray) -> tuple[np.ndarray, Sequence[str]]:
+    def _enhance_for_ocr(self, image: np.ndarray, quality: ImageQualityProfile) -> tuple[np.ndarray, str, Sequence[str]]:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        denoised = cv2.fastNlMeansDenoising(gray, None, 10, 7, 21)
-        clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8)).apply(denoised)
-        normalized = cv2.normalize(clahe, None, 0, 255, cv2.NORM_MINMAX)
+        denoise_strength = 4 if quality.looks_clean else 7 if quality.visual_classification == "balanced" else 9
+        denoised = cv2.fastNlMeansDenoising(gray, None, denoise_strength, 7, 21)
+        clahe_clip_limit = 1.4 if quality.looks_clean else 1.8 if quality.visual_classification == "balanced" else 2.1
+        clahe = cv2.createCLAHE(clipLimit=clahe_clip_limit, tileGridSize=(8, 8)).apply(denoised)
+        contrast_weight = 0.3 if quality.looks_clean else 0.45 if quality.visual_classification == "balanced" else 0.7
+        contrast_enhanced = cv2.addWeighted(denoised, 1.0 - contrast_weight, clahe, contrast_weight, 0)
+        sharpened = _light_unsharp_mask(
+            contrast_enhanced,
+            amount=0.45 if quality.looks_clean else 0.55 if quality.visual_classification == "balanced" else 0.35,
+            sigma=1.0 if quality.looks_clean else 1.2,
+        )
+
+        if quality.visual_classification != "noisy":
+            enhanced = cv2.cvtColor(sharpened, cv2.COLOR_GRAY2BGR)
+            return enhanced, "soft", ("denoise", "contrast", "light_sharpen")
+
         thresholded = cv2.adaptiveThreshold(
-            normalized,
+            sharpened,
             255,
             cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
             cv2.THRESH_BINARY,
-            31,
-            15,
+            35,
+            11,
         )
-        thresholded = cv2.medianBlur(thresholded, 3)
-        enhanced = cv2.cvtColor(thresholded, cv2.COLOR_GRAY2BGR)
-        return enhanced, ("denoise", "contrast", "threshold")
+        guided = _apply_threshold_guidance(sharpened, thresholded)
+        enhanced = cv2.cvtColor(guided, cv2.COLOR_GRAY2BGR)
+        return enhanced, "strong", ("denoise", "contrast", "threshold_guidance")
+
+    def _analyze_image(self, image: np.ndarray) -> ImageQualityProfile:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        contrast_std = float(gray.std())
+        laplacian_variance = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+        dark_ratio = float((gray < 110).mean())
+        bright_ratio = float((gray > 220).mean())
+        edges = cv2.Canny(gray, 50, 150)
+        edge_ratio = float((edges > 0).mean())
+        histogram = cv2.calcHist([gray], [0], None, [256], [0, 256]).ravel()
+        histogram /= max(float(histogram.sum()), 1.0)
+        entropy = float(-(histogram[histogram > 0] * np.log2(histogram[histogram > 0])).sum())
+
+        looks_like_white_page = bright_ratio > 0.82 and dark_ratio < 0.08
+        looks_clean = looks_like_white_page or (
+            dark_ratio < 0.08 and laplacian_variance > 900 and entropy < 5.5
+        ) or (
+            bright_ratio > 0.2 and dark_ratio < 0.05 and laplacian_variance > 1400
+        )
+
+        if looks_clean:
+            visual_classification = "clean"
+        elif edge_ratio > 0.09 or (dark_ratio > 0.18 and entropy > 6.0) or (
+            contrast_std < 65 and dark_ratio > 0.12 and bright_ratio < 0.45
+        ):
+            visual_classification = "noisy"
+        else:
+            visual_classification = "balanced"
+
+        return ImageQualityProfile(
+            contrast_std=contrast_std,
+            laplacian_variance=laplacian_variance,
+            dark_ratio=dark_ratio,
+            bright_ratio=bright_ratio,
+            edge_ratio=edge_ratio,
+            entropy=entropy,
+            looks_clean=looks_clean,
+            looks_like_white_page=looks_like_white_page,
+            visual_classification=visual_classification,
+        )
 
 
 def estimate_skew_angle(image: Image.Image) -> float:
@@ -260,3 +338,16 @@ def _rotate_bound(image: np.ndarray, angle: float) -> np.ndarray:
         flags=cv2.INTER_CUBIC,
         borderMode=cv2.BORDER_REPLICATE,
     )
+
+
+def _light_unsharp_mask(image: np.ndarray, amount: float, sigma: float) -> np.ndarray:
+    blurred = cv2.GaussianBlur(image, (0, 0), sigma)
+    sharpened = cv2.addWeighted(image, 1.0 + amount, blurred, -amount, 0)
+    return np.clip(sharpened, 0, 255).astype(np.uint8)
+
+
+def _apply_threshold_guidance(base_gray: np.ndarray, thresholded: np.ndarray) -> np.ndarray:
+    guided = base_gray.copy()
+    text_mask = thresholded == 0
+    guided[text_mask] = np.clip(guided[text_mask].astype(np.float32) * 0.42, 0, 255).astype(np.uint8)
+    return guided

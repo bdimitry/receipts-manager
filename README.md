@@ -178,14 +178,14 @@ The PaddleOCR helper currently returns:
   - `order`
   - `bbox` as an optional four-point polygon when Paddle exposes coordinates
 
-The Paddle helper now also applies automatic preprocessing before OCR. The baseline preprocessing layer currently:
+The Paddle helper now also applies automatic preprocessing before OCR. The preprocessing layer is now adaptive and safe-by-default:
 
-- upscales smaller images
-- attempts receipt-region crop when a dominant document contour is visible
-- deskews mildly rotated photos
-- denoises grayscale text regions
-- boosts local contrast
-- applies thresholding for OCR-friendly text separation
+- smaller images can still be upscaled, but the scale is capped for clean baseline receipts
+- receipt-region crop is attempted only when a dominant document contour is visible
+- deskew still handles mild photo rotation
+- all paths use grayscale denoise plus local contrast recovery
+- clean and PDF-like pages now stay on a softer path with light sharpening instead of destructive binarization
+- hard receipt photos can still use stronger threshold-guided text separation when the image actually looks noisy
 
 You can compare OCR output with and without preprocessing:
 
@@ -201,6 +201,7 @@ The Paddle helper response now also includes lightweight preprocessing metadata:
 
 - `preprocessingApplied`
 - `pages[]`
+  - `strategy`
   - `imageSizeBefore`
   - `imageSizeAfter`
   - `stepsApplied`
@@ -341,6 +342,12 @@ To include the local real-check corpus from `C:\Users\dmitr\Pictures\чеки` i
 ```powershell
 docker exec home-budget-paddleocr-service python diagnostics.py --profiles en cyrillic latin --preprocess true --local-corpus-dir "C:/Users/dmitr/Pictures/чеки"
 ```
+
+For preprocessing-specific regression work, compare the mandatory real corpus with `preprocess=true` and `preprocess=false`, paying special attention to:
+
+- `5.jpg` as the clean baseline sanity case
+- `2.jpg` and `4.jpg` as hard noisy retail photos
+- `6.pdf` as the clean PDF-rendered document case
 
 This is intentionally a baseline OCR backend only. It is not yet a final receipt parsing pipeline.
 

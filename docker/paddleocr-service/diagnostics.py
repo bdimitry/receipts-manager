@@ -42,6 +42,7 @@ def main() -> None:
             json.dumps(
                 {
                     "preprocessingApplied": processed.applied,
+                    "strategy": processed.strategy,
                     "stepsApplied": list(processed.steps_applied),
                     "sizeBefore": {"width": processed.size_before.width, "height": processed.size_before.height},
                     "sizeAfter": {"width": processed.size_after.width, "height": processed.size_after.height},
@@ -87,6 +88,7 @@ def _run_local_sample(sample_path: Path, profiles: list[str], preprocessor: Rece
             json.dumps(
                 {
                     "preprocessingApplied": processed.applied,
+                    "strategy": processed.strategy,
                     "stepsApplied": list(processed.steps_applied),
                     "sizeBefore": {"width": processed.size_before.width, "height": processed.size_before.height},
                     "sizeAfter": {"width": processed.size_after.width, "height": processed.size_after.height},

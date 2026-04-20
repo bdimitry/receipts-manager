@@ -67,6 +67,7 @@ class PaddleOcrAppTests(unittest.TestCase):
         )
         self.assertEqual([line["order"] for line in body["lines"]], [0, 1, 2])
         self.assertEqual(body["lines"][0]["bbox"], [[10.0, 20.0], [220.0, 20.0], [220.0, 60.0], [10.0, 60.0]])
+        self.assertIn(body["pages"][0]["strategy"], {"soft", "strong"})
         self.assertGreater(len(body["pages"][0]["stepsApplied"]), 0)
         self.assertGreater(engine.calls, 0)
 
@@ -136,6 +137,7 @@ class PaddleOcrAppTests(unittest.TestCase):
         body = response.get_json()
         self.assertFalse(body["preprocessingApplied"])
         self.assertEqual(body["pages"][0]["stepsApplied"], [])
+        self.assertEqual(body["pages"][0]["strategy"], "disabled")
 
 
 class FakeEngine:

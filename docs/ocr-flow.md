@@ -102,14 +102,22 @@ Before OCR, the Paddle helper now runs a dedicated preprocessing layer that is s
 
 Current baseline steps:
 
-- upscale small images to an OCR-friendly long edge
+- optionally upscale smaller images, but with a capped scale factor for clean receipts
 - detect and crop the dominant receipt or document area when possible
 - deskew mild rotation
 - denoise grayscale text regions
-- improve local contrast with CLAHE
-- apply thresholding to separate text from noisy backgrounds
+- improve local contrast with CLAHE-based soft contrast recovery
+- choose between:
+  - a `soft` path for clean and PDF-like pages
+  - a `strong` path with threshold-guided darkening for noisy receipt photos
 
 This pipeline is intentionally pragmatic. It is meant to improve typical user photos of receipts without requiring manual edits, while still staying simple enough to extend in later steps.
+
+The key safety rule for the current branch is now:
+
+- clean baseline receipts must not be turned into harsh binary masks
+- thresholding is no longer the universal default preprocessing step
+- if preprocessing makes a clean receipt visually worse for a human, that is treated as a defect
 
 The preprocessing layer can be turned off for comparison through request override:
 
@@ -127,6 +135,7 @@ The Paddle helper response now also includes lightweight debug metadata:
 
 - `preprocessingApplied`
 - `pages[]`
+  - `strategy`
   - `imageSizeBefore`
   - `imageSizeAfter`
   - `stepsApplied`
@@ -353,6 +362,10 @@ Current diagnostic conclusion:
 - the most visible script-mixing issues are already present in raw PaddleOCR output on some inputs
 - the line mapper is mostly preserving engine text and improving row order, not introducing character corruption
 - the controlled comparison corpus now selects `en` as the strongest default baseline for the standard OCR branch, while `cyrillic` remains useful as a comparison profile
+- preprocessing is now also treated as an explicit quality lever:
+  - clean baseline receipts like `5.jpg` should stay on the soft path
+  - PDF-like pages such as `6.pdf` should avoid destructive thresholding
+  - hard noisy photos such as `2.jpg` and `4.jpg` may still use the stronger path when it keeps OCR usable
 
 Service-side preprocessing tests can be run directly with:
 
