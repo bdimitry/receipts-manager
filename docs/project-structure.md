@@ -140,6 +140,7 @@ These files define:
 - OCR client integration
 - notification provider clients
 - both Tesseract and PaddleOCR adapters live here, while receipt parsing stays in the service layer
+- Paddle is now the standard adapter path on this branch; Tesseract remains explicit legacy fallback only
 - `OcrRequestOptions` now travels through the OCR client boundary so Spring can request a routed helper profile without mixing helper internals into controller code
 
 ### `security`
@@ -157,6 +158,8 @@ Contains helper services and init scripts for:
 - Tesseract OCR helper
 - PaddleOCR helper
 - Telegram mock
+
+The default Compose stack is now Paddle-first. The Tesseract helper is behind the `legacy-ocr` Docker profile so it does not define normal runtime or test expectations anymore.
 
 Inside `docker/paddleocr-service`:
 
@@ -181,6 +184,7 @@ Inside `src/main/java/com/blyndov/homebudgetreceiptsmanager/service`:
 - `ParsedReceiptDocument`: structured parser result model for merchant/date/total/currency/items
 - `ParsedReceiptLineItem`: structured parser line item model with raw fragment and source lines
 - `ReceiptOcrValidationService`: post-parser sanity checks for suspicious merchant, total, date, and line-item results
+- `ReceiptOcrKeywordLexicon`: small explicit English/Ukrainian/Russian OCR keyword registry used conservatively by normalization, parser, and validation
 - `ReceiptOcrService`: orchestration layer that now persists the product OCR artifacts produced by routing, extraction, normalization, parsing, and validation, and restores them on retrieval
 
 ### `docker-compose.yml`
@@ -202,15 +206,17 @@ Starts:
 
 Backend coverage includes:
 
+- JUnit 5 integration and API tests built around `@SpringBootTest` + `TestRestTemplate`
 - auth
 - purchases with currency validation
 - receipts and OCR
-- receipt OCR persistence and retrieval coverage for raw OCR, normalized lines, parser-ready text, parsed currency, parsed items, and validation warnings
+- receipt OCR persistence and retrieval coverage for raw OCR, normalized lines, parser-ready text, parsed currency, parsed items, validation warnings, and OCR routing metadata
 - realistic OCR parser fixtures with noisy Cyrillic text
 - reports and downloads
 - mixed-currency reporting safety
 - notifications
 - demo smoke flow
+- focused unit and service tests for routing, normalization, parser, validation, and OCR lexicon helpers
 
 ### `src/test/resources/fixtures/ocr`
 
@@ -275,8 +281,9 @@ Holds:
 4. backend controllers delegate to services
 5. services persist to PostgreSQL and interact with S3, SQS, OCR, and notifications
 6. the OCR adapter selects Tesseract or PaddleOCR by configuration and now accepts both raw text and ordered OCR line rows for the evolving OCR pipeline
-7. OCR results are stored as receipt summary fields plus `ReceiptLineItem` rows
-8. dashboard and reports format financial data with explicit currency awareness
-9. frontend reflects backend state through TanStack Query and form mutations
+7. the standard branch now verifies that flow through Paddle-first integration infrastructure and repo-local wrapper execution
+8. OCR results are stored as receipt summary fields plus `ReceiptLineItem` rows
+9. dashboard and reports format financial data with explicit currency awareness
+10. frontend reflects backend state through TanStack Query and form mutations
 
 For a deeper view, continue with [architecture-overview.md](architecture-overview.md), [frontend-architecture.md](frontend-architecture.md), and [ocr-flow.md](ocr-flow.md).

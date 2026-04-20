@@ -20,28 +20,23 @@ public class ReceiptOcrLineNormalizationService {
     private static final Pattern DIGIT_RE = Pattern.compile("\\d");
     private static final Pattern AMOUNT_RE = Pattern.compile("\\b\\d+[.,]\\d{2}\\b");
     private static final Pattern LONG_DIGITS_RE = Pattern.compile("\\d{10,}");
-    private static final Pattern BARCODE_HINT_RE = Pattern.compile(
-        "(barcode|ean|штрих|код)",
-        Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
-    );
     private static final Pattern WORD_SEPARATOR_RE = Pattern.compile("(?<=[" + CYRILLIC_AND_LATIN + "])[.:;|](?=[" + CYRILLIC_AND_LATIN + "])");
     private static final Pattern PUNCT_SPACING_RE = Pattern.compile("\\s*([=:])\\s*");
     private static final Pattern MULTI_PUNCT_RE = Pattern.compile("([.,:;=\\-]){2,}");
-    private static final Pattern MULTIPLIER_RE = Pattern.compile("(?:(?<=\\s)|(?<=\\d)|(?<=\\b))[xхХ×](?:(?=\\s)|(?=\\d)|(?=\\b))");
+    private static final Pattern MULTIPLIER_RE = Pattern.compile(
+        "(?:(?<=\\s)|(?<=\\d)|(?<=\\b))[x\\u0445\\u0425\\u00D7](?:(?=\\s)|(?=\\d)|(?=\\b))"
+    );
     private static final Pattern AMOUNT_SUFFIX_RE = Pattern.compile("(?<=\\d)\\s*[,.;:]+\\s*$");
     private static final Pattern TRAILING_EQUALS_RE = Pattern.compile("\\s+=\\s*$");
     private static final Pattern LEADING_EDGE_RE = Pattern.compile("^[\\s`'\".,;:|=_-]+");
     private static final Pattern TRAILING_EDGE_RE = Pattern.compile("[\\s`'\";:|=_-]+$");
     private static final Pattern NON_WORD_COMPACT_RE = Pattern.compile("[^0-9A-Za-z\\p{IsCyrillic}]+");
-    private static final Pattern SERVICE_HINT_RE = Pattern.compile(
-        "(receipt|cash|date|document|thank|total|subtotal|balance|sale|discount|special|sum|"
-            + "дата|чек|каса|касса|документ|сума|разом|ціна|спец)",
-        Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
-    );
-    private static final Pattern HEADER_HINT_RE = Pattern.compile(
-        "(receipt|cash|date|document|thank|store|market|дата|чек|документ|магазин|маркет)",
-        Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
-    );
+
+    private final ReceiptOcrKeywordLexicon keywordLexicon;
+
+    public ReceiptOcrLineNormalizationService(ReceiptOcrKeywordLexicon keywordLexicon) {
+        this.keywordLexicon = keywordLexicon;
+    }
 
     public NormalizedOcrDocument normalizeDocument(OcrExtractionResult extractionResult) {
         String rawText = extractionResult == null ? null : extractionResult.rawText();
@@ -168,7 +163,7 @@ public class ReceiptOcrLineNormalizationService {
             tags.add("barcode_like");
         }
 
-        if (hasLongDigits && BARCODE_HINT_RE.matcher(normalizedText).find()) {
+        if (hasLongDigits && keywordLexicon.containsBarcodeKeyword(normalizedText)) {
             tags.add("barcode_like");
         }
 
@@ -180,12 +175,14 @@ public class ReceiptOcrLineNormalizationService {
             tags.add("price_like");
         }
 
-        if (SERVICE_HINT_RE.matcher(normalizedText).find()) {
+        if (keywordLexicon.containsSummaryKeyword(normalizedText)
+            || keywordLexicon.containsPaymentKeyword(normalizedText)
+            || keywordLexicon.containsPromoKeyword(normalizedText)) {
             tags.add("service_like");
         }
 
         int headerWindow = Math.max(3, Math.min(totalLines, 4));
-        if (order < headerWindow && (HEADER_HINT_RE.matcher(normalizedText).find() || (!hasAmount && alphaCount >= 3))) {
+        if (order < headerWindow && (keywordLexicon.containsHeaderKeyword(normalizedText) || (!hasAmount && alphaCount >= 3))) {
             tags.add("header_like");
         }
 

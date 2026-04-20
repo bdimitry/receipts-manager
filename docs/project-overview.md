@@ -25,8 +25,8 @@ It allows a user to:
 - MailHog for email verification
 - Telegram mock for local message delivery checks
 - OCR helper containers:
-  - Tesseract as the stable default backend
-  - PaddleOCR as a new baseline alternative backend
+  - PaddleOCR as the standard backend on this branch
+  - Tesseract as an explicit legacy fallback and comparison helper
 - Flyway migrations
 - Swagger UI and OpenAPI
 - GitHub Actions CI
@@ -65,8 +65,8 @@ It allows a user to:
 - parsed store name, total amount, and purchase date are stored as best-effort fields
 - parsed currency is stored when explicit markers are found
 - parsed line items are stored separately and linked to the receipt
-- multilingual OCR runs with `ukr+rus+eng` in the local helper container
-- the main backend can now switch between OCR helper backends through configuration without changing the business parsing flow
+- the main backend now defaults to Paddle-first OCR routing instead of a hidden Tesseract default
+- the main backend can still switch between OCR helper backends through explicit configuration without changing the business parsing flow
 - receipt upload now accepts an optional `receiptCountryHint` so OCR routing can use stronger language context when the user knows the document origin
 - current supported manual hint set is intentionally practical:
   - `UKRAINE`
@@ -80,6 +80,7 @@ It allows a user to:
 - the PaddleOCR helper now returns line-based OCR output with stable reading order, so the next parser step can work with explicit receipt rows instead of a single long text blob
 - the PaddleOCR helper now stops at raw ordered line extraction, while the Spring backend owns conservative line normalization, line tagging, and parser-ready `normalizedLines[]`
 - the live OCR processing path now uses that Java-normalized stream as the main post-OCR artifact, and the baseline parser now runs on parser-ready normalized lines instead of raw helper text
+- Spring now also owns a small explicit OCR keyword lexicon for safe post-OCR heuristics around receipt summary words, payment/service markers, barcode/account markers, and trusted merchant aliases
 - the baseline parser now returns a first structured Java document result with merchant, date, total, parsed currency, and best-effort line items
 - a dedicated Java validation layer now marks suspicious merchant, total, date, and line-item results instead of pretending every parse is equally trustworthy
 - receipt detail and OCR retrieval now read those persisted OCR artifacts back through the product API instead of depending on a legacy partial recompute path
@@ -172,6 +173,7 @@ Focus on:
 - persisted OCR downstream artifacts used for retrieval, not just processing-time parsing
 - baseline OCR parser model with structured document extraction over normalized lines
 - post-parse validation warnings that keep noisy results honest in the product
+- Paddle-first test infrastructure and repo-local wrapper execution
 - currency-safe reporting and dashboard behavior
 - test coverage across backend and frontend layers
 

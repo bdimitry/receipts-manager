@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.blyndov.homebudgetreceiptsmanager.client.OcrExtractionLine;
 import com.blyndov.homebudgetreceiptsmanager.dto.NormalizedOcrLineResponse;
+import com.blyndov.homebudgetreceiptsmanager.service.ReceiptOcrKeywordLexicon;
 import com.blyndov.homebudgetreceiptsmanager.service.ReceiptOcrLineNormalizationService;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -19,7 +20,7 @@ class ReceiptOcrNormalizationCorpusTests {
 
     @BeforeEach
     void setUp() {
-        normalizationService = new ReceiptOcrLineNormalizationService();
+        normalizationService = new ReceiptOcrLineNormalizationService(new ReceiptOcrKeywordLexicon());
     }
 
     @Test

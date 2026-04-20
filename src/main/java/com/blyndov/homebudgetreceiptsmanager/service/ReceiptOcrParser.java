@@ -60,6 +60,12 @@ public class ReceiptOcrParser {
         MERCHANT_ALIASES.put(Pattern.compile("(?iu)ukrsib\\s*bank|укрсиб"), "UkrsibBank");
     }
 
+    private final ReceiptOcrKeywordLexicon keywordLexicon;
+
+    public ReceiptOcrParser(ReceiptOcrKeywordLexicon keywordLexicon) {
+        this.keywordLexicon = keywordLexicon;
+    }
+
     public ParsedReceiptDocument parse(NormalizedOcrDocument document) {
         if (document == null) {
             return new ParsedReceiptDocument(null, null, null, null, List.of());
@@ -95,7 +101,7 @@ public class ReceiptOcrParser {
             .filter(candidate -> !looksLikeServiceOrPaymentLine(candidate.title()))
             .filter(candidate -> !looksLikeReceiptMetaLine(candidate.title()))
             .filter(candidate -> !looksLikeProductCodeLine(candidate.title()))
-            .filter(candidate -> !GENERIC_HEADER_LINES.contains(normalizeForMatching(candidate.title())))
+            .filter(candidate -> !keywordLexicon.isGenericHeader(candidate.title()))
             .filter(candidate -> countLetters(candidate.title()) >= 4 || extractMerchantAlias(candidate.title()).isPresent())
             .sorted(
                 Comparator.comparingInt((MerchantCandidate candidate) -> merchantScore(candidate.line(), candidate.title()))
@@ -106,7 +112,7 @@ public class ReceiptOcrParser {
 
         Optional<String> aliasCandidate = lines.stream()
             .map(NormalizedOcrLineResponse::normalizedText)
-            .map(this::extractMerchantAlias)
+            .map(keywordLexicon::extractMerchantAlias)
             .flatMap(Optional::stream)
             .findFirst();
 
@@ -571,14 +577,14 @@ public class ReceiptOcrParser {
 
     private boolean containsTotalKeyword(String line) {
         String normalized = normalizeForMatching(line);
-        return TOTAL_KEYWORDS.stream().anyMatch(normalized::contains);
+        return keywordLexicon.containsSummaryKeyword(normalized);
     }
 
     private boolean isAccountLike(String line) {
         String normalized = normalizeForMatching(line);
         long digitCount = normalized.chars().filter(Character::isDigit).count();
         boolean ibanLike = normalized.contains("ua") && digitCount >= 10;
-        return ibanLike || ACCOUNT_KEYWORDS.stream().anyMatch(normalized::contains);
+        return ibanLike || keywordLexicon.containsAccountKeyword(normalized);
     }
 
     private boolean isBarcodeLike(String line) {
@@ -596,8 +602,7 @@ public class ReceiptOcrParser {
         }
 
         return normalized.contains("штрих")
-            || normalized.contains("barcode")
-            || normalized.contains("ean")
+            || keywordLexicon.containsBarcodeKeyword(normalized)
             || normalized.contains("koa")
             || normalized.contains("k0a");
     }
@@ -616,7 +621,7 @@ public class ReceiptOcrParser {
 
     private boolean looksLikeServiceOrPaymentLine(String line) {
         String normalized = normalizeForMatching(line);
-        return PAYMENT_KEYWORDS.stream().anyMatch(normalized::contains)
+        return keywordLexicon.containsPaymentKeyword(normalized)
             || MASKED_CARD_PATTERN.matcher(normalized).find()
             || normalized.contains("novus zakaz")
             || normalized.contains("zakaz ua");
@@ -625,7 +630,7 @@ public class ReceiptOcrParser {
     private boolean looksLikePromoOrDiscountLine(String line) {
         String normalized = normalizeForMatching(line);
         return looksLikeDateRange(line)
-            || PROMO_KEYWORDS.stream().anyMatch(normalized::contains)
+            || keywordLexicon.containsPromoKeyword(normalized)
             || normalized.contains("-20")
             || normalized.contains("- 20")
             || normalized.contains("uk-20")
@@ -636,7 +641,7 @@ public class ReceiptOcrParser {
     private boolean looksLikeTaxLine(String line) {
         String normalized = normalizeForMatching(line);
         return normalized.contains("%")
-            || TAX_KEYWORDS.stream().anyMatch(normalized::contains)
+            || keywordLexicon.containsTaxKeyword(normalized)
             || normalized.contains("a=")
             || normalized.contains("пдв");
     }
@@ -749,10 +754,7 @@ public class ReceiptOcrParser {
     }
 
     private Optional<String> extractMerchantAlias(String value) {
-        return MERCHANT_ALIASES.entrySet().stream()
-            .filter(entry -> entry.getKey().matcher(value).find())
-            .map(Map.Entry::getValue)
-            .findFirst();
+        return keywordLexicon.extractMerchantAlias(value);
     }
 
     private boolean containsMultiplierMarker(String value) {

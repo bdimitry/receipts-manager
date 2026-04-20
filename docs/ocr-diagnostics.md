@@ -99,6 +99,7 @@ The next layer after diagnostics now also lives in Java:
 - `ReceiptOcrParser` consumes `normalizedLines[]`
 - it returns a baseline `ParsedReceiptDocument`
 - `ReceiptOcrValidationService` marks suspicious parse results with warnings and a weak-quality flag
+- `ReceiptOcrKeywordLexicon` provides a tiny explicit English/Ukrainian/Russian keyword registry for safe summary, payment, barcode, and merchant heuristics
 - no parser logic lives in the Python helper anymore
 
 ## Diagnostic Corpus
@@ -231,3 +232,22 @@ The current branch has now started that validation work. The practical next inve
 - continuing preprocessing tuning with the mandatory corpus when a clean receipt starts to degrade visually
 - deciding whether a simple primary-plus-fallback profile strategy is worth adding later
 - then moving into parser refinement and stronger sanity checks on top of the current normalized line stream
+
+## Self-Contained Verification
+
+The repository now ships with a real Maven Wrapper again, so backend verification no longer requires a globally installed Maven.
+
+Standard backend verification from the repo root:
+
+```powershell
+.\mvnw.cmd test
+```
+
+The OCR integration test base now targets the real Paddle-first path:
+
+- Postgres + Flyway
+- LocalStack
+- Paddle helper container
+- Telegram mock
+
+Legacy Tesseract is now explicit fallback coverage only and is not the default integration-test path.

@@ -13,7 +13,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 
 @Component
-@ConditionalOnProperty(prefix = "app.ocr.service", name = "backend", havingValue = "TESSERACT", matchIfMissing = true)
+@ConditionalOnProperty(prefix = "app.ocr.service", name = "backend", havingValue = "TESSERACT")
 public class TesseractOcrClient implements OcrClient {
 
     private final RestClient restClient;

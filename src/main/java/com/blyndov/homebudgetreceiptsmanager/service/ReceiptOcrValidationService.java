@@ -35,6 +35,11 @@ public class ReceiptOcrValidationService {
         "receipt", "cash receipt", "document", "thank you", "дякуємо", "спасибо"
     );
     private static final Set<String> TRUSTED_MERCHANTS = Set.of("novus", "ukrsibbank", "fresh market", "coffee house");
+    private final ReceiptOcrKeywordLexicon keywordLexicon;
+
+    public ReceiptOcrValidationService(ReceiptOcrKeywordLexicon keywordLexicon) {
+        this.keywordLexicon = keywordLexicon;
+    }
 
     public ParsedReceiptValidationResult validate(NormalizedOcrDocument document, ParsedReceiptDocument parsedDocument) {
         if (document == null || parsedDocument == null) {
@@ -69,7 +74,7 @@ public class ReceiptOcrValidationService {
         }
 
         String normalizedMerchant = normalizeForMatching(merchantName);
-        if (TRUSTED_MERCHANTS.contains(normalizedMerchant)) {
+        if (TRUSTED_MERCHANTS.contains(normalizedMerchant) || keywordLexicon.isTrustedMerchant(normalizedMerchant)) {
             return Optional.empty();
         }
 
@@ -79,9 +84,11 @@ public class ReceiptOcrValidationService {
         boolean shortLeadWord = merchantName.trim().contains(" ")
             && merchantName.trim().split("\\s+")[0].length() <= 2;
         boolean hasDigits = merchantName.chars().anyMatch(Character::isDigit);
-        boolean genericHeader = GENERIC_HEADERS.contains(normalizedMerchant);
+        boolean genericHeader = GENERIC_HEADERS.contains(normalizedMerchant) || keywordLexicon.isGenericHeader(normalizedMerchant);
         boolean serviceLike = PAYMENT_KEYWORDS.stream().anyMatch(normalizedMerchant::contains)
-            || TOTAL_KEYWORDS.stream().anyMatch(normalizedMerchant::contains);
+            || TOTAL_KEYWORDS.stream().anyMatch(normalizedMerchant::contains)
+            || keywordLexicon.containsPaymentKeyword(normalizedMerchant)
+            || keywordLexicon.containsSummaryKeyword(normalizedMerchant);
 
         Optional<NormalizedOcrLineResponse> sourceLine = document.normalizedLines().stream()
             .limit(10)
@@ -140,7 +147,7 @@ public class ReceiptOcrValidationService {
             .map(NormalizedOcrLineResponse::normalizedText)
             .filter(StringUtils::hasText)
             .map(this::normalizeForMatching)
-            .anyMatch(text -> TOTAL_KEYWORDS.stream().anyMatch(text::contains));
+            .anyMatch(text -> TOTAL_KEYWORDS.stream().anyMatch(text::contains) || keywordLexicon.containsSummaryKeyword(text));
 
         if (totalAmount == null) {
             if (hasSummaryContext || itemSum.compareTo(BigDecimal.ZERO) > 0) {
@@ -200,7 +207,10 @@ public class ReceiptOcrValidationService {
         }
 
         boolean paymentContentInItems = lineItems.stream().anyMatch(this::looksLikePaymentOrServiceItem);
-        if (paymentContentInItems || (looksLikeBankDocument(document) && !lineItems.isEmpty())) {
+        boolean bankLikeContamination = looksLikeBankDocument(document)
+            && !lineItems.isEmpty()
+            && (parsedDocument.totalAmount() == null || parsedDocument.merchantName() == null);
+        if (paymentContentInItems || bankLikeContamination) {
             warnings.add(ReceiptParseWarningCode.PAYMENT_CONTENT_IN_ITEMS);
             warnings.add(ReceiptParseWarningCode.SUSPICIOUS_LINE_ITEMS);
         }
@@ -224,6 +234,7 @@ public class ReceiptOcrValidationService {
         return StreamSupport.texts(item).stream()
             .map(this::normalizeForMatching)
             .anyMatch(normalized -> PAYMENT_KEYWORDS.stream().anyMatch(normalized::contains)
+                || keywordLexicon.containsPaymentKeyword(normalized)
                 || BANKISH_MARKER_PATTERN.matcher(normalized).find()
                 || normalized.contains("barcode")
                 || normalized.contains("mask")
@@ -281,6 +292,7 @@ public class ReceiptOcrValidationService {
             .filter(StringUtils::hasText)
             .map(this::normalizeForMatching)
             .filter(text -> PAYMENT_KEYWORDS.stream().anyMatch(text::contains)
+                || keywordLexicon.containsPaymentKeyword(text)
                 || BANKISH_MARKER_PATTERN.matcher(text).find())
             .count();
 

@@ -8,6 +8,7 @@ import com.blyndov.homebudgetreceiptsmanager.service.NormalizedOcrDocument;
 import com.blyndov.homebudgetreceiptsmanager.service.ParsedReceiptDocument;
 import com.blyndov.homebudgetreceiptsmanager.service.ParsedReceiptLineItem;
 import com.blyndov.homebudgetreceiptsmanager.service.ParsedReceiptValidationResult;
+import com.blyndov.homebudgetreceiptsmanager.service.ReceiptOcrKeywordLexicon;
 import com.blyndov.homebudgetreceiptsmanager.service.ReceiptOcrLineNormalizationService;
 import com.blyndov.homebudgetreceiptsmanager.service.ReceiptOcrParser;
 import com.blyndov.homebudgetreceiptsmanager.service.ReceiptOcrValidationService;
@@ -29,9 +30,10 @@ class ReceiptOcrValidationServiceTests {
 
     @BeforeEach
     void setUp() {
-        normalizationService = new ReceiptOcrLineNormalizationService();
-        parser = new ReceiptOcrParser();
-        validationService = new ReceiptOcrValidationService();
+        ReceiptOcrKeywordLexicon keywordLexicon = new ReceiptOcrKeywordLexicon();
+        normalizationService = new ReceiptOcrLineNormalizationService(keywordLexicon);
+        parser = new ReceiptOcrParser(keywordLexicon);
+        validationService = new ReceiptOcrValidationService(keywordLexicon);
     }
 
     @Test

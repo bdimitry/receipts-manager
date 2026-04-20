@@ -57,9 +57,9 @@ springdoc:
 app:
   ocr:
     service:
-      backend: ${OCR_SERVICE_BACKEND:TESSERACT}
-      base-url: ${OCR_SERVICE_BASE_URL:http://localhost:8081}
-      tesseract-base-url: ${OCR_SERVICE_TESSERACT_BASE_URL:}
+      backend: ${OCR_SERVICE_BACKEND:PADDLE}
+      base-url: ${OCR_SERVICE_BASE_URL:http://localhost:8083}
+      tesseract-base-url: ${OCR_SERVICE_TESSERACT_BASE_URL:http://localhost:8081}
       paddle-base-url: ${OCR_SERVICE_PADDLE_BASE_URL:http://localhost:8083}
   notifications:
     email:

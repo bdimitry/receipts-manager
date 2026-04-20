@@ -5,7 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "app.ocr.service")
 public class OcrClientProperties {
 
-    private OcrBackend backend = OcrBackend.TESSERACT;
+    private OcrBackend backend = OcrBackend.PADDLE;
     private String baseUrl;
     private String tesseractBaseUrl;
     private String paddleBaseUrl;

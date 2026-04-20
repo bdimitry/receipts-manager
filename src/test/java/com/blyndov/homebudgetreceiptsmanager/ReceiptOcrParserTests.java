@@ -7,6 +7,7 @@ import com.blyndov.homebudgetreceiptsmanager.entity.CurrencyCode;
 import com.blyndov.homebudgetreceiptsmanager.service.NormalizedOcrDocument;
 import com.blyndov.homebudgetreceiptsmanager.service.ParsedReceiptDocument;
 import com.blyndov.homebudgetreceiptsmanager.service.ParsedReceiptLineItem;
+import com.blyndov.homebudgetreceiptsmanager.service.ReceiptOcrKeywordLexicon;
 import com.blyndov.homebudgetreceiptsmanager.service.ReceiptOcrLineNormalizationService;
 import com.blyndov.homebudgetreceiptsmanager.service.ReceiptOcrParser;
 import java.io.IOException;
@@ -25,8 +26,9 @@ class ReceiptOcrParserTests {
 
     @BeforeEach
     void setUp() {
-        normalizationService = new ReceiptOcrLineNormalizationService();
-        parser = new ReceiptOcrParser();
+        ReceiptOcrKeywordLexicon keywordLexicon = new ReceiptOcrKeywordLexicon();
+        normalizationService = new ReceiptOcrLineNormalizationService(keywordLexicon);
+        parser = new ReceiptOcrParser(keywordLexicon);
     }
 
     @Test

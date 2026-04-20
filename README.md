@@ -45,8 +45,8 @@ Backend:
 - async report and OCR processing
 - CSV, PDF, and XLSX report generation
 - two OCR backend options:
-  - Tesseract helper as the current default path
-  - PaddleOCR helper as an alternative baseline backend for OCR comparison work
+  - PaddleOCR helper as the standard default path on this branch
+  - Tesseract helper as an explicit legacy fallback for comparison only
 
 Frontend:
 
@@ -96,8 +96,13 @@ Main local URLs:
 - Swagger UI: [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
 - MailHog UI: [http://localhost:8025](http://localhost:8025)
 - Telegram mock: [http://localhost:8082/messages](http://localhost:8082/messages)
-- Tesseract OCR helper: [http://localhost:8081/health](http://localhost:8081/health)
 - PaddleOCR helper: [http://localhost:8083/health](http://localhost:8083/health)
+
+The legacy Tesseract helper is no longer part of the default stack on this branch. If you explicitly want it for comparison, start it through the legacy Docker profile:
+
+```powershell
+docker compose --profile legacy-ocr up -d ocr-service
+```
 
 Stop everything:
 
@@ -147,10 +152,10 @@ The application shell keeps the left navigation in place while the right content
 
 ## OCR Backends
 
-The project now ships with two OCR helper services:
+The project still contains two OCR helper services, but only one is standard on this branch:
 
-- `ocr-service`: the current Tesseract-based helper kept for comparison
-- `paddleocr-service`: a PaddleOCR-based baseline helper for OCR quality exploration
+- `paddleocr-service`: the standard PaddleOCR-based helper used by the main flow and test suite
+- `ocr-service`: a legacy Tesseract-based helper kept only for explicit fallback and comparison work
 
 The main Spring Boot app chooses the backend through environment configuration:
 
@@ -164,6 +169,11 @@ Supported values:
 
 - `TESSERACT`
 - `PADDLE`
+
+Current default on this branch:
+
+- `OCR_SERVICE_BACKEND=PADDLE`
+- `OCR_SERVICE_BASE_URL=http://paddleocr-service:8083`
 
 If `OCR_SERVICE_BACKEND=PADDLE`, the backend sends receipt images to `POST /ocr` on the Paddle helper and maps the response back into the existing receipt OCR flow.
 
@@ -216,6 +226,14 @@ The Paddle helper now also applies automatic preprocessing before OCR. The prepr
 - all paths use grayscale denoise plus local contrast recovery
 - clean and PDF-like pages now stay on a softer path with light sharpening instead of destructive binarization
 - hard receipt photos can still use stronger threshold-guided text separation when the image actually looks noisy
+
+The Python helper stops there. Product-facing post-OCR work now lives in Spring:
+
+- Java normalization
+- Java tagging and lightweight classification
+- Java parser heuristics
+- Java validation and sanity checks
+- Java OCR keyword lexicon support for receipt summary, payment, barcode, and local-language heuristics
 
 You can compare OCR output with and without preprocessing:
 
@@ -403,8 +421,10 @@ The PaddleOCR helper now warms its baseline models during container startup, so 
 Backend:
 
 ```powershell
-mvn test
+.\mvnw.cmd test
 ```
+
+The repository now includes a real Maven Wrapper again, so backend builds and tests no longer depend on a globally installed Maven distribution.
 
 Frontend:
 
@@ -418,10 +438,16 @@ npm run build
 
 CI runs both layers:
 
-- Maven backend tests
+- wrapper-based Maven backend tests
 - frontend unit/integration tests
 - frontend Playwright smoke check
 - frontend production build
+
+Backend test architecture is now intentional:
+
+- integration and API tests use JUnit 5, `@SpringBootTest`, and `TestRestTemplate`
+- unit and service tests cover routing, normalization, parser, validation, and OCR lexicon helpers
+- shared OCR integration infrastructure now exercises the real Paddle-based standard path, not the legacy Tesseract path
 
 To smoke-test the PaddleOCR helper manually:
 

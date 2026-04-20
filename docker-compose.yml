@@ -63,6 +63,7 @@ services:
       retries: 10
 
   ocr-service:
+    profiles: ["legacy-ocr"]
     build:
       context: ./docker/ocr-service
       dockerfile: Dockerfile
@@ -116,8 +117,8 @@ services:
       AWS_SQS_QUEUE: ${AWS_SQS_QUEUE:-report-generation-queue}
       AWS_SQS_RECEIPT_OCR_QUEUE: ${AWS_SQS_RECEIPT_OCR_QUEUE:-receipt-ocr-queue}
       OCR_SERVICE_BACKEND: ${OCR_SERVICE_BACKEND:-PADDLE}
-      OCR_SERVICE_BASE_URL: ${OCR_SERVICE_BASE_URL:-http://ocr-service:8081}
-      OCR_SERVICE_TESSERACT_BASE_URL: ${OCR_SERVICE_TESSERACT_BASE_URL:-}
+      OCR_SERVICE_BASE_URL: ${OCR_SERVICE_BASE_URL:-http://paddleocr-service:8083}
+      OCR_SERVICE_TESSERACT_BASE_URL: ${OCR_SERVICE_TESSERACT_BASE_URL:-http://ocr-service:8081}
       OCR_SERVICE_PADDLE_BASE_URL: ${OCR_SERVICE_PADDLE_BASE_URL:-http://paddleocr-service:8083}
       SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-mailhog}
       SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-1025}
@@ -136,8 +137,6 @@ services:
       mailhog:
         condition: service_started
       telegram-mock:
-        condition: service_healthy
-      ocr-service:
         condition: service_healthy
       paddleocr-service:
         condition: service_healthy

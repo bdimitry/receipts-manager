@@ -55,15 +55,24 @@ public abstract class AbstractPostgresIntegrationTest {
 
     @SuppressWarnings("resource")
     private static final GenericContainer<?> OCR_SERVICE = new GenericContainer<>(
-        new ImageFromDockerfile("home-budget-ocr-test", false)
-            .withFileFromPath("Dockerfile", Paths.get("docker/ocr-service/Dockerfile"))
-            .withFileFromPath("requirements.txt", Paths.get("docker/ocr-service/requirements.txt"))
-            .withFileFromPath("app.py", Paths.get("docker/ocr-service/app.py"))
+        new ImageFromDockerfile("home-budget-paddleocr-test", false)
+            .withFileFromPath("Dockerfile", Paths.get("docker/paddleocr-service/Dockerfile"))
+            .withFileFromPath("requirements.txt", Paths.get("docker/paddleocr-service/requirements.txt"))
+            .withFileFromPath("app.py", Paths.get("docker/paddleocr-service/app.py"))
+            .withFileFromPath("diagnostics.py", Paths.get("docker/paddleocr-service/diagnostics.py"))
+            .withFileFromPath("ocr_engine.py", Paths.get("docker/paddleocr-service/ocr_engine.py"))
+            .withFileFromPath("preprocessing.py", Paths.get("docker/paddleocr-service/preprocessing.py"))
+            .withFileFromPath("profiles.py", Paths.get("docker/paddleocr-service/profiles.py"))
+            .withFileFromPath("response_mapping.py", Paths.get("docker/paddleocr-service/response_mapping.py"))
     )
-        .withExposedPorts(8081)
-        .withEnv("OCR_LANGUAGES", "ukr+rus+eng")
-        .withEnv("OCR_TESSERACT_CONFIG", "--oem 3 --psm 6")
-        .waitingFor(Wait.forHttp("/health").forStatusCode(200));
+        .withExposedPorts(8083)
+        .withEnv("PADDLE_OCR_PROFILE", "en")
+        .withEnv("PADDLE_OCR_PREPROCESSING_ENABLED", "true")
+        .waitingFor(
+            Wait.forHttp("/health")
+                .forStatusCode(200)
+                .withStartupTimeout(Duration.ofMinutes(6))
+        );
 
     @SuppressWarnings("resource")
     private static final GenericContainer<?> TELEGRAM_MOCK_SERVICE = new GenericContainer<>(
@@ -121,8 +130,20 @@ public abstract class AbstractPostgresIntegrationTest {
         );
         registry.add("app.notifications.telegram.bot-token", () -> TEST_TELEGRAM_BOT_TOKEN);
         registry.add(
+            "app.ocr.service.backend",
+            () -> "PADDLE"
+        );
+        registry.add(
             "app.ocr.service.base-url",
-            () -> "http://%s:%d".formatted(OCR_SERVICE.getHost(), OCR_SERVICE.getMappedPort(8081))
+            () -> "http://%s:%d".formatted(OCR_SERVICE.getHost(), OCR_SERVICE.getMappedPort(8083))
+        );
+        registry.add(
+            "app.ocr.service.paddle-base-url",
+            () -> "http://%s:%d".formatted(OCR_SERVICE.getHost(), OCR_SERVICE.getMappedPort(8083))
+        );
+        registry.add(
+            "app.ocr.service.tesseract-base-url",
+            () -> "http://127.0.0.1:18081"
         );
     }
 

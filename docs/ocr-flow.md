@@ -42,23 +42,11 @@ Flow:
 
 ## OCR Backend Options
 
-The project now supports two helper backends behind the same application OCR entry point.
-
-### Tesseract Backend
-
-This is still the stable default backend used by the main local stack.
-
-It uses multilingual Tesseract recognition by default:
-
-- `ukr`
-- `rus`
-- `eng`
-
-The default runtime combination is `ukr+rus+eng`.
+The project still contains two helper backends behind the same application OCR entry point, but the branch standard is now Paddle-first.
 
 ### PaddleOCR Backend
 
-This is a new alternative baseline OCR backend designed for OCR-quality experiments.
+This is the standard OCR backend used by the main local stack, backend integration tests, and the current product flow.
 
 It runs as a separate helper container and exposes:
 
@@ -73,10 +61,30 @@ Response contract:
   - `order`
   - `bbox` when coordinates are available
 
-The Spring Boot application can switch to it through:
+The Spring Boot application uses it by default through:
 
 - `app.ocr.service.backend=PADDLE`
+- `app.ocr.service.base-url=http://...:8083`
 - `app.ocr.service.paddle-base-url=http://...`
+
+### Tesseract Backend
+
+This backend is now explicit legacy fallback coverage only.
+
+It is kept for:
+
+- controlled comparison work
+- explicit fallback experiments
+- avoiding a hard delete while the branch direction is still being validated
+
+It is not the default runtime or integration-test path anymore.
+
+When needed, it is selected only through explicit configuration:
+
+- `app.ocr.service.backend=TESSERACT`
+- `app.ocr.service.tesseract-base-url=http://...`
+
+For Docker Compose, the legacy Tesseract helper is now behind the `legacy-ocr` profile instead of shipping as part of the normal stack.
 
 The existing business parsing flow remains unchanged. The Paddle response is now normalized into both:
 
@@ -107,6 +115,31 @@ Current routing baseline:
 - the final helper profile is still chosen by quality-aware candidate scoring, so a manual country hint can keep `en` if the local-language OCR result is visibly worse
 
 The helper still returns one selected helper profile per OCR attempt. The practical "English plus chosen or detected language" strategy is implemented in Spring as candidate-profile routing and selection, not as a hidden monolithic helper default.
+
+### OCR Keyword Lexicon Layer
+
+Spring now also includes a small explicit OCR keyword lexicon that acts only as a safe assistive layer after OCR.
+
+It is intentionally narrow and language-aware:
+
+- English
+- Ukrainian
+- Russian
+
+Current categories include:
+
+- receipt summary words such as `total`, `sum`, `balance`, `сумма`, `сума`, `итого`
+- service and payment words such as `visa`, `mastercard`, `terminal`, `payment`, `картка`, `банк`
+- barcode and account markers such as `barcode`, `ean`, `штрих код`, `iban`, `swift`, `edrpou`
+- a tiny merchant alias set such as `NOVUS` and `UkrsibBank`
+
+The lexicon is not a fake OCR replacement. It is only used conservatively in:
+
+- normalization tagging
+- parser heuristics
+- validation heuristics
+
+It does not rewrite arbitrary OCR text and does not invent product titles.
 
 ### Paddle Preprocessing Layer
 
@@ -544,6 +577,24 @@ Chosen strategy:
 
 If queue publication itself fails after upload commit, the receipt is marked `FAILED` with a diagnostic message.
 
+## Test Architecture
+
+The backend suite is intentionally split into two layers:
+
+- integration and API tests:
+  - JUnit 5
+  - `@SpringBootTest`
+  - `TestRestTemplate`
+  - shared Spring + Postgres + LocalStack + Paddle helper infrastructure
+- focused unit and service tests:
+  - routing
+  - normalization
+  - parser
+  - validation
+  - OCR keyword lexicon
+
+The standard OCR integration path in tests now targets PaddleOCR. Legacy Tesseract coverage is secondary and must be opted into explicitly.
+
 ## Local Verification
 
 1. start the stack:
@@ -552,12 +603,10 @@ If queue publication itself fails after upload commit, the receipt is marked `FA
 docker compose up -d --build
 ```
 
-2. optional: switch the main backend to PaddleOCR:
+2. optional: start the legacy Tesseract helper for comparison only:
 
 ```powershell
-$env:OCR_SERVICE_BACKEND="PADDLE"
-$env:OCR_SERVICE_PADDLE_BASE_URL="http://paddleocr-service:8083"
-docker compose up -d --build app paddleocr-service
+docker compose --profile legacy-ocr up -d ocr-service
 ```
 
 3. compare OCR output with and without preprocessing:
@@ -570,7 +619,7 @@ curl -X POST "http://localhost:8083/ocr?preprocess=true" `
   -F "file=@C:/temp/receipt.png;type=image/png"
 ```
 
-3. upload a PNG or PDF receipt with explicit currency and optional country hint:
+4. upload a PNG or PDF receipt with explicit currency and optional country hint:
 
 ```powershell
 curl -X POST "http://localhost:8080/api/receipts/upload" `
@@ -580,7 +629,7 @@ curl -X POST "http://localhost:8080/api/receipts/upload" `
   -F "receiptCountryHint=UKRAINE"
 ```
 
-4. poll OCR status:
+5. poll OCR status:
 
 ```powershell
 Invoke-RestMethod -Method Get `
@@ -620,7 +669,13 @@ For Java-side normalization verification, confirm that `GET /api/receipts/{id}/o
   - `tags`
   - `ignored`
 
-6. inspect queues and logs if needed:
+6. run backend tests from the repo-local Maven Wrapper:
+
+```powershell
+.\mvnw.cmd test
+```
+
+7. inspect queues and logs if needed:
 
 ```powershell
 docker exec home-budget-localstack awslocal sqs receive-message `
@@ -638,6 +693,6 @@ docker compose logs -f paddleocr-service
 - some receipts still produce partial item extraction
 - no automatic purchase creation
 - no OCR confidence scoring
-- no receipt-template-specific tuning beyond the current `ukr+rus+eng` helper setup
+- no receipt-template-specific tuning beyond the current Paddle profile-routing strategy and explicit legacy fallback
 - Java normalization is intentionally conservative and still leaves some noisy mixed-language product names untouched
 - parser work still comes later; `normalizedLines[]` are the bridge into that step

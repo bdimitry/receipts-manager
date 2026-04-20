@@ -12,7 +12,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 
 @Component
-@ConditionalOnProperty(prefix = "app.ocr.service", name = "backend", havingValue = "PADDLE")
+@ConditionalOnProperty(prefix = "app.ocr.service", name = "backend", havingValue = "PADDLE", matchIfMissing = true)
 public class PaddleOcrClient implements OcrClient {
 
     private final RestClient restClient;

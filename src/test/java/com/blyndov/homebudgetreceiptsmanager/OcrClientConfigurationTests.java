@@ -30,20 +30,20 @@ class OcrClientConfigurationTests {
         );
 
     @Test
-    void defaultsToTesseractBackend() {
+    void defaultsToPaddleBackend() {
         contextRunner.run(context -> {
             assertThat(context).hasSingleBean(OcrClient.class);
-            assertThat(context.getBean(OcrClient.class)).isInstanceOf(TesseractOcrClient.class);
+            assertThat(context.getBean(OcrClient.class)).isInstanceOf(PaddleOcrClient.class);
         });
     }
 
     @Test
-    void switchesToPaddleBackendWhenConfigured() {
+    void switchesToTesseractBackendWhenExplicitlyConfigured() {
         contextRunner
-            .withPropertyValues("app.ocr.service.backend=PADDLE")
+            .withPropertyValues("app.ocr.service.backend=TESSERACT")
             .run(context -> {
                 assertThat(context).hasSingleBean(OcrClient.class);
-                assertThat(context.getBean(OcrClient.class)).isInstanceOf(PaddleOcrClient.class);
+                assertThat(context.getBean(OcrClient.class)).isInstanceOf(TesseractOcrClient.class);
             });
     }
 
