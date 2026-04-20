@@ -107,6 +107,7 @@ describe("dashboard", () => {
             contentType: "image/png",
             fileSize: 1024,
             currency: "UAH",
+            receiptCountryHint: null,
             s3Key: "receipts/11.png",
             uploadedAt: "2026-03-31T10:00:00Z",
             ocrStatus: "DONE",

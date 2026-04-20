@@ -24,16 +24,21 @@ Flow:
 
 1. `POST /api/receipts/upload` stores the file in S3 and metadata in PostgreSQL
 2. the upload request now also stores the selected `currency`
-3. after transaction commit, `ReceiptOcrQueueProducer` publishes a message to `receipt-ocr-queue`
-4. `ReceiptOcrQueueConsumer` polls the queue
-5. the consumer marks the receipt `PROCESSING`
-6. the consumer downloads the file from S3
-7. the configured OCR client sends the file to the selected OCR helper container
-8. the raw OCR text is stored
-9. `ReceiptOcrLineNormalizationService` builds Java `normalizedLines[]` and parser-ready text
-10. `ReceiptOcrParser` performs best-effort baseline parsing for summary fields, parsed currency, and line items
-11. `ReceiptOcrValidationService` runs sanity checks on the parsed result
-12. the receipt persists those OCR artifacts and validation warnings and is marked `DONE` or `FAILED`
+3. the upload request can optionally store `receiptCountryHint`
+4. after transaction commit, `ReceiptOcrQueueProducer` publishes a message to `receipt-ocr-queue`
+5. `ReceiptOcrQueueConsumer` polls the queue
+6. the consumer marks the receipt `PROCESSING`
+7. the consumer downloads the file from S3
+8. `ReceiptOcrRoutingService` resolves OCR profile strategy in this order:
+   - user-selected country hint
+   - auto-detected script or language from preview OCR text
+   - safe fallback profile
+9. the configured OCR client sends the file to the selected OCR helper container with routing options
+10. the raw OCR text is stored
+11. `ReceiptOcrLineNormalizationService` builds Java `normalizedLines[]` and parser-ready text
+12. `ReceiptOcrParser` performs best-effort baseline parsing for summary fields, parsed currency, and line items
+13. `ReceiptOcrValidationService` runs sanity checks on the parsed result
+14. the receipt persists those OCR artifacts, routing metadata, and validation warnings and is marked `DONE` or `FAILED`
 
 ## OCR Backend Options
 
@@ -84,17 +89,24 @@ The PaddleOCR helper now warms its baseline models during container startup. Thi
 
 For Docker-based local runs, OCR endpoint values in `.env` must use container service names, not `localhost`. Inside the `app` container, `localhost` points back to the Spring Boot container itself.
 
-Current local diagnostic baseline on this branch uses an explicit OCR profile strategy:
+Current local diagnostic profile registry on this branch includes:
 
-- active profile: `en`
-- compared profiles: `en`, `cyrillic`, `latin`
-- OCR version: `PP-OCRv4`
-- detector: `DB`
-- recognizer: `SVTR_LCNet`
-- detector model: `en_PP-OCRv3_det_infer`
-- recognizer model: `en_PP-OCRv4_rec_infer`
-- classifier model: `ch_ppocr_mobile_v2.0_cls_infer`
-- default angle classification: `false`
+- `en`
+- `cyrillic`
+- `polish`
+- `german`
+- `latin`
+
+Current routing baseline:
+
+- safe fallback profile: `en`
+- `UKRAINE` -> `en+cyrillic`
+- `POLAND` -> `en+polish`
+- `GERMANY` -> `en+german`
+- auto-detection can also promote `cyrillic`, `polish`, or `german` when preview OCR text is strong enough
+- the final helper profile is still chosen by quality-aware candidate scoring, so a manual country hint can keep `en` if the local-language OCR result is visibly worse
+
+The helper still returns one selected helper profile per OCR attempt. The practical "English plus chosen or detected language" strategy is implemented in Spring as candidate-profile routing and selection, not as a hidden monolithic helper default.
 
 ### Paddle Preprocessing Layer
 
@@ -279,6 +291,10 @@ When OCR processing succeeds, the receipt now stores the same downstream OCR art
 - `parsedTotalAmount`
 - `parsedCurrency`
 - `parsedPurchaseDate`
+- `receiptCountryHint`
+- `languageDetectionSource`
+- `ocrProfileStrategy`
+- `ocrProfileUsed`
 - persisted `ReceiptLineItem` rows
 
 This means receipt detail and `GET /api/receipts/{id}/ocr` now prefer the product-integrated OCR result instead of rebuilding most of it from raw OCR text on every read.
@@ -345,6 +361,13 @@ The helper also exposes diagnostic visibility so the OCR baseline can be inspect
 - `diagnostics.rawEngineText`
 - `diagnostics.mappedLines`
 - `diagnostics.mappedRawText`
+
+The product API now complements that helper-side visibility with persisted routing metadata on `GET /api/receipts/{id}/ocr`:
+
+- `receiptCountryHint`
+- `languageDetectionSource`
+- `ocrProfileStrategy`
+- `ocrProfileUsed`
 
 This lets you compare the engine's own text with:
 
@@ -492,6 +515,10 @@ Use:
 - `parsedTotalAmount`
 - `parsedCurrency`
 - `parsedPurchaseDate`
+- `receiptCountryHint`
+- `languageDetectionSource`
+- `ocrProfileStrategy`
+- `ocrProfileUsed`
 - `parseWarnings`
 - `weakParseQuality`
 - `rawOcrText`
@@ -543,13 +570,14 @@ curl -X POST "http://localhost:8083/ocr?preprocess=true" `
   -F "file=@C:/temp/receipt.png;type=image/png"
 ```
 
-3. upload a PNG or PDF receipt with explicit currency:
+3. upload a PNG or PDF receipt with explicit currency and optional country hint:
 
 ```powershell
 curl -X POST "http://localhost:8080/api/receipts/upload" `
   -H "Authorization: Bearer <JWT_TOKEN>" `
   -F "file=@C:/temp/receipt.png;type=image/png" `
-  -F "currency=UAH"
+  -F "currency=UAH" `
+  -F "receiptCountryHint=UKRAINE"
 ```
 
 4. poll OCR status:
@@ -566,6 +594,10 @@ Invoke-RestMethod -Method Get `
 - `normalizedLines`
 - `parsedTotalAmount`
 - `parsedCurrency`
+- `receiptCountryHint`
+- `languageDetectionSource`
+- `ocrProfileStrategy`
+- `ocrProfileUsed`
 - `parseWarnings`
 - `weakParseQuality`
 - `lineItems`

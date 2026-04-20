@@ -1,6 +1,8 @@
 package com.blyndov.homebudgetreceiptsmanager.dto;
 
 import com.blyndov.homebudgetreceiptsmanager.entity.CurrencyCode;
+import com.blyndov.homebudgetreceiptsmanager.entity.OcrLanguageDetectionSource;
+import com.blyndov.homebudgetreceiptsmanager.entity.ReceiptCountryHint;
 import com.blyndov.homebudgetreceiptsmanager.entity.ReceiptOcrStatus;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -13,6 +15,10 @@ public record ReceiptOcrResponse(
     ReceiptOcrStatus ocrStatus,
     String rawOcrText,
     List<NormalizedOcrLineResponse> normalizedLines,
+    ReceiptCountryHint receiptCountryHint,
+    OcrLanguageDetectionSource languageDetectionSource,
+    String ocrProfileStrategy,
+    String ocrProfileUsed,
     String parsedStoreName,
     BigDecimal parsedTotalAmount,
     CurrencyCode parsedCurrency,

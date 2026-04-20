@@ -94,7 +94,7 @@ class ReceiptOcrFailureIntegrationTests extends AbstractPostgresIntegrationTest 
         userRepository.deleteAll();
         clearBucket();
         drainOcrQueue();
-        when(ocrClient.extractResult(any(), any(), any())).thenThrow(new IllegalStateException("Simulated OCR failure"));
+        when(ocrClient.extractResult(any(), any(), any(), any())).thenThrow(new IllegalStateException("Simulated OCR failure"));
     }
 
     @Test
@@ -122,6 +122,9 @@ class ReceiptOcrFailureIntegrationTests extends AbstractPostgresIntegrationTest 
         assertThat(receiptRepository.findById(uploadResponse.getBody().id()).orElseThrow().getParsedCurrency()).isNull();
         assertThat(receiptRepository.findById(uploadResponse.getBody().id()).orElseThrow().getNormalizedOcrLinesJson()).isNull();
         assertThat(receiptRepository.findById(uploadResponse.getBody().id()).orElseThrow().getParserReadyText()).isNull();
+        assertThat(receiptRepository.findById(uploadResponse.getBody().id()).orElseThrow().getLanguageDetectionSource()).isNull();
+        assertThat(receiptRepository.findById(uploadResponse.getBody().id()).orElseThrow().getOcrProfileStrategy()).isNull();
+        assertThat(receiptRepository.findById(uploadResponse.getBody().id()).orElseThrow().getOcrProfileUsed()).isNull();
         assertThat(receiptRepository.findById(uploadResponse.getBody().id()).orElseThrow().getParseWarningsJson()).isNull();
         assertThat(receiptRepository.findById(uploadResponse.getBody().id()).orElseThrow().isWeakParseQuality()).isFalse();
 

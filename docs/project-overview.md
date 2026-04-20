@@ -67,6 +67,15 @@ It allows a user to:
 - parsed line items are stored separately and linked to the receipt
 - multilingual OCR runs with `ukr+rus+eng` in the local helper container
 - the main backend can now switch between OCR helper backends through configuration without changing the business parsing flow
+- receipt upload now accepts an optional `receiptCountryHint` so OCR routing can use stronger language context when the user knows the document origin
+- current supported manual hint set is intentionally practical:
+  - `UKRAINE`
+  - `POLAND`
+  - `GERMANY`
+- OCR routing now resolves in this order:
+  - user-selected country hint
+  - lightweight auto-detection from preview OCR text
+  - safe fallback profile
 - the PaddleOCR helper now includes a separate adaptive preprocessing layer for crop cleanup, deskew, denoise, contrast recovery, and safe-by-default soft vs strong enhancement before OCR
 - the PaddleOCR helper now returns line-based OCR output with stable reading order, so the next parser step can work with explicit receipt rows instead of a single long text blob
 - the PaddleOCR helper now stops at raw ordered line extraction, while the Spring backend owns conservative line normalization, line tagging, and parser-ready `normalizedLines[]`
@@ -75,7 +84,12 @@ It allows a user to:
 - a dedicated Java validation layer now marks suspicious merchant, total, date, and line-item results instead of pretending every parse is equally trustworthy
 - receipt detail and OCR retrieval now read those persisted OCR artifacts back through the product API instead of depending on a legacy partial recompute path
 - the current diagnostic baseline uses explicit OCR profiles and shows that most obvious mixed-script degradation happens in the OCR engine on script-mismatched inputs, not in the line mapper
-- the selected baseline profile for the standard OCR branch is now `en`, based on a controlled comparison corpus across `en`, `cyrillic`, and `latin`
+- the safe fallback profile for the standard OCR branch remains `en`, but the routing layer can now intentionally promote `cyrillic`, `polish`, or `german` when a user hint or auto-detection makes that route stronger
+- OCR routing metadata is now persisted and returned for diagnostics:
+  - `receiptCountryHint`
+  - `languageDetectionSource`
+  - `ocrProfileStrategy`
+  - `ocrProfileUsed`
 - OCR `DONE` means text extraction succeeded, even if structured parsing is partial
 - OCR `FAILED` means extraction or processing itself failed
 

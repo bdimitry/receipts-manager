@@ -36,7 +36,10 @@ class PaddleOcrAppTests(unittest.TestCase):
         self.assertEqual(body["defaultConfig"]["profile"], "en")
         self.assertEqual(body["defaultConfig"]["language"], "en")
         self.assertEqual(body["defaultConfig"]["recModelName"], "en_PP-OCRv4_rec_infer")
-        self.assertEqual([profile["name"] for profile in body["availableProfiles"]], ["en", "cyrillic", "latin"])
+        self.assertEqual(
+            [profile["name"] for profile in body["availableProfiles"]],
+            ["en", "cyrillic", "polish", "german", "latin"],
+        )
         self.assertTrue(body["preprocessingEnabled"])
 
     def test_ocr_endpoint_returns_lines_and_preprocessing_metadata(self):

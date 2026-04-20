@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestClient;
@@ -18,6 +19,7 @@ import org.springframework.web.client.RestClient;
 class PaddleOcrClientTests {
 
     private HttpServer server;
+    private final AtomicReference<String> lastRequestPath = new AtomicReference<>();
 
     @AfterEach
     void tearDown() {
@@ -54,11 +56,35 @@ class PaddleOcrClientTests {
             java.util.List.of(220.0d, 60.0d),
             java.util.List.of(10.0d, 60.0d)
         );
+        assertThat(lastRequestPath.get()).isEqualTo("/ocr");
         assertThat(client.extractText("receipt.png", "image/png", "fake-image".getBytes(StandardCharsets.UTF_8)))
             .isEqualTo("STORE\nTOTAL 123.45");
     }
 
+    @Test
+    void extractResultPassesProfileOverrideToPaddleService() throws Exception {
+        server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext("/ocr", this::handleOcrRequest);
+        server.start();
+
+        OcrClientProperties properties = new OcrClientProperties();
+        properties.setPaddleBaseUrl("http://127.0.0.1:" + server.getAddress().getPort());
+
+        PaddleOcrClient client = new PaddleOcrClient(RestClient.builder(), properties);
+
+        OcrExtractionResult response = client.extractResult(
+            "receipt.png",
+            "image/png",
+            "fake-image".getBytes(StandardCharsets.UTF_8),
+            new com.blyndov.homebudgetreceiptsmanager.client.OcrRequestOptions("cyrillic")
+        );
+
+        assertThat(response.rawText()).isEqualTo("STORE\nTOTAL 123.45");
+        assertThat(lastRequestPath.get()).isEqualTo("/ocr?profile=cyrillic");
+    }
+
     private void handleOcrRequest(HttpExchange exchange) throws IOException {
+        lastRequestPath.set(exchange.getRequestURI().toString());
         byte[] responseBody = """
             {
               "rawText": "STORE\\nTOTAL 123.45",

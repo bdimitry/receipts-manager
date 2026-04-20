@@ -167,6 +167,36 @@ Supported values:
 
 If `OCR_SERVICE_BACKEND=PADDLE`, the backend sends receipt images to `POST /ocr` on the Paddle helper and maps the response back into the existing receipt OCR flow.
 
+Receipt upload also supports an optional `receiptCountryHint` so the OCR route can use stronger language context when the user knows where the document comes from.
+
+Supported country hints in the current product flow:
+
+- `UKRAINE`
+- `POLAND`
+- `GERMANY`
+
+The upload default remains `Auto-detect`. The backend resolves OCR routing in this order:
+
+1. user-selected country hint
+2. lightweight auto-detection from preview OCR text
+3. safe fallback profile
+
+Current country-to-strategy mappings:
+
+- `UKRAINE` -> `en+cyrillic`
+- `POLAND` -> `en+polish`
+- `GERMANY` -> `en+german`
+
+The product requirement is always "English plus a local language signal." Because the current Paddle helper cannot always run every combination as one literal multi-language recognizer, the practical implementation is:
+
+- resolve a strategy such as `en+cyrillic`, `en+polish`, or `en+german`
+- run candidate OCR profiles for that strategy
+- choose the strongest result with lightweight OCR heuristics
+
+The important product behavior is that a manual country hint selects the routing strategy, not a blind hard force of the local profile. If the local-language candidate comes back materially worse than English, the final `ocrProfileUsed` can still stay on `en` while preserving the chosen strategy for diagnostics.
+
+This keeps the OCR-first architecture intact while making routing more explainable and easier to debug later.
+
 When you run the stack through `docker compose`, `.env` values are injected into containers. For container-to-container traffic, use Docker service names such as `paddleocr-service`, `ocr-service`, `telegram-mock`, `localstack`, and `mailhog`, not `localhost`.
 
 The PaddleOCR helper currently returns:
@@ -246,6 +276,10 @@ Persisted receipt OCR artifacts now include:
 - persisted parse warnings
 - weak parse quality flag
 - persisted parsed line items
+- selected `receiptCountryHint`
+- `languageDetectionSource`
+- `ocrProfileStrategy`
+- `ocrProfileUsed`
 
 `GET /api/receipts/{id}/ocr` now prefers those persisted OCR artifacts during retrieval, so receipt detail reflects the same product-integrated pipeline that ran during async processing instead of depending on a legacy partial recompute path.
 
@@ -253,6 +287,10 @@ The same OCR response now also exposes validation output:
 
 - `parseWarnings[]`
 - `weakParseQuality`
+- `receiptCountryHint`
+- `languageDetectionSource`
+- `ocrProfileStrategy`
+- `ocrProfileUsed`
 
 `GET /api/receipts/{id}/ocr` now includes `normalizedLines[]` with:
 
@@ -309,20 +347,27 @@ For diagnosis, the helper also exposes:
 - `diagnostics.mappedLines`
 - `diagnostics.mappedRawText`
 
-The current diagnostic baseline on this branch uses an explicit OCR profile strategy:
+The current diagnostic registry on this branch includes explicit OCR profiles:
 
-- active profile: `en`
-- compared profiles: `en`, `cyrillic`, `latin`
-- detector: `en_PP-OCRv3_det_infer`
-- recognizer: `en_PP-OCRv4_rec_infer`
-- recognizer algorithm: `SVTR_LCNet`
-- OCR version: `PP-OCRv4`
+- `en`
+- `cyrillic`
+- `polish`
+- `german`
+- `latin`
+
+Current routing baseline:
+
+- safe fallback profile: `en`
+- country hint can promote `cyrillic`, `polish`, or `german`
+- auto-detection can also promote one of those profiles when preview OCR text is strong enough
+- the final selected route is quality-scored, persisted, and returned for diagnostics
 
 Current conclusion from the diagnostic step:
 
 - the weakest quality cases mostly originate in the OCR engine itself on script-mismatched inputs
 - `lines[]` mapping preserves engine text fairly closely and mainly affects order and grouping
-- the controlled comparison corpus now selects `en` as the strongest default baseline for the standard OCR branch, while `cyrillic` remains available as a comparison profile
+- the controlled comparison corpus still supports `en` as the strongest default fallback baseline for the standard OCR branch
+- local-language hints now let the route intentionally promote `cyrillic`, `polish`, or `german` instead of forcing one global profile
 
 To run the Paddle helper service-side tests directly:
 
@@ -334,13 +379,13 @@ docker run --rm -w /app receipts-manager-paddleocr-service-test:latest python -m
 To run the local OCR diagnostic comparison script:
 
 ```powershell
-docker exec home-budget-paddleocr-service python diagnostics.py --profiles en cyrillic latin --preprocess true
+docker exec home-budget-paddleocr-service python diagnostics.py --profiles en cyrillic polish german latin --preprocess true
 ```
 
 To include the local real-check corpus from `C:\Users\dmitr\Pictures\чеки` in the diagnostic printout:
 
 ```powershell
-docker exec home-budget-paddleocr-service python diagnostics.py --profiles en cyrillic latin --preprocess true --local-corpus-dir "C:/Users/dmitr/Pictures/чеки"
+docker exec home-budget-paddleocr-service python diagnostics.py --profiles en cyrillic polish german latin --preprocess true --local-corpus-dir "C:/Users/dmitr/Pictures/чеки"
 ```
 
 For preprocessing-specific regression work, compare the mandatory real corpus with `preprocess=true` and `preprocess=false`, paying special attention to:
@@ -408,7 +453,11 @@ Then open the receipt detail page and verify:
 - OCR status changes to `DONE`
 - parsed line items are shown
 - parsed total and receipt currency are correct
-- the OCR helper handles multilingual `ukr+rus+eng` text in the current local setup
+- OCR routing metadata is visible:
+  - receipt country hint
+  - detection source
+  - OCR strategy
+  - OCR profile used
 
 If you upload a bank transfer slip or payment document instead of a retail receipt, the system now prefers a safe OCR outcome:
 

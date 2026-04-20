@@ -132,6 +132,7 @@ These files define:
 - stable request and response contracts
 - OCR responses include parsed line items and validation warnings
 - purchase and receipt responses include currency
+- receipt upload and OCR DTOs now also carry OCR routing fields such as `receiptCountryHint`, `languageDetectionSource`, `ocrProfileStrategy`, and `ocrProfileUsed`
 
 ### `client`
 
@@ -139,6 +140,7 @@ These files define:
 - OCR client integration
 - notification provider clients
 - both Tesseract and PaddleOCR adapters live here, while receipt parsing stays in the service layer
+- `OcrRequestOptions` now travels through the OCR client boundary so Spring can request a routed helper profile without mixing helper internals into controller code
 
 ### `security`
 
@@ -159,7 +161,7 @@ Contains helper services and init scripts for:
 Inside `docker/paddleocr-service`:
 
 - `app.py`: HTTP API and OCR orchestration
-- `profiles.py`: explicit OCR profile registry for baseline and comparison runs
+- `profiles.py`: explicit OCR profile registry for baseline, routing, and comparison runs
 - `corpus.py`: reproducible diagnostic corpus for OCR profile comparison
 - `comparison.py`: scoring and recommendation logic for profile selection
 - `diagnostics.py`: local comparison script for raw PaddleOCR output across OCR profiles
@@ -170,13 +172,16 @@ Inside `docker/paddleocr-service`:
 
 Inside `src/main/java/com/blyndov/homebudgetreceiptsmanager/service`:
 
+- `ReceiptOcrLanguageDetector`: lightweight script and language heuristics over preview OCR text
+- `ReceiptOcrRoutingService`: resolves OCR profile strategy from country hint, auto-detection, and fallback rules
+- `ReceiptOcrRoutingDecision`: internal routing result carrying strategy, detection source, profile used, and extracted OCR lines
 - `ReceiptOcrLineNormalizationService`: Java-side conservative line normalization, tagging, and parser-ready `normalizedLines[]` construction after raw OCR extraction
 - `NormalizedOcrDocument`: internal Spring-side downstream OCR artifact that carries `normalizedLines[]`, `parserReadyLines[]`, and `parserReadyText`
 - `ReceiptOcrParser`: line-oriented baseline parser that consumes `normalizedLines[]`
 - `ParsedReceiptDocument`: structured parser result model for merchant/date/total/currency/items
 - `ParsedReceiptLineItem`: structured parser line item model with raw fragment and source lines
 - `ReceiptOcrValidationService`: post-parser sanity checks for suspicious merchant, total, date, and line-item results
-- `ReceiptOcrService`: orchestration layer that now persists the product OCR artifacts produced by extraction, normalization, parsing, and validation, and restores them on retrieval
+- `ReceiptOcrService`: orchestration layer that now persists the product OCR artifacts produced by routing, extraction, normalization, parsing, and validation, and restores them on retrieval
 
 ### `docker-compose.yml`
 

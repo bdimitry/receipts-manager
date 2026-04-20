@@ -24,6 +24,16 @@ public class TesseractOcrClient implements OcrClient {
 
     @Override
     public OcrExtractionResult extractResult(String originalFileName, String contentType, byte[] content) {
+        return extractResult(originalFileName, contentType, content, OcrRequestOptions.defaultOptions());
+    }
+
+    @Override
+    public OcrExtractionResult extractResult(
+        String originalFileName,
+        String contentType,
+        byte[] content,
+        OcrRequestOptions options
+    ) {
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
         builder.part("file", new NamedByteArrayResource(originalFileName, content), MediaType.parseMediaType(contentType));
 

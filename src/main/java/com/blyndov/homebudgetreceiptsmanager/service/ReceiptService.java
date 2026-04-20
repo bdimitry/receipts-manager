@@ -5,6 +5,7 @@ import com.blyndov.homebudgetreceiptsmanager.dto.ReceiptResponse;
 import com.blyndov.homebudgetreceiptsmanager.entity.CurrencyCode;
 import com.blyndov.homebudgetreceiptsmanager.entity.Purchase;
 import com.blyndov.homebudgetreceiptsmanager.entity.Receipt;
+import com.blyndov.homebudgetreceiptsmanager.entity.ReceiptCountryHint;
 import com.blyndov.homebudgetreceiptsmanager.entity.User;
 import com.blyndov.homebudgetreceiptsmanager.exception.CurrencyMismatchException;
 import com.blyndov.homebudgetreceiptsmanager.exception.InvalidFileException;
@@ -56,7 +57,12 @@ public class ReceiptService {
     }
 
     @Transactional
-    public ReceiptResponse uploadReceipt(MultipartFile file, Long purchaseId, CurrencyCode currency) {
+    public ReceiptResponse uploadReceipt(
+        MultipartFile file,
+        Long purchaseId,
+        CurrencyCode currency,
+        ReceiptCountryHint receiptCountryHint
+    ) {
         validateFile(file);
 
         User currentUser = authService.getCurrentAuthenticatedUser();
@@ -66,9 +72,10 @@ public class ReceiptService {
         String s3Key = buildS3Key(currentUser.getId(), originalFileName);
 
         log.info(
-            "Uploading receipt for userId={}, purchaseId={}, originalFileName={}, contentType={}, size={}",
+            "Uploading receipt for userId={}, purchaseId={}, receiptCountryHint={}, originalFileName={}, contentType={}, size={}",
             currentUser.getId(),
             purchaseId,
+            receiptCountryHint,
             originalFileName,
             file.getContentType(),
             file.getSize()
@@ -84,6 +91,7 @@ public class ReceiptService {
             receipt.setContentType(file.getContentType());
             receipt.setFileSize(file.getSize());
             receipt.setCurrency(currency);
+            receipt.setReceiptCountryHint(receiptCountryHint);
             receipt.setS3Key(s3Key);
 
             Receipt savedReceipt = receiptRepository.saveAndFlush(receipt);
@@ -143,6 +151,7 @@ public class ReceiptService {
             receipt.getContentType(),
             receipt.getFileSize(),
             receipt.getCurrency(),
+            receipt.getReceiptCountryHint(),
             receipt.getS3Key(),
             receipt.getUploadedAt(),
             receipt.getOcrStatus(),

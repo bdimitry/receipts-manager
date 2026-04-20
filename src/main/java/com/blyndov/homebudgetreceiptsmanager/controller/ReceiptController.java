@@ -3,6 +3,7 @@ package com.blyndov.homebudgetreceiptsmanager.controller;
 import com.blyndov.homebudgetreceiptsmanager.dto.ReceiptOcrResponse;
 import com.blyndov.homebudgetreceiptsmanager.dto.ReceiptResponse;
 import com.blyndov.homebudgetreceiptsmanager.entity.CurrencyCode;
+import com.blyndov.homebudgetreceiptsmanager.entity.ReceiptCountryHint;
 import com.blyndov.homebudgetreceiptsmanager.service.ReceiptService;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -29,9 +30,11 @@ public class ReceiptController {
     public ResponseEntity<ReceiptResponse> uploadReceipt(
         @RequestParam("file") MultipartFile file,
         @RequestParam(required = false) Long purchaseId,
-        @RequestParam CurrencyCode currency
+        @RequestParam CurrencyCode currency,
+        @RequestParam(required = false) ReceiptCountryHint receiptCountryHint
     ) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(receiptService.uploadReceipt(file, purchaseId, currency));
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(receiptService.uploadReceipt(file, purchaseId, currency, receiptCountryHint));
     }
 
     @GetMapping

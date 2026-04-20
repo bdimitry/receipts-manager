@@ -18,6 +18,8 @@ Compared profiles:
 
 - `en`
 - `cyrillic`
+- `polish`
+- `german`
 - `latin`
 
 Current selected baseline profile for the standard OCR branch:
@@ -31,7 +33,28 @@ Current selected baseline profile for the standard OCR branch:
 - classifier model: `ch_ppocr_mobile_v2.0_cls_infer`
 - default angle classification: `false`
 
-`cyrillic` and `latin` remain available as controlled comparison profiles.
+`cyrillic`, `polish`, `german`, and `latin` remain available as controlled comparison profiles.
+
+The product flow now persists OCR routing metadata so the selected route is diagnosable after processing:
+
+- `receiptCountryHint`
+- `languageDetectionSource`
+- `ocrProfileStrategy`
+- `ocrProfileUsed`
+
+Current routing priority:
+
+1. explicit user-selected country hint
+2. auto-detected script or language from preview OCR text
+3. safe fallback profile
+
+Current country-to-strategy mappings:
+
+- `UKRAINE` -> `en+cyrillic`
+- `POLAND` -> `en+polish`
+- `GERMANY` -> `en+german`
+
+Manual country hints now select a comparison strategy, not a blind hard force of the local profile. Spring still quality-scores the candidate OCR outputs inside that strategy, so `ocrProfileUsed` can remain `en` when the local-language result is more fragmented than the English fallback.
 
 ## Diagnostic Endpoints
 
@@ -46,6 +69,7 @@ The Paddle helper exposes two diagnostic-friendly entry points:
 - `defaultConfig`
 - `availableProfiles[]`
 - preprocessing defaults
+- current profile descriptions
 
 `POST /ocr?debug=true` returns:
 
@@ -167,13 +191,13 @@ Compare:
 4. Run the bundled comparison script across OCR profiles:
 
 ```powershell
-docker exec home-budget-paddleocr-service python diagnostics.py --profiles en cyrillic latin --preprocess true
+docker exec home-budget-paddleocr-service python diagnostics.py --profiles en cyrillic polish german latin --preprocess true
 ```
 
 5. Optionally include the local real-check corpus from `C:\Users\dmitr\Pictures\чеки`:
 
 ```powershell
-docker exec home-budget-paddleocr-service python diagnostics.py --profiles en cyrillic latin --preprocess true --local-corpus-dir "C:/Users/dmitr/Pictures/чеки"
+docker exec home-budget-paddleocr-service python diagnostics.py --profiles en cyrillic polish german latin --preprocess true --local-corpus-dir "C:/Users/dmitr/Pictures/чеки"
 ```
 
 The script runs the full diagnostic corpus and, for each profile, prints:
@@ -196,10 +220,10 @@ At the end it also prints:
 
 The current controlled comparison supports this baseline decision:
 
-- the standard OCR-first branch should use `en` as the default baseline profile
-- `cyrillic` should remain a diagnostic comparison profile and a possible future fallback, not the implicit default
+- the standard OCR-first branch should keep `en` as the safe default fallback profile
+- `cyrillic`, `polish`, and `german` should be promoted through explicit routing rather than becoming hidden global defaults
 - line-based output is good enough to continue toward normalization and parser experiments
-- future modules should still validate the chosen baseline on more real receipts, especially local-language retail documents
+- future modules should still validate the chosen routing strategy on more real receipts, especially local-language retail documents
 
 The current branch has now started that validation work. The practical next investigation should focus on one of these paths:
 

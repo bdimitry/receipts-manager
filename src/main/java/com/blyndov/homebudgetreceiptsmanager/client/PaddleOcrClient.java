@@ -23,7 +23,17 @@ public class PaddleOcrClient implements OcrClient {
 
     @Override
     public OcrExtractionResult extractResult(String originalFileName, String contentType, byte[] content) {
-        PaddleOcrServiceResponse response = extractPaddleResponse(originalFileName, contentType, content);
+        return extractResult(originalFileName, contentType, content, OcrRequestOptions.defaultOptions());
+    }
+
+    @Override
+    public OcrExtractionResult extractResult(
+        String originalFileName,
+        String contentType,
+        byte[] content,
+        OcrRequestOptions options
+    ) {
+        PaddleOcrServiceResponse response = extractPaddleResponse(originalFileName, contentType, content, options);
         String rawText = normalize(response.rawText());
         List<OcrExtractionLine> lines = response.lines() == null
             ? List.of()
@@ -46,11 +56,26 @@ public class PaddleOcrClient implements OcrClient {
     }
 
     public PaddleOcrServiceResponse extractPaddleResponse(String originalFileName, String contentType, byte[] content) {
+        return extractPaddleResponse(originalFileName, contentType, content, OcrRequestOptions.defaultOptions());
+    }
+
+    public PaddleOcrServiceResponse extractPaddleResponse(
+        String originalFileName,
+        String contentType,
+        byte[] content,
+        OcrRequestOptions options
+    ) {
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
         builder.part("file", new NamedByteArrayResource(originalFileName, content), MediaType.parseMediaType(contentType));
 
         PaddleOcrServiceResponse response = restClient.post()
-            .uri("/ocr")
+            .uri(uriBuilder -> {
+                uriBuilder.path("/ocr");
+                if (options != null && StringUtils.hasText(options.profile())) {
+                    uriBuilder.queryParam("profile", options.profile());
+                }
+                return uriBuilder.build();
+            })
             .contentType(MediaType.MULTIPART_FORM_DATA)
             .body(builder.build())
             .retrieve()

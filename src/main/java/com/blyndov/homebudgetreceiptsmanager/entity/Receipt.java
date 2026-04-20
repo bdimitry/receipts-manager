@@ -51,6 +51,10 @@ public class Receipt {
     @Column(nullable = false, length = 3)
     private CurrencyCode currency;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "receipt_country_hint", length = 30)
+    private ReceiptCountryHint receiptCountryHint;
+
     @Column(name = "s3_key", nullable = false, unique = true, length = 1024)
     private String s3Key;
 
@@ -82,6 +86,16 @@ public class Receipt {
 
     @Column(name = "parser_ready_text", columnDefinition = "TEXT")
     private String parserReadyText;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "language_detection_source", length = 30)
+    private OcrLanguageDetectionSource languageDetectionSource;
+
+    @Column(name = "ocr_profile_strategy", length = 50)
+    private String ocrProfileStrategy;
+
+    @Column(name = "ocr_profile_used", length = 50)
+    private String ocrProfileUsed;
 
     @Column(name = "parse_warnings_json", columnDefinition = "TEXT")
     private String parseWarningsJson;
@@ -153,6 +167,14 @@ public class Receipt {
 
     public void setCurrency(CurrencyCode currency) {
         this.currency = currency;
+    }
+
+    public ReceiptCountryHint getReceiptCountryHint() {
+        return receiptCountryHint;
+    }
+
+    public void setReceiptCountryHint(ReceiptCountryHint receiptCountryHint) {
+        this.receiptCountryHint = receiptCountryHint;
     }
 
     public String getS3Key() {
@@ -233,6 +255,30 @@ public class Receipt {
 
     public void setParserReadyText(String parserReadyText) {
         this.parserReadyText = parserReadyText;
+    }
+
+    public OcrLanguageDetectionSource getLanguageDetectionSource() {
+        return languageDetectionSource;
+    }
+
+    public void setLanguageDetectionSource(OcrLanguageDetectionSource languageDetectionSource) {
+        this.languageDetectionSource = languageDetectionSource;
+    }
+
+    public String getOcrProfileStrategy() {
+        return ocrProfileStrategy;
+    }
+
+    public void setOcrProfileStrategy(String ocrProfileStrategy) {
+        this.ocrProfileStrategy = ocrProfileStrategy;
+    }
+
+    public String getOcrProfileUsed() {
+        return ocrProfileUsed;
+    }
+
+    public void setOcrProfileUsed(String ocrProfileUsed) {
+        this.ocrProfileUsed = ocrProfileUsed;
     }
 
     public String getParseWarningsJson() {

@@ -1,7 +1,5 @@
 package com.blyndov.homebudgetreceiptsmanager.service;
 
-import com.blyndov.homebudgetreceiptsmanager.client.OcrClient;
-import com.blyndov.homebudgetreceiptsmanager.client.OcrExtractionResult;
 import com.blyndov.homebudgetreceiptsmanager.dto.NormalizedOcrLineResponse;
 import com.blyndov.homebudgetreceiptsmanager.dto.ReceiptLineItemResponse;
 import com.blyndov.homebudgetreceiptsmanager.dto.ReceiptOcrResponse;
@@ -35,7 +33,7 @@ public class ReceiptOcrService {
 
     private final ReceiptRepository receiptRepository;
     private final S3StorageService s3StorageService;
-    private final OcrClient ocrClient;
+    private final ReceiptOcrRoutingService receiptOcrRoutingService;
     private final ReceiptOcrParser receiptOcrParser;
     private final ReceiptOcrLineNormalizationService lineNormalizationService;
     private final ReceiptOcrValidationService receiptOcrValidationService;
@@ -44,7 +42,7 @@ public class ReceiptOcrService {
     public ReceiptOcrService(
         ReceiptRepository receiptRepository,
         S3StorageService s3StorageService,
-        OcrClient ocrClient,
+        ReceiptOcrRoutingService receiptOcrRoutingService,
         ReceiptOcrParser receiptOcrParser,
         ReceiptOcrLineNormalizationService lineNormalizationService,
         ReceiptOcrValidationService receiptOcrValidationService,
@@ -52,7 +50,7 @@ public class ReceiptOcrService {
     ) {
         this.receiptRepository = receiptRepository;
         this.s3StorageService = s3StorageService;
-        this.ocrClient = ocrClient;
+        this.receiptOcrRoutingService = receiptOcrRoutingService;
         this.receiptOcrParser = receiptOcrParser;
         this.lineNormalizationService = lineNormalizationService;
         this.receiptOcrValidationService = receiptOcrValidationService;
@@ -70,6 +68,9 @@ public class ReceiptOcrService {
         receipt.setParsedPurchaseDate(null);
         receipt.setNormalizedOcrLinesJson(null);
         receipt.setParserReadyText(null);
+        receipt.setLanguageDetectionSource(null);
+        receipt.setOcrProfileStrategy(null);
+        receipt.setOcrProfileUsed(null);
         receipt.setParseWarningsJson(null);
         receipt.setWeakParseQuality(false);
         receipt.clearLineItems();
@@ -82,7 +83,8 @@ public class ReceiptOcrService {
     public void process(Long receiptId) {
         Receipt receipt = getReceiptEntity(receiptId);
         byte[] content = s3StorageService.download(receipt.getS3Key());
-        OcrExtractionResult extractionResult = ocrClient.extractResult(receipt.getOriginalFileName(), receipt.getContentType(), content);
+        ReceiptOcrRoutingDecision routingDecision = receiptOcrRoutingService.route(receipt, content);
+        var extractionResult = routingDecision.extractionResult();
         String rawText = extractionResult.rawText();
 
         if (!StringUtils.hasText(rawText)) {
@@ -96,6 +98,9 @@ public class ReceiptOcrService {
         receipt.setRawOcrText(rawText);
         receipt.setNormalizedOcrLinesJson(serializeNormalizedLines(normalizedDocument.normalizedLines()));
         receipt.setParserReadyText(normalizedDocument.parserReadyText());
+        receipt.setLanguageDetectionSource(routingDecision.detectionSource());
+        receipt.setOcrProfileStrategy(routingDecision.ocrProfileStrategy());
+        receipt.setOcrProfileUsed(routingDecision.ocrProfileUsed());
         receipt.setParseWarningsJson(serializeWarningCodes(validationResult.warnings()));
         receipt.setWeakParseQuality(validationResult.weakParseQuality());
         receipt.setParsedStoreName(parsedData.merchantName());
@@ -109,9 +114,12 @@ public class ReceiptOcrService {
         receiptRepository.save(receipt);
 
         log.info(
-            "Receipt OCR completed successfully for receiptId={}, userId={}, parsedStoreName={}, parsedTotalAmount={}, parsedPurchaseDate={}, parsedCurrency={}, lineItemCount={}, normalizedLineCount={}, parserReadyLineCount={}, warnings={}",
+            "Receipt OCR completed successfully for receiptId={}, userId={}, strategy={}, profileUsed={}, detectionSource={}, parsedStoreName={}, parsedTotalAmount={}, parsedPurchaseDate={}, parsedCurrency={}, lineItemCount={}, normalizedLineCount={}, parserReadyLineCount={}, warnings={}",
             receipt.getId(),
             receipt.getUser().getId(),
+            routingDecision.ocrProfileStrategy(),
+            routingDecision.ocrProfileUsed(),
+            routingDecision.detectionSource(),
             receipt.getParsedStoreName(),
             receipt.getParsedTotalAmount(),
             receipt.getParsedPurchaseDate(),
@@ -134,6 +142,9 @@ public class ReceiptOcrService {
         receipt.setParsedPurchaseDate(null);
         receipt.setNormalizedOcrLinesJson(null);
         receipt.setParserReadyText(null);
+        receipt.setLanguageDetectionSource(null);
+        receipt.setOcrProfileStrategy(null);
+        receipt.setOcrProfileUsed(null);
         receipt.setParseWarningsJson(null);
         receipt.setWeakParseQuality(false);
         receipt.clearLineItems();
@@ -153,6 +164,9 @@ public class ReceiptOcrService {
         receipt.setParsedPurchaseDate(null);
         receipt.setNormalizedOcrLinesJson(null);
         receipt.setParserReadyText(null);
+        receipt.setLanguageDetectionSource(null);
+        receipt.setOcrProfileStrategy(null);
+        receipt.setOcrProfileUsed(null);
         receipt.setParseWarningsJson(null);
         receipt.setWeakParseQuality(false);
         receipt.clearLineItems();
@@ -190,6 +204,10 @@ public class ReceiptOcrService {
             receipt.getOcrStatus(),
             receipt.getRawOcrText(),
             normalizedDocument.normalizedLines(),
+            receipt.getReceiptCountryHint(),
+            receipt.getLanguageDetectionSource(),
+            receipt.getOcrProfileStrategy(),
+            receipt.getOcrProfileUsed(),
             receipt.getParsedStoreName(),
             receipt.getParsedTotalAmount(),
             parsedCurrency,

@@ -6,8 +6,9 @@ import { Link } from "react-router-dom";
 import { z } from "zod";
 import { getPurchases } from "../../purchases/api";
 import { getReceipts, uploadReceipt } from "../api";
-import type { ReceiptResponse } from "../../../shared/api/types";
+import type { ReceiptCountryHint, ReceiptResponse } from "../../../shared/api/types";
 import { useI18n } from "../../../shared/i18n/I18nContext";
+import type { TranslationKey } from "../../../shared/i18n/translations";
 import { DEFAULT_CURRENCY, SUPPORTED_CURRENCIES } from "../../../shared/lib/currency";
 import { getCurrencyLabel, getOcrStatusLabel } from "../../../shared/lib/domain";
 import { formatCurrency, formatDateTime } from "../../../shared/lib/format";
@@ -25,9 +26,16 @@ const schema = z.object({
     .refine((value) => value instanceof FileList && value.length > 0, "Please choose a file"),
   purchaseId: z.string().optional(),
   currency: z.enum(["USD", "EUR", "UAH", "RUB"]),
+  receiptCountryHint: z.enum(["AUTO", "UKRAINE", "POLAND", "GERMANY"]),
 });
 
 type ReceiptFormValues = z.infer<typeof schema>;
+const RECEIPT_COUNTRY_OPTIONS: Array<{ value: "AUTO" | ReceiptCountryHint; labelKey: TranslationKey }> = [
+  { value: "AUTO", labelKey: "receiptCountryAutoDetect" },
+  { value: "UKRAINE", labelKey: "receiptCountryUkraine" },
+  { value: "POLAND", labelKey: "receiptCountryPoland" },
+  { value: "GERMANY", labelKey: "receiptCountryGermany" },
+];
 
 function mapOcrTone(status: string) {
   if (status === "DONE") {
@@ -68,6 +76,7 @@ export function ReceiptsPage() {
     defaultValues: {
       purchaseId: "",
       currency: DEFAULT_CURRENCY,
+      receiptCountryHint: "AUTO",
     },
   });
   const selectedPurchaseId = watch("purchaseId");
@@ -78,6 +87,7 @@ export function ReceiptsPage() {
         values.file[0],
         values.currency,
         values.purchaseId ? Number(values.purchaseId) : undefined,
+        values.receiptCountryHint === "AUTO" ? undefined : values.receiptCountryHint,
       ),
     onSuccess: (createdReceipt) => {
       queryClient.setQueryData<ReceiptResponse[]>(["receipts"], (currentReceipts) => {
@@ -88,6 +98,7 @@ export function ReceiptsPage() {
       reset({
         purchaseId: "",
         currency: DEFAULT_CURRENCY,
+        receiptCountryHint: "AUTO",
       });
     },
   });
@@ -137,6 +148,17 @@ export function ReceiptsPage() {
               ))}
             </select>
             {errors.currency ? <small>{errors.currency.message}</small> : null}
+          </label>
+          <label className="field field--wide">
+            <span>{t("receiptCountryHint")}</span>
+            <select {...register("receiptCountryHint")}>
+              {RECEIPT_COUNTRY_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {t(option.labelKey)}
+                </option>
+              ))}
+            </select>
+            <small>{t("receiptCountryHintHelp")}</small>
           </label>
           {uploadMutation.isError ? <p className="form-error">{uploadMutation.error.message}</p> : null}
           {uploadMutation.isSuccess ? <p className="form-success">{t("receiptUploadSuccess")}</p> : null}

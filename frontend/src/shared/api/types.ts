@@ -1,5 +1,7 @@
 export type ThemeMode = "light" | "dark";
 export type LanguageCode = "ru" | "uk" | "en";
+export type ReceiptCountryHint = "UKRAINE" | "POLAND" | "GERMANY";
+export type OcrLanguageDetectionSource = "USER_SELECTED" | "AUTO_DETECTED" | "DEFAULT_FALLBACK";
 
 export type NotificationChannel = "EMAIL" | "TELEGRAM";
 export type ReceiptOcrStatus = "NEW" | "PROCESSING" | "DONE" | "FAILED";
@@ -63,6 +65,7 @@ export interface ReceiptResponse {
   contentType: string;
   fileSize: number;
   currency: CurrencyCode;
+  receiptCountryHint: ReceiptCountryHint | null;
   s3Key: string;
   uploadedAt: string;
   ocrStatus: ReceiptOcrStatus;
@@ -101,6 +104,10 @@ export interface ReceiptOcrResponse {
   ocrStatus: ReceiptOcrStatus;
   rawOcrText: string | null;
   normalizedLines?: NormalizedOcrLineResponse[];
+  receiptCountryHint?: ReceiptCountryHint | null;
+  languageDetectionSource?: OcrLanguageDetectionSource | null;
+  ocrProfileStrategy?: string | null;
+  ocrProfileUsed?: string | null;
   parsedStoreName: string | null;
   parsedTotalAmount: number | null;
   parsedCurrency?: CurrencyCode | null;

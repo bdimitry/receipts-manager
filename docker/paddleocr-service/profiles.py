@@ -36,6 +36,20 @@ OCR_PROFILES: dict[str, OcrProfile] = {
         description="Cyrillic-focused profile for Ukrainian/Russian text blocks and local transaction terms.",
         intended_corpus="Cyrillic-heavy receipts and payment documents.",
     ),
+    "polish": OcrProfile(
+        name="polish",
+        paddle_lang="latin",
+        use_angle_cls=False,
+        description="Polish-oriented strategy using Paddle's Latin recognizer as the closest practical profile.",
+        intended_corpus="Polish receipts with Latin-script labels, dates, and totals.",
+    ),
+    "german": OcrProfile(
+        name="german",
+        paddle_lang="german",
+        use_angle_cls=False,
+        description="German-oriented profile for receipts with German labels, dates, and amount markers.",
+        intended_corpus="German receipts and payment summaries.",
+    ),
     "latin": OcrProfile(
         name="latin",
         paddle_lang="latin",

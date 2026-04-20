@@ -54,6 +54,32 @@ function getValidationWarningLabel(code: string, t: (key: TranslationKey) => str
   }
 }
 
+function getCountryHintLabel(code: string | null | undefined, t: (key: TranslationKey) => string) {
+  switch (code) {
+    case "UKRAINE":
+      return t("receiptCountryUkraine");
+    case "POLAND":
+      return t("receiptCountryPoland");
+    case "GERMANY":
+      return t("receiptCountryGermany");
+    default:
+      return t("receiptCountryAutoDetect");
+  }
+}
+
+function getRoutingSourceLabel(code: string | null | undefined, t: (key: TranslationKey) => string) {
+  switch (code) {
+    case "USER_SELECTED":
+      return t("ocrRoutingUserSelected");
+    case "AUTO_DETECTED":
+      return t("ocrRoutingAutoDetected");
+    case "DEFAULT_FALLBACK":
+      return t("ocrRoutingDefaultFallback");
+    default:
+      return "-";
+  }
+}
+
 export function ReceiptDetailPage() {
   const { t, language } = useI18n();
   const params = useParams();
@@ -155,6 +181,27 @@ export function ReceiptDetailPage() {
           <div>
             <dt>{t("linkedPurchase")}</dt>
             <dd>{receipt.purchaseId ?? t("noLinkedPurchase")}</dd>
+          </div>
+        </dl>
+      </Card>
+      <Card>
+        <h2>{t("ocrRouting")}</h2>
+        <dl className="detail-grid">
+          <div>
+            <dt>{t("receiptCountryHint")}</dt>
+            <dd>{getCountryHintLabel(ocr.receiptCountryHint, t)}</dd>
+          </div>
+          <div>
+            <dt>{t("ocrDetectionSource")}</dt>
+            <dd>{getRoutingSourceLabel(ocr.languageDetectionSource, t)}</dd>
+          </div>
+          <div>
+            <dt>{t("ocrProfileStrategy")}</dt>
+            <dd>{ocr.ocrProfileStrategy ?? "-"}</dd>
+          </div>
+          <div>
+            <dt>{t("ocrProfileUsed")}</dt>
+            <dd>{ocr.ocrProfileUsed ?? "-"}</dd>
           </div>
         </dl>
       </Card>

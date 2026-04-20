@@ -14,7 +14,9 @@ import com.blyndov.homebudgetreceiptsmanager.dto.ReceiptOcrResponse;
 import com.blyndov.homebudgetreceiptsmanager.dto.ReceiptResponse;
 import com.blyndov.homebudgetreceiptsmanager.dto.RegisterRequest;
 import com.blyndov.homebudgetreceiptsmanager.entity.CurrencyCode;
+import com.blyndov.homebudgetreceiptsmanager.entity.OcrLanguageDetectionSource;
 import com.blyndov.homebudgetreceiptsmanager.entity.Receipt;
+import com.blyndov.homebudgetreceiptsmanager.entity.ReceiptCountryHint;
 import com.blyndov.homebudgetreceiptsmanager.entity.ReceiptOcrStatus;
 import com.blyndov.homebudgetreceiptsmanager.repository.ReceiptRepository;
 import com.blyndov.homebudgetreceiptsmanager.repository.UserRepository;
@@ -93,7 +95,7 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         clearBucket();
         drainOcrQueue();
         String rawText = new ClassPathResource("fixtures/ocr/receipt-cyrillic-noisy.txt").getContentAsString(StandardCharsets.UTF_8);
-        when(ocrClient.extractResult(any(), any(), any())).thenReturn(mapResult(rawText));
+        when(ocrClient.extractResult(any(), any(), any(), any())).thenReturn(mapResult(rawText));
     }
 
     @Test
@@ -114,6 +116,10 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         Receipt processedReceipt = awaitReceiptStatus(uploadResponse.getBody().id(), ReceiptOcrStatus.DONE);
         assertThat(processedReceipt.getNormalizedOcrLinesJson()).isNotBlank();
         assertThat(processedReceipt.getParserReadyText()).isNotBlank();
+        assertThat(processedReceipt.getReceiptCountryHint()).isNull();
+        assertThat(processedReceipt.getLanguageDetectionSource()).isEqualTo(OcrLanguageDetectionSource.AUTO_DETECTED);
+        assertThat(processedReceipt.getOcrProfileStrategy()).isEqualTo("en+cyrillic");
+        assertThat(processedReceipt.getOcrProfileUsed()).isEqualTo("cyrillic");
         assertThat(processedReceipt.getParseWarningsJson()).isEqualTo("[]");
         assertThat(processedReceipt.isWeakParseQuality()).isFalse();
         assertThat(processedReceipt.getLineItems()).hasSizeGreaterThan(1);
@@ -132,6 +138,10 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         assertThat(ocrResponse.getBody()).isNotNull();
         assertThat(ocrResponse.getBody().currency()).isEqualTo(CurrencyCode.UAH);
         assertThat(ocrResponse.getBody().normalizedLines()).isNotEmpty();
+        assertThat(ocrResponse.getBody().receiptCountryHint()).isNull();
+        assertThat(ocrResponse.getBody().languageDetectionSource()).isEqualTo(OcrLanguageDetectionSource.AUTO_DETECTED);
+        assertThat(ocrResponse.getBody().ocrProfileStrategy()).isEqualTo("en+cyrillic");
+        assertThat(ocrResponse.getBody().ocrProfileUsed()).isEqualTo("cyrillic");
         assertThat(ocrResponse.getBody().normalizedLines().stream().anyMatch(line -> line.tags().contains("price_like"))).isTrue();
         assertThat(ocrResponse.getBody().lineItems()).hasSizeGreaterThan(1);
         assertThat(ocrResponse.getBody().lineItems().get(0).title()).isEqualTo("МОЛОКО ЯГОТИНСЬКЕ");
@@ -145,7 +155,7 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
 
     @Test
     void realOcrFlowUsesJavaNormalizedStreamAsParserInput() {
-        when(ocrClient.extractResult(any(), any(), any())).thenReturn(
+        when(ocrClient.extractResult(any(), any(), any(), any())).thenReturn(
             new OcrExtractionResult(
                 "FRESH.MARKET\n1234567890123456\nTOTAL.. 210.40,\nTHANK.YOU",
                 List.of(
@@ -169,6 +179,9 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         Receipt processedReceipt = awaitReceiptStatus(uploadResponse.getBody().id(), ReceiptOcrStatus.DONE);
         assertThat(processedReceipt.getNormalizedOcrLinesJson()).contains("FRESH MARKET");
         assertThat(processedReceipt.getParserReadyText()).contains("FRESH MARKET");
+        assertThat(processedReceipt.getLanguageDetectionSource()).isEqualTo(OcrLanguageDetectionSource.DEFAULT_FALLBACK);
+        assertThat(processedReceipt.getOcrProfileStrategy()).isEqualTo("en");
+        assertThat(processedReceipt.getOcrProfileUsed()).isEqualTo("en");
         assertThat(processedReceipt.getParseWarningsJson()).isEqualTo("[]");
         assertThat(processedReceipt.isWeakParseQuality()).isFalse();
         assertThat(processedReceipt.getParsedStoreName()).isEqualTo("FRESH MARKET");
@@ -184,6 +197,9 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         assertThat(ocrResponse.getBody()).isNotNull();
         assertThat(ocrResponse.getBody().normalizedLines()).extracting(line -> line.normalizedText())
             .contains("FRESH MARKET", "TOTAL. 210.40", "THANK YOU");
+        assertThat(ocrResponse.getBody().languageDetectionSource()).isEqualTo(OcrLanguageDetectionSource.DEFAULT_FALLBACK);
+        assertThat(ocrResponse.getBody().ocrProfileStrategy()).isEqualTo("en");
+        assertThat(ocrResponse.getBody().ocrProfileUsed()).isEqualTo("en");
         assertThat(ocrResponse.getBody().normalizedLines().stream().anyMatch(line -> line.ignored())).isTrue();
         assertThat(ocrResponse.getBody().parsedStoreName()).isEqualTo("FRESH MARKET");
         assertThat(ocrResponse.getBody().parsedTotalAmount()).isEqualByComparingTo("210.40");
@@ -194,7 +210,7 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
     @Test
     void noisyReceiptPersistsValidationWarningsAndReturnsThemViaApi() throws Exception {
         String rawText = new ClassPathResource("fixtures/ocr/real-receipt-4-lines.txt").getContentAsString(StandardCharsets.UTF_8);
-        when(ocrClient.extractResult(any(), any(), any())).thenReturn(mapResult(rawText));
+        when(ocrClient.extractResult(any(), any(), any(), any())).thenReturn(mapResult(rawText));
         String accessToken = registerAndLogin(uniqueEmail("ocr-warn"), "P@ssword123");
 
         ResponseEntity<ReceiptResponse> uploadResponse = restTemplate.exchange(
@@ -219,6 +235,34 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         assertThat(ocrResponse.getBody().parseWarnings())
             .contains("SUSPICIOUS_TOTAL", "SUSPICIOUS_LINE_ITEMS");
         assertThat(ocrResponse.getBody().weakParseQuality()).isTrue();
+    }
+
+    @Test
+    void persistenceStoresManualCountryRoutingMetadata() {
+        when(ocrClient.extractResult(any(), any(), any(), any())).thenReturn(
+            mapResult("NOVUS\nTOTAL 103.98\nDATE 2026-04-12")
+        );
+        String accessToken = registerAndLogin(uniqueEmail("ocr-country"), "P@ssword123");
+
+        ResponseEntity<ReceiptResponse> uploadResponse = restTemplate.exchange(
+            "/api/receipts/upload",
+            HttpMethod.POST,
+            multipartEntity(
+                "receipt-country.png",
+                MediaType.IMAGE_PNG,
+                "png".getBytes(StandardCharsets.UTF_8),
+                CurrencyCode.UAH,
+                accessToken,
+                ReceiptCountryHint.UKRAINE
+            ),
+            ReceiptResponse.class
+        );
+
+        Receipt processedReceipt = awaitReceiptStatus(uploadResponse.getBody().id(), ReceiptOcrStatus.DONE);
+        assertThat(processedReceipt.getReceiptCountryHint()).isEqualTo(ReceiptCountryHint.UKRAINE);
+        assertThat(processedReceipt.getLanguageDetectionSource()).isEqualTo(OcrLanguageDetectionSource.USER_SELECTED);
+        assertThat(processedReceipt.getOcrProfileStrategy()).isEqualTo("en+cyrillic");
+        assertThat(processedReceipt.getOcrProfileUsed()).isIn("en", "cyrillic");
     }
 
     private Receipt awaitReceiptStatus(Long receiptId, ReceiptOcrStatus expectedStatus) {
@@ -252,6 +296,17 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         CurrencyCode currency,
         String accessToken
     ) {
+        return multipartEntity(filename, mediaType, content, currency, accessToken, null);
+    }
+
+    private HttpEntity<MultiValueMap<String, Object>> multipartEntity(
+        String filename,
+        MediaType mediaType,
+        byte[] content,
+        CurrencyCode currency,
+        String accessToken,
+        ReceiptCountryHint receiptCountryHint
+    ) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
         headers.setBearerAuth(accessToken);
@@ -266,6 +321,9 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         body.add("file", fileEntity);
         body.add("currency", currency.name());
+        if (receiptCountryHint != null) {
+            body.add("receiptCountryHint", receiptCountryHint.name());
+        }
 
         return new HttpEntity<>(body, headers);
     }

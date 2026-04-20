@@ -26,6 +26,7 @@ describe("receipts flow", () => {
 
   it("uploads a receipt and shows it in the list", async () => {
     let uploadedCurrency: string | null = null;
+    let uploadedCountryHint: string | null = null;
     let receipts = [
       {
         id: 10,
@@ -34,6 +35,7 @@ describe("receipts flow", () => {
         contentType: "image/png",
         fileSize: 3000,
         currency: "UAH",
+        receiptCountryHint: null,
         s3Key: "receipts/10.png",
         uploadedAt: "2026-03-31T10:00:00Z",
         ocrStatus: "PROCESSING",
@@ -66,8 +68,9 @@ describe("receipts flow", () => {
       http.get("/api/receipts", () => HttpResponse.json(receipts)),
     );
 
-    uploadReceiptMock.mockImplementation(async (_file, currency, purchaseId) => {
+    uploadReceiptMock.mockImplementation(async (_file, currency, purchaseId, receiptCountryHint) => {
       uploadedCurrency = currency;
+      uploadedCountryHint = receiptCountryHint ?? null;
       const createdReceipt = {
         id: 11,
         purchaseId: purchaseId ?? 1,
@@ -75,6 +78,7 @@ describe("receipts flow", () => {
         contentType: "image/png",
         fileSize: 2048,
         currency,
+        receiptCountryHint: receiptCountryHint ?? null,
         s3Key: "receipts/11.png",
         uploadedAt: "2026-03-31T10:05:00Z",
         ocrStatus: "NEW" as const,
@@ -101,11 +105,13 @@ describe("receipts flow", () => {
     await user.upload(screen.getByLabelText("File"), file);
     await user.selectOptions(screen.getByLabelText(/Link to purchase/i), "1");
     await user.selectOptions(screen.getByLabelText("Currency"), "EUR");
+    await user.selectOptions(screen.getByRole("combobox", { name: /Receipt country/i }), "UKRAINE");
     await user.click(screen.getByRole("button", { name: "Upload receipt" }));
 
     await waitFor(() => {
       expect(uploadedCurrency).toBe("EUR");
-      expect(uploadReceiptMock).toHaveBeenCalledWith(expect.any(File), "EUR", 1);
+      expect(uploadedCountryHint).toBe("UKRAINE");
+      expect(uploadReceiptMock).toHaveBeenCalledWith(expect.any(File), "EUR", 1, "UKRAINE");
     });
     expect(await screen.findByText("new-receipt.png", {}, { timeout: 5_000 })).toBeInTheDocument();
     expect(screen.getByText(/Receipt uploaded/i)).toBeInTheDocument();
@@ -121,6 +127,7 @@ describe("receipts flow", () => {
           contentType: "image/png",
           fileSize: 3000,
           currency: "UAH",
+          receiptCountryHint: "UKRAINE",
           s3Key: "receipts/11.png",
           uploadedAt: "2026-03-31T10:05:00Z",
           ocrStatus: "DONE",
@@ -138,6 +145,10 @@ describe("receipts flow", () => {
           currency: "UAH",
           ocrStatus: "DONE",
           rawOcrText: "FRESH MARKET\nTOTAL 42.75",
+          receiptCountryHint: "UKRAINE",
+          languageDetectionSource: "USER_SELECTED",
+          ocrProfileStrategy: "en+cyrillic",
+          ocrProfileUsed: "en",
           parsedStoreName: "Fresh Market",
           parsedTotalAmount: 42.75,
           parsedCurrency: "UAH",
@@ -178,9 +189,12 @@ describe("receipts flow", () => {
     );
 
     expect(await screen.findByText("Fresh Market")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "OCR routing" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Parsed line items" })).toBeInTheDocument();
     expect(screen.getByText(/TOTAL 42.75/i)).toBeInTheDocument();
     expect(screen.getByText(/Raw OCR text/i)).toBeInTheDocument();
+    expect(screen.getByText(/Manual country selection/i)).toBeInTheDocument();
+    expect(screen.getByText("en+cyrillic")).toBeInTheDocument();
     expect(screen.getByText("Milk")).toBeInTheDocument();
     expect(screen.getByText("Bread")).toBeInTheDocument();
     expect(screen.getByText("Milk 2 x 10.50 21.00")).toBeInTheDocument();

@@ -8,7 +8,10 @@ class OcrProfilesTests(unittest.TestCase):
     def test_default_profile_is_en_and_available(self):
         self.assertEqual(DEFAULT_OCR_PROFILE, "en")
         self.assertEqual(resolve_profile(None).name, "en")
-        self.assertEqual([profile.name for profile in available_profiles()], ["en", "cyrillic", "latin"])
+        self.assertEqual(
+            [profile.name for profile in available_profiles()],
+            ["en", "cyrillic", "polish", "german", "latin"],
+        )
 
     def test_resolve_profile_rejects_unknown_profile(self):
         with self.assertRaises(ValueError):

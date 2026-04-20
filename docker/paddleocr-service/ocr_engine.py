@@ -12,7 +12,7 @@ class PaddleOcrEngine:
     def __init__(self, profile_name: str) -> None:
         self.profile_name = profile_name
         self._engines: dict[tuple[str, bool], PaddleOCR] = {}
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
 
     def warm_up(self) -> None:
         self._engine(resolve_profile(self.profile_name))

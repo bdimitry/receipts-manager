@@ -1,6 +1,7 @@
 package com.blyndov.homebudgetreceiptsmanager.dto;
 
 import com.blyndov.homebudgetreceiptsmanager.entity.CurrencyCode;
+import com.blyndov.homebudgetreceiptsmanager.entity.ReceiptCountryHint;
 import com.blyndov.homebudgetreceiptsmanager.entity.ReceiptOcrStatus;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -13,6 +14,7 @@ public record ReceiptResponse(
     String contentType,
     Long fileSize,
     CurrencyCode currency,
+    ReceiptCountryHint receiptCountryHint,
     String s3Key,
     Instant uploadedAt,
     ReceiptOcrStatus ocrStatus,
