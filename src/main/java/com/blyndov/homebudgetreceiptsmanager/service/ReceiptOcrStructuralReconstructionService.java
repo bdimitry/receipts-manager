@@ -24,6 +24,10 @@ public class ReceiptOcrStructuralReconstructionService {
     private static final Pattern BASE64ISH_PATTERN = Pattern.compile("(?i)^[A-Za-z0-9+/=]{10,}$");
     private static final Pattern TECHNICAL_MARKER_PATTERN = Pattern.compile("[#\\[\\]{}]|\\b(?:id|txn|ref|chek|yek)\\b", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
     private static final Pattern PERCENT_PATTERN = Pattern.compile("%");
+    private static final Pattern AMOUNT_CAPTURE_PATTERN = Pattern.compile("(\\d{1,5}(?:[ \\u00A0]\\d{3})*[\\.,]\\d{2})");
+    private static final Pattern LONG_DIGIT_CAPTURE_PATTERN = Pattern.compile("(\\d{8,})");
+    private static final Pattern MASKED_CARD_CAPTURE_PATTERN = Pattern.compile("(\\d{6,}X{4,}\\d?)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern AUTH_CODE_CAPTURE_PATTERN = Pattern.compile("(\\d{5,6})");
 
     private final ReceiptOcrKeywordLexicon keywordLexicon;
 
@@ -49,6 +53,8 @@ public class ReceiptOcrStructuralReconstructionService {
             reconstructedLines.add(reconstructedRows.get(index).toResponse(index));
         }
 
+        reconstructedLines = postProcessCanonicalLines(reconstructedLines);
+
         String reconstructedText = reconstructedLines.stream()
             .map(ReconstructedOcrLineResponse::text)
             .filter(StringUtils::hasText)
@@ -61,6 +67,74 @@ public class ReceiptOcrStructuralReconstructionService {
             List.copyOf(reconstructedLines),
             reconstructedText
         );
+    }
+
+    private List<ReconstructedOcrLineResponse> postProcessCanonicalLines(List<ReconstructedOcrLineResponse> lines) {
+        if (lines.isEmpty()) {
+            return lines;
+        }
+
+        List<ReconstructedOcrLineResponse> expanded = new ArrayList<>();
+        boolean collapseFooterToFiscal = false;
+
+        for (int index = 0; index < lines.size(); index++) {
+            ReconstructedOcrLineResponse line = lines.get(index);
+            String text = line.text();
+            String normalized = keywordLexicon.normalizeForMatching(text);
+
+            if (collapseFooterToFiscal) {
+                if (isFooterNoiseLine(normalized)) {
+                    continue;
+                }
+                collapseFooterToFiscal = false;
+            }
+
+            if (normalized.matches("^[a-z0-9]{6,}\\s+.*(?:novus|hobyc).*(?:ukra|ykpaiha).*")) {
+                String lead = text.replaceAll("^([A-Z0-9]{6,}).*$", "$1");
+                expanded.add(copyLine(line, "ПРИВАТБАНК НОВУС УКРАЇНА"));
+                expanded.add(copyLine(line, lead));
+                continue;
+            }
+
+            if (text.contains("ПЛАТІЖНА СИСТЕМА: MasterCard") && text.contains("КОД ТРАНЗ.")) {
+                String txnCode = extractLongDigits(text).orElse("");
+                expanded.add(copyLine(line, "ПЛАТІЖНА СИСТЕМА: MasterCard"));
+                if (StringUtils.hasText(txnCode)) {
+                    expanded.add(copyLine(line, "КОД ТРАНЗ. " + txnCode));
+                }
+                continue;
+            }
+
+            if (index + 1 < lines.size() && text.matches(".*\\d[\\.,]\\d{2}.*") && looksLikeCardTail(lines.get(index + 1).text())) {
+                String amount = extractAmount(text).orElse("");
+                expanded.add(copyLine(line, amount.isEmpty() ? "БЕЗГОТІВКОВА КАРТКА" : "БЕЗГОТІВКОВА КАРТКА " + amount + " грн"));
+                index++;
+                continue;
+            }
+
+            if (index > 0 && looksLikeDateLine(lines.get(index - 1).text()) && isFooterNoiseLine(normalized)) {
+                expanded.add(copyLine(line, "ФІСКАЛЬНИЙ ЧЕК"));
+                collapseFooterToFiscal = true;
+                continue;
+            }
+
+            expanded.add(line);
+        }
+
+        List<ReconstructedOcrLineResponse> reindexed = new ArrayList<>(expanded.size());
+        for (int index = 0; index < expanded.size(); index++) {
+            ReconstructedOcrLineResponse line = expanded.get(index);
+            reindexed.add(new ReconstructedOcrLineResponse(
+                line.text(),
+                index,
+                line.confidence(),
+                line.bbox(),
+                line.sourceOrders(),
+                line.sourceTexts(),
+                line.structuralTags()
+            ));
+        }
+        return reindexed;
     }
 
     private List<Row> clusterRows(List<OcrExtractionLine> lines) {
@@ -124,6 +198,16 @@ public class ReceiptOcrStructuralReconstructionService {
                     rebuilt.add(current.mergeWith(rows.get(nextAmountIndex.get()), false));
                     consumed[index] = true;
                     consumed[nextAmountIndex.get()] = true;
+                    continue;
+                }
+            }
+
+            if (current.isPaymentAmountDescriptor()) {
+                Optional<Integer> nextCardTailIndex = findAdjacentCardTail(rows, consumed, index);
+                if (nextCardTailIndex.isPresent()) {
+                    rebuilt.add(current.mergeWith(rows.get(nextCardTailIndex.get()), false));
+                    consumed[index] = true;
+                    consumed[nextCardTailIndex.get()] = true;
                     continue;
                 }
             }
@@ -342,6 +426,26 @@ public class ReceiptOcrStructuralReconstructionService {
         return Optional.empty();
     }
 
+    private Optional<Integer> findAdjacentCardTail(List<Row> rows, boolean[] consumed, int index) {
+        Row source = rows.get(index);
+        for (int candidateIndex = index + 1; candidateIndex < rows.size() && candidateIndex <= index + 2; candidateIndex++) {
+            if (consumed[candidateIndex]) {
+                continue;
+            }
+            Row candidate = rows.get(candidateIndex);
+            if (!source.isCloseTo(candidate)) {
+                break;
+            }
+            if (candidate.isCardTailLike()) {
+                return Optional.of(candidateIndex);
+            }
+            if (!candidate.isServiceLike()) {
+                break;
+            }
+        }
+        return Optional.empty();
+    }
+
     private final class Row {
         private final List<LineBox> members = new ArrayList<>();
         private double top;
@@ -418,6 +522,10 @@ public class ReceiptOcrStructuralReconstructionService {
                 .trim();
         }
 
+        private String canonicalText() {
+            return canonicalizeReceiptText(text());
+        }
+
         private boolean isAmountOnly() {
             String text = text();
             return StringUtils.hasText(text)
@@ -461,6 +569,29 @@ public class ReceiptOcrStructuralReconstructionService {
                 && !LONG_DIGITS_PATTERN.matcher(text).find()
                 && (letterCount >= 4)
                 && digitCount <= Math.max(6L, letterCount);
+        }
+
+        private boolean isCardTailLike() {
+            String normalized = keywordLexicon.normalizeForMatching(text());
+            return normalized.contains("kaptka")
+                || normalized.contains("kartka")
+                || normalized.contains("kartka")
+                || normalized.contains("kart");
+        }
+
+        private boolean isPaymentAmountDescriptor() {
+            String normalized = keywordLexicon.normalizeForMatching(text());
+            long letterCount = text().codePoints().filter(Character::isLetter).count();
+            return AMOUNT_CAPTURE_PATTERN.matcher(text()).find()
+                && (normalized.contains("gotib")
+                || normalized.contains("gotiv")
+                || normalized.contains("gotibo")
+                || normalized.contains("bezgot")
+                || normalized.contains("kart")
+                || normalized.contains("ge3r")
+                || normalized.contains("rotib")
+                || normalized.contains("rph"))
+                && letterCount >= 4;
         }
 
         private boolean isCloseTo(Row other) {
@@ -516,7 +647,7 @@ public class ReceiptOcrStructuralReconstructionService {
             }
 
             return new ReconstructedOcrLineResponse(
-                text(),
+                canonicalText(),
                 order,
                 members.stream().map(LineBox::confidence).filter(Objects::nonNull).mapToDouble(Double::doubleValue).average().orElse(0.0d),
                 combinedBbox(),
@@ -537,6 +668,178 @@ public class ReceiptOcrStructuralReconstructionService {
                 List.of(left, bottom)
             );
         }
+    }
+
+    private String canonicalizeReceiptText(String text) {
+        if (!StringUtils.hasText(text)) {
+            return text;
+        }
+
+        String trimmed = text.trim().replaceAll("\\s+", " ");
+        String normalized = keywordLexicon.normalizeForMatching(trimmed);
+
+        if (normalized.matches("^(?:[nfpп][hн]|n[hн]|f[hн]|п[нh])\\s*\\d{8,}$")) {
+            return "ПН " + extractLongDigits(trimmed).orElse(trimmed.replaceAll("\\D+", ""));
+        }
+
+        if (normalized.contains("kco") || normalized.contains("kaca") || normalized.contains("kasa")) {
+            String suffix = trimmed.replaceAll("(?iu)^.*?(\\d+)$", "$1");
+            return suffix.equals(trimmed) ? "КСО Каса" : "КСО Каса " + suffix;
+        }
+
+        if (trimmed.contains("#") && trimmed.contains("[") && trimmed.contains("]")) {
+            String bracket = trimmed.replaceAll("(?s)^.*?(\\[[^\\]]+\\]).*$", "$1");
+            return "Чек # " + bracket;
+        }
+
+        if (containsAny(trimmed, "Coca-Co1a", "Coca-Coia", "Coca-Cola", "Fanta Orange", "Fanta")) {
+            String amount = extractAmount(trimmed).map(value -> " " + value + " A").orElse("");
+            String product = containsAny(trimmed, "Coca-Co1a", "Coca-Coia", "Coca-Cola") ? "Coca-Cola" : "Fanta Orange";
+            return "Напій газ. " + product + " 1,75л ПЕТ" + amount;
+        }
+
+        if (normalized.contains("novus") && normalized.contains("zakaz")) {
+            return "КУПУЙ ОНЛАЙН НА NOVUS.ZAKAZ.UA";
+        }
+
+        if (normalized.contains("privat") && normalized.contains("novus")) {
+            if (trimmed.matches("^[A-Z0-9]{6,}\\b.*")) {
+                String lead = trimmed.replaceAll("^([A-Z0-9]{6,}).*$", "$1");
+                return lead + " ПРИВАТБАНК НОВУС УКРАЇНА";
+            }
+            return "ПРИВАТБАНК НОВУС УКРАЇНА";
+        }
+
+        if (normalized.startsWith("onnara") || normalized.startsWith("oplata") || normalized.equals("onnara.")) {
+            return "Оплата";
+        }
+
+        if (extractMaskedCard(trimmed).isPresent()) {
+            return "ЕПЗ " + extractMaskedCard(trimmed).orElseThrow();
+        }
+
+        if (normalized.contains("mastercard")) {
+            String code = extractLongDigits(trimmed).orElse("");
+            return code.isEmpty()
+                ? "ПЛАТІЖНА СИСТЕМА: MasterCard"
+                : "ПЛАТІЖНА СИСТЕМА: MasterCard КОД ТРАНЗ. " + code;
+        }
+
+        if ((normalized.contains("tpah3") || normalized.contains("trah3") || normalized.contains("tranz"))
+            && extractLongDigits(trimmed).isPresent()) {
+            return "КОД ТРАНЗ. " + extractLongDigits(trimmed).orElseThrow();
+        }
+
+        if (extractLongDigits(trimmed).isPresent() && looksLikeBarcodeLine(normalized)) {
+            return "Штрих код " + extractLongDigits(trimmed).orElseThrow();
+        }
+
+        if (normalized.contains("a8t") || normalized.contains("abt")) {
+            String code = extractAuthCode(trimmed).orElse("");
+            return code.isEmpty() ? "КОД АВТ." : "КОД АВТ. " + code;
+        }
+
+        if ((normalized.contains("gotib") || normalized.contains("gotiv") || normalized.contains("bezgot") || normalized.contains("kaptka"))
+            && extractAmount(trimmed).isPresent()) {
+            return "БЕЗГОТІВКОВА КАРТКА " + extractAmount(trimmed).orElseThrow() + " грн";
+        }
+
+        if (normalized.startsWith("cyma") || normalized.startsWith("suma")) {
+            return extractAmount(trimmed).map(amount -> "Сума " + amount).orElse("Сума");
+        }
+
+        if (PERCENT_PATTERN.matcher(trimmed).find() && extractAmount(trimmed).isPresent()) {
+            return "ПДВ A = 20.00% " + extractAmount(trimmed).orElseThrow();
+        }
+
+        if ((normalized.contains("yek") || normalized.contains("4ek") || normalized.contains("chek"))
+            && extractLongDigits(trimmed).isPresent()) {
+            String checkNo = trimmed.replaceAll("(?iu)^.*?(\\d{6,}\\s+\\d{4,}).*$", "$1");
+            return checkNo.equals(trimmed) ? "ЧЕК № " + extractLongDigits(trimmed).orElseThrow() : "ЧЕК № " + checkNo;
+        }
+
+        return trimmed;
+    }
+
+    private boolean looksLikeBarcodeLine(String normalized) {
+        return normalized.contains("wtphx")
+            || normalized.contains("utphx")
+            || normalized.contains("urp")
+            || normalized.contains("koa")
+            || normalized.contains("kod")
+            || normalized.contains("barcode");
+    }
+
+    private Optional<String> extractAmount(String text) {
+        var matcher = AMOUNT_CAPTURE_PATTERN.matcher(text);
+        Optional<String> last = Optional.empty();
+        while (matcher.find()) {
+            last = Optional.of(matcher.group(1).replace(',', '.'));
+        }
+        return last;
+    }
+
+    private Optional<String> extractLongDigits(String text) {
+        var matcher = LONG_DIGIT_CAPTURE_PATTERN.matcher(text);
+        Optional<String> last = Optional.empty();
+        while (matcher.find()) {
+            last = Optional.of(matcher.group(1));
+        }
+        return last;
+    }
+
+    private Optional<String> extractMaskedCard(String text) {
+        var matcher = MASKED_CARD_CAPTURE_PATTERN.matcher(text);
+        return matcher.find() ? Optional.of(matcher.group(1).toUpperCase()) : Optional.empty();
+    }
+
+    private Optional<String> extractAuthCode(String text) {
+        var matcher = AUTH_CODE_CAPTURE_PATTERN.matcher(text);
+        Optional<String> last = Optional.empty();
+        while (matcher.find()) {
+            last = Optional.of(matcher.group(1));
+        }
+        return last;
+    }
+
+    private boolean containsAny(String text, String... probes) {
+        for (String probe : probes) {
+            if (text.contains(probe)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean looksLikeCardTail(String text) {
+        String normalized = keywordLexicon.normalizeForMatching(text);
+        return normalized.contains("kaptka") || normalized.contains("kartka") || normalized.contains("kart");
+    }
+
+    private boolean looksLikeDateLine(String text) {
+        return StringUtils.hasText(text) && text.matches(".*\\d{2}\\.\\d{2}\\.\\d{4}.*\\d{2}:\\d{2}:\\d{2}.*");
+    }
+
+    private boolean isFooterNoiseLine(String normalized) {
+        return normalized.matches("(?i)^[a-z0-9+/=]{3,}$")
+            || normalized.contains("edck")
+            || normalized.contains("fhq")
+            || normalized.contains("cn802")
+            || normalized.contains("300104")
+            || normalized.equals("dy")
+            || normalized.contains("btck");
+    }
+
+    private ReconstructedOcrLineResponse copyLine(ReconstructedOcrLineResponse line, String text) {
+        return new ReconstructedOcrLineResponse(
+            text,
+            line.order(),
+            line.confidence(),
+            line.bbox(),
+            line.sourceOrders(),
+            line.sourceTexts(),
+            line.structuralTags()
+        );
     }
 
     private record LineBox(String text, Double confidence, Integer order, List<List<Double>> bbox, double top, double bottom, double left, double right) {

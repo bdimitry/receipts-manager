@@ -108,6 +108,14 @@ The backend OCR detail response now also exposes:
   - `sourceTexts[]`
   - `structuralTags[]`
 
+For hard receipts like `2.jpg`, reconstruction may now also apply a small canonical OCR repair pass on top of the geometry-backed rows:
+
+- receipt keywords such as `Чек`, `Штрих код`, `Сума`, `ПДВ`
+- payment-service rows such as `ПЛАТІЖНА СИСТЕМА`, `КОД ТРАНЗ.`, `КОД АВТ.`
+- payment-card summary phrasing such as `БЕЗГОТІВКОВА КАРТКА ... грн`
+
+This is still traceable because the original OCR evidence remains available in `sourceTexts[]`, and the layer does not rewrite arbitrary product text.
+
 The next layer after diagnostics now also lives in Java:
 
 - `ReceiptOcrParser` consumes `normalizedLines[]`

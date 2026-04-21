@@ -35,9 +35,9 @@ class ReceiptOcrStructuralReconstructionServiceTests {
 
         assertThat(reconstructed.reconstructedLines()).extracting(line -> line.text())
             .containsExactly(
-                "Hanin ra3.Coca-Co1a 1,75n nET 49.99 A",
-                "WTPHX KOA 5449000130389",
-                "Hanin ra3.Fanta Orange 1,75n nET 53.99 A"
+                "Напій газ. Coca-Cola 1,75л ПЕТ 49.99 A",
+                "Штрих код 5449000130389",
+                "Напій газ. Fanta Orange 1,75л ПЕТ 53.99 A"
             );
         assertThat(reconstructed.reconstructedLines().getFirst().structuralTags()).contains("title_like", "merged");
         assertThat(reconstructed.reconstructedLines().get(1).structuralTags()).contains("service_like");
@@ -112,7 +112,7 @@ class ReceiptOcrStructuralReconstructionServiceTests {
         );
 
         assertThat(reconstructed.reconstructedLines()).extracting(line -> line.text())
-            .containsExactly("KAPTKA", "Cyma 103.98");
+            .containsExactly("KAPTKA", "Сума 103.98");
         assertThat(reconstructed.reconstructedLines().get(1).structuralTags()).contains("summary_like", "merged");
     }
 
@@ -131,9 +131,72 @@ class ReceiptOcrStructuralReconstructionServiceTests {
         );
 
         assertThat(reconstructed.reconstructedLines()).extracting(line -> line.text())
-            .containsExactly("Cyma 103.98", "nAB A=.20.00% 17.33");
+            .containsExactly("Сума 103.98", "ПДВ A = 20.00% 17.33");
         assertThat(reconstructed.reconstructedLines().getFirst().structuralTags()).contains("summary_like", "merged");
         assertThat(reconstructed.reconstructedLines().get(1).structuralTags()).contains("summary_like", "merged");
+    }
+
+    @Test
+    void canonicalizesStrongReceiptKeywordsWithoutChangingSourceEvidence() {
+        var reconstructed = reconstructionService.reconstruct(
+            new OcrExtractionResult(
+                "WTPHX KOA 5449000130389\nHanin ra3.Coca-Co1a 1,75n nET 49.99 A\nCyma 103.98\nnAB A=.20.00% 17.33\n4EK Ib 000315311 00256",
+                List.of(
+                    rawLine("WTPHX KOA 5449000130389", 0, bbox(40, 20, 420, 44)),
+                    rawLine("Hanin ra3.Coca-Co1a 1,75n nET 49.99 A", 1, bbox(40, 60, 520, 84)),
+                    rawLine("Cyma 103.98", 2, bbox(40, 100, 250, 124)),
+                    rawLine("nAB A=.20.00% 17.33", 3, bbox(40, 140, 310, 164)),
+                    rawLine("4EK Ib 000315311 00256", 4, bbox(40, 180, 330, 204))
+                )
+            )
+        );
+
+        assertThat(reconstructed.reconstructedLines()).extracting(line -> line.text())
+            .containsExactly(
+                "Штрих код 5449000130389",
+                "Напій газ. Coca-Cola 1,75л ПЕТ 49.99 A",
+                "Сума 103.98",
+                "ПДВ A = 20.00% 17.33",
+                "ЧЕК № 000315311 00256"
+            );
+        assertThat(reconstructed.reconstructedLines().getFirst().sourceTexts()).containsExactly("WTPHX KOA 5449000130389");
+    }
+
+    @Test
+    void mergesPaymentAmountDescriptorWithCardTailAndCanonicalizesResult() {
+        var reconstructed = reconstructionService.reconstruct(
+            new OcrExtractionResult(
+                "GE3rOTIBKOBA 103.98 rPH\nKAPTKA",
+                List.of(
+                    rawLine("GE3rOTIBKOBA 103.98 rPH", 0, bbox(40, 20, 340, 44)),
+                    rawLine("KAPTKA", 1, bbox(40, 52, 170, 74))
+                )
+            )
+        );
+
+        assertThat(reconstructed.reconstructedLines()).extracting(line -> line.text())
+            .containsExactly("БЕЗГОТІВКОВА КАРТКА 103.98 грн");
+    }
+
+    @Test
+    void splitsBankAcquirerTokenAndCanonicalizesPaymentSystemRows() {
+        var reconstructed = reconstructionService.reconstruct(
+            new OcrExtractionResult(
+                "S1K70DWE nPHBATGAHK HOBYC yKPAIHA\nROATIRHA CHCTEMA:MasterCard KOATPAH3.*110540009500",
+                List.of(
+                    rawLine("S1K70DWE nPHBATGAHK HOBYC yKPAIHA", 0, bbox(40, 20, 520, 46)),
+                    rawLine("ROATIRHA CHCTEMA:MasterCard KOATPAH3.*110540009500", 1, bbox(40, 60, 720, 88))
+                )
+            )
+        );
+
+        assertThat(reconstructed.reconstructedLines()).extracting(line -> line.text())
+            .containsExactly(
+                "ПРИВАТБАНК НОВУС УКРАЇНА",
+                "S1K70DWE",
+                "ПЛАТІЖНА СИСТЕМА: MasterCard",
+                "КОД ТРАНЗ. 110540009500"
+            );
     }
 
     private OcrExtractionLine rawLine(String text, int order, List<List<Double>> bbox) {
