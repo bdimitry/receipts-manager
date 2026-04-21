@@ -1,6 +1,7 @@
 package com.blyndov.homebudgetreceiptsmanager.service;
 
 import com.blyndov.homebudgetreceiptsmanager.dto.NormalizedOcrLineResponse;
+import com.blyndov.homebudgetreceiptsmanager.dto.ReconstructedOcrLineResponse;
 import com.blyndov.homebudgetreceiptsmanager.dto.ReceiptLineItemResponse;
 import com.blyndov.homebudgetreceiptsmanager.dto.ReceiptOcrResponse;
 import com.blyndov.homebudgetreceiptsmanager.entity.CurrencyCode;
@@ -28,6 +29,8 @@ public class ReceiptOcrService {
     private static final Logger log = LoggerFactory.getLogger(ReceiptOcrService.class);
     private static final TypeReference<List<NormalizedOcrLineResponse>> NORMALIZED_LINES_TYPE = new TypeReference<>() {
     };
+    private static final TypeReference<List<ReconstructedOcrLineResponse>> RECONSTRUCTED_LINES_TYPE = new TypeReference<>() {
+    };
     private static final TypeReference<List<String>> WARNING_CODES_TYPE = new TypeReference<>() {
     };
 
@@ -35,6 +38,7 @@ public class ReceiptOcrService {
     private final S3StorageService s3StorageService;
     private final ReceiptOcrRoutingService receiptOcrRoutingService;
     private final ReceiptOcrParser receiptOcrParser;
+    private final ReceiptOcrStructuralReconstructionService structuralReconstructionService;
     private final ReceiptOcrLineNormalizationService lineNormalizationService;
     private final ReceiptOcrValidationService receiptOcrValidationService;
     private final ObjectMapper objectMapper;
@@ -44,6 +48,7 @@ public class ReceiptOcrService {
         S3StorageService s3StorageService,
         ReceiptOcrRoutingService receiptOcrRoutingService,
         ReceiptOcrParser receiptOcrParser,
+        ReceiptOcrStructuralReconstructionService structuralReconstructionService,
         ReceiptOcrLineNormalizationService lineNormalizationService,
         ReceiptOcrValidationService receiptOcrValidationService,
         ObjectMapper objectMapper
@@ -52,6 +57,7 @@ public class ReceiptOcrService {
         this.s3StorageService = s3StorageService;
         this.receiptOcrRoutingService = receiptOcrRoutingService;
         this.receiptOcrParser = receiptOcrParser;
+        this.structuralReconstructionService = structuralReconstructionService;
         this.lineNormalizationService = lineNormalizationService;
         this.receiptOcrValidationService = receiptOcrValidationService;
         this.objectMapper = objectMapper;
@@ -67,6 +73,7 @@ public class ReceiptOcrService {
         receipt.setParsedCurrency(null);
         receipt.setParsedPurchaseDate(null);
         receipt.setNormalizedOcrLinesJson(null);
+        receipt.setReconstructedOcrLinesJson(null);
         receipt.setParserReadyText(null);
         receipt.setLanguageDetectionSource(null);
         receipt.setOcrProfileStrategy(null);
@@ -91,11 +98,13 @@ public class ReceiptOcrService {
             throw new IllegalStateException("OCR returned empty text");
         }
 
-        NormalizedOcrDocument normalizedDocument = lineNormalizationService.normalizeDocument(extractionResult);
+        ReconstructedOcrDocument reconstructedDocument = structuralReconstructionService.reconstruct(extractionResult);
+        NormalizedOcrDocument normalizedDocument = lineNormalizationService.normalizeDocument(reconstructedDocument);
         ParsedReceiptDocument parsedData = receiptOcrParser.parse(normalizedDocument);
         ParsedReceiptValidationResult validationResult = receiptOcrValidationService.validate(normalizedDocument, parsedData);
 
         receipt.setRawOcrText(rawText);
+        receipt.setReconstructedOcrLinesJson(serializeReconstructedLines(reconstructedDocument.reconstructedLines()));
         receipt.setNormalizedOcrLinesJson(serializeNormalizedLines(normalizedDocument.normalizedLines()));
         receipt.setParserReadyText(normalizedDocument.parserReadyText());
         receipt.setLanguageDetectionSource(routingDecision.detectionSource());
@@ -114,7 +123,7 @@ public class ReceiptOcrService {
         receiptRepository.save(receipt);
 
         log.info(
-            "Receipt OCR completed successfully for receiptId={}, userId={}, strategy={}, profileUsed={}, detectionSource={}, parsedStoreName={}, parsedTotalAmount={}, parsedPurchaseDate={}, parsedCurrency={}, lineItemCount={}, normalizedLineCount={}, parserReadyLineCount={}, warnings={}",
+            "Receipt OCR completed successfully for receiptId={}, userId={}, strategy={}, profileUsed={}, detectionSource={}, parsedStoreName={}, parsedTotalAmount={}, parsedPurchaseDate={}, parsedCurrency={}, lineItemCount={}, reconstructedLineCount={}, normalizedLineCount={}, parserReadyLineCount={}, warnings={}",
             receipt.getId(),
             receipt.getUser().getId(),
             routingDecision.ocrProfileStrategy(),
@@ -125,6 +134,7 @@ public class ReceiptOcrService {
             receipt.getParsedPurchaseDate(),
             parsedData.currency(),
             receipt.getLineItems().size(),
+            normalizedDocument.reconstructedLines().size(),
             normalizedDocument.normalizedLines().size(),
             normalizedDocument.parserReadyLines().size(),
             validationResult.warnings().stream().map(Enum::name).collect(Collectors.joining(","))
@@ -141,6 +151,7 @@ public class ReceiptOcrService {
         receipt.setParsedCurrency(null);
         receipt.setParsedPurchaseDate(null);
         receipt.setNormalizedOcrLinesJson(null);
+        receipt.setReconstructedOcrLinesJson(null);
         receipt.setParserReadyText(null);
         receipt.setLanguageDetectionSource(null);
         receipt.setOcrProfileStrategy(null);
@@ -163,6 +174,7 @@ public class ReceiptOcrService {
         receipt.setParsedCurrency(null);
         receipt.setParsedPurchaseDate(null);
         receipt.setNormalizedOcrLinesJson(null);
+        receipt.setReconstructedOcrLinesJson(null);
         receipt.setParserReadyText(null);
         receipt.setLanguageDetectionSource(null);
         receipt.setOcrProfileStrategy(null);
@@ -203,6 +215,7 @@ public class ReceiptOcrService {
             receipt.getCurrency(),
             receipt.getOcrStatus(),
             receipt.getRawOcrText(),
+            normalizedDocument.reconstructedLines(),
             normalizedDocument.normalizedLines(),
             receipt.getReceiptCountryHint(),
             receipt.getLanguageDetectionSource(),
@@ -254,6 +267,14 @@ public class ReceiptOcrService {
         }
     }
 
+    private String serializeReconstructedLines(List<ReconstructedOcrLineResponse> reconstructedLines) {
+        try {
+            return objectMapper.writeValueAsString(reconstructedLines);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Failed to persist reconstructed OCR lines", exception);
+        }
+    }
+
     private String serializeWarningCodes(List<ReceiptParseWarningCode> warnings) {
         try {
             return objectMapper.writeValueAsString(warnings.stream().map(Enum::name).toList());
@@ -268,6 +289,9 @@ public class ReceiptOcrService {
         }
 
         try {
+            List<ReconstructedOcrLineResponse> reconstructedLines = StringUtils.hasText(receipt.getReconstructedOcrLinesJson())
+                ? objectMapper.readValue(receipt.getReconstructedOcrLinesJson(), RECONSTRUCTED_LINES_TYPE)
+                : List.of();
             List<NormalizedOcrLineResponse> normalizedLines = objectMapper.readValue(
                 receipt.getNormalizedOcrLinesJson(),
                 NORMALIZED_LINES_TYPE
@@ -292,6 +316,7 @@ public class ReceiptOcrService {
 
             return new NormalizedOcrDocument(
                 receipt.getRawOcrText(),
+                reconstructedLines,
                 normalizedLines,
                 parserReadyLines,
                 parserReadyText

@@ -35,10 +35,11 @@ Flow:
    - safe fallback profile
 9. the configured OCR client sends the file to the selected OCR helper container with routing options
 10. the raw OCR text is stored
-11. `ReceiptOcrLineNormalizationService` builds Java `normalizedLines[]` and parser-ready text
-12. `ReceiptOcrParser` performs best-effort baseline parsing for summary fields, parsed currency, and line items
-13. `ReceiptOcrValidationService` runs sanity checks on the parsed result
-14. the receipt persists those OCR artifacts, routing metadata, and validation warnings and is marked `DONE` or `FAILED`
+11. `ReceiptOcrStructuralReconstructionService` rebuilds a cleaner geometry-aware line stream before normalization
+12. `ReceiptOcrLineNormalizationService` builds Java `normalizedLines[]` and parser-ready text from reconstructed lines
+13. `ReceiptOcrParser` performs best-effort baseline parsing for summary fields, parsed currency, and line items
+14. `ReceiptOcrValidationService` runs sanity checks on the parsed result
+15. the receipt persists those OCR artifacts, routing metadata, and validation warnings and is marked `DONE` or `FAILED`
 
 ## OCR Backend Options
 
@@ -207,9 +208,42 @@ Responsibility split:
 The real OCR processing path now uses Java normalization as an active downstream step, not just as response decoration:
 
 - `OcrClient` returns raw ordered lines from the helper
-- `ReceiptOcrLineNormalizationService` builds a normalized document artifact in Java
+- `ReceiptOcrStructuralReconstructionService` first rebuilds a safer parser-ready line structure from OCR geometry
+- `ReceiptOcrLineNormalizationService` then builds a normalized document artifact in Java
 - non-ignored normalized lines become the parser-ready stream
 - current parser invocation already consumes that parser-ready text instead of raw helper text
+
+### Java Structural Reconstruction Layer
+
+Before normalization, Spring now runs a dedicated layout-aware structural reconstruction layer.
+
+Its job is not business parsing. Instead, it uses OCR geometry and line metadata to recover a better parser-ready line stream while preserving traceability.
+
+Current responsibilities:
+
+- cluster OCR fragments into visual rows using bbox overlap and line center proximity
+- preserve reading order top-to-bottom and left-to-right
+- separate service or barcode fragments from content fragments when they share the same OCR row
+- reconnect detached amount rows with nearby item-title rows
+- reconnect title rows with following standalone amount rows
+- preserve summary lines such as `TOTAL` or `Cyma` without flattening them into item rows
+
+Current debug artifact:
+
+- `reconstructedLines[]`
+  - `text`
+  - `order`
+  - `confidence`
+  - `bbox`
+  - `sourceOrders[]`
+  - `sourceTexts[]`
+  - `structuralTags[]`
+
+This layer is intentionally conservative:
+
+- it never invents text that is not present in OCR output
+- it keeps the original raw `lines[]` intact for diagnostics
+- when rows are merged or reordered, that evidence remains visible in `sourceOrders[]` and `sourceTexts[]`
 
 The Java normalization layer is intentionally conservative. It does not try to infer store names, totals, dates, or items.
 
@@ -312,12 +346,14 @@ Current parser rules focus on:
 - filtering payment/card/promo fragments out of item extraction so they do not pollute parsed line items
 
 The parser uses `normalizedLines[]` as its primary input. Raw OCR text remains stored for diagnostics and compatibility, but it is no longer the main parsing artifact.
+The parser also no longer needs to compensate for every OCR row-order defect itself. The new structural reconstruction layer is now the primary place where detached amount rows, split title or amount rows, and interleaved barcode/service rows are cleaned up before parsing.
 
 ## Persisted OCR Artifacts
 
 When OCR processing succeeds, the receipt now stores the same downstream OCR artifacts that the product later uses during retrieval:
 
 - `rawOcrText`
+- `reconstructedOcrLinesJson`
 - `normalizedOcrLinesJson`
 - `parserReadyText`
 - `parsedStoreName`
@@ -543,6 +579,7 @@ Use:
 `ReceiptOcrResponse` now includes:
 
 - `currency`
+- `reconstructedLines`
 - `normalizedLines`
 - `parsedStoreName`
 - `parsedTotalAmount`

@@ -61,7 +61,7 @@ It allows a user to:
 ### OCR And Parsing Model
 
 - raw OCR text is always stored when extraction succeeds
-- Java-normalized OCR lines and parser-ready text are now persisted on the receipt as first-class downstream OCR artifacts
+- geometry-aware reconstructed OCR lines, Java-normalized OCR lines, and parser-ready text are now persisted on the receipt as first-class downstream OCR artifacts
 - parsed store name, total amount, and purchase date are stored as best-effort fields
 - parsed currency is stored when explicit markers are found
 - parsed line items are stored separately and linked to the receipt
@@ -78,8 +78,8 @@ It allows a user to:
   - safe fallback profile
 - the PaddleOCR helper now includes a separate adaptive preprocessing layer for crop cleanup, deskew, denoise, contrast recovery, and safe-by-default soft vs strong enhancement before OCR
 - the PaddleOCR helper now returns line-based OCR output with stable reading order, so the next parser step can work with explicit receipt rows instead of a single long text blob
-- the PaddleOCR helper now stops at raw ordered line extraction, while the Spring backend owns conservative line normalization, line tagging, and parser-ready `normalizedLines[]`
-- the live OCR processing path now uses that Java-normalized stream as the main post-OCR artifact, and the baseline parser now runs on parser-ready normalized lines instead of raw helper text
+- the PaddleOCR helper now stops at raw ordered line extraction, while the Spring backend owns structural reconstruction, conservative line normalization, line tagging, and parser-ready `normalizedLines[]`
+- the live OCR processing path now first rebuilds a safer OCR row stream from geometry, then normalizes and parses that reconstructed stream instead of flattening raw helper text too early
 - Spring now also owns a small explicit OCR keyword lexicon for safe post-OCR heuristics around receipt summary words, payment/service markers, barcode/account markers, and trusted merchant aliases
 - the baseline parser now returns a first structured Java document result with merchant, date, total, parsed currency, and best-effort line items
 - a dedicated Java validation layer now marks suspicious merchant, total, date, and line-item results instead of pretending every parse is equally trustworthy
@@ -160,6 +160,7 @@ Understand:
 - how JWT flows into a protected SPA
 - how typed API calls, forms, and query state are organized
 - how receipt OCR results are persisted beyond raw text, including normalized lines and parser-ready text
+- how reconstructed OCR lines now bridge extraction and parser logic before normalization
 - how parse warnings and weak-quality flags now travel through the product flow
 
 ### Middle Or Senior Developer
@@ -171,6 +172,7 @@ Focus on:
 - UI integration over existing async backend contracts
 - OCR parsing model with persisted line items
 - persisted OCR downstream artifacts used for retrieval, not just processing-time parsing
+- structural reconstruction as a separate backend layer between OCR extraction and parser logic
 - baseline OCR parser model with structured document extraction over normalized lines
 - post-parse validation warnings that keep noisy results honest in the product
 - Paddle-first test infrastructure and repo-local wrapper execution

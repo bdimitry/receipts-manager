@@ -125,7 +125,7 @@ These files define:
   - `ReceiptLineItem`
   - `ReportJob`
   - `CurrencyCode`
-- `Receipt` now persists both summary OCR fields and downstream standard-OCR artifacts such as `normalizedOcrLinesJson`, `parserReadyText`, `parsedCurrency`, `parseWarningsJson`, and `weakParseQuality`
+- `Receipt` now persists both summary OCR fields and downstream standard-OCR artifacts such as `reconstructedOcrLinesJson`, `normalizedOcrLinesJson`, `parserReadyText`, `parsedCurrency`, `parseWarningsJson`, and `weakParseQuality`
 
 ### `dto`
 
@@ -178,8 +178,10 @@ Inside `src/main/java/com/blyndov/homebudgetreceiptsmanager/service`:
 - `ReceiptOcrLanguageDetector`: lightweight script and language heuristics over preview OCR text
 - `ReceiptOcrRoutingService`: resolves OCR profile strategy from country hint, auto-detection, and fallback rules
 - `ReceiptOcrRoutingDecision`: internal routing result carrying strategy, detection source, profile used, and extracted OCR lines
+- `ReceiptOcrStructuralReconstructionService`: geometry-aware reconstruction layer that rebuilds cleaner receipt rows from raw OCR line geometry before normalization
+- `ReconstructedOcrDocument`: internal artifact carrying the original OCR lines plus the reconstructed line stream
 - `ReceiptOcrLineNormalizationService`: Java-side conservative line normalization, tagging, and parser-ready `normalizedLines[]` construction after raw OCR extraction
-- `NormalizedOcrDocument`: internal Spring-side downstream OCR artifact that carries `normalizedLines[]`, `parserReadyLines[]`, and `parserReadyText`
+- `NormalizedOcrDocument`: internal Spring-side downstream OCR artifact that carries `reconstructedLines[]`, `normalizedLines[]`, `parserReadyLines[]`, and `parserReadyText`
 - `ReceiptOcrParser`: line-oriented baseline parser that consumes `normalizedLines[]`
 - `ParsedReceiptDocument`: structured parser result model for merchant/date/total/currency/items
 - `ParsedReceiptLineItem`: structured parser line item model with raw fragment and source lines
@@ -210,7 +212,7 @@ Backend coverage includes:
 - auth
 - purchases with currency validation
 - receipts and OCR
-- receipt OCR persistence and retrieval coverage for raw OCR, normalized lines, parser-ready text, parsed currency, parsed items, validation warnings, and OCR routing metadata
+- receipt OCR persistence and retrieval coverage for raw OCR, reconstructed lines, normalized lines, parser-ready text, parsed currency, parsed items, validation warnings, and OCR routing metadata
 - realistic OCR parser fixtures with noisy Cyrillic text
 - reports and downloads
 - mixed-currency reporting safety
@@ -281,9 +283,10 @@ Holds:
 4. backend controllers delegate to services
 5. services persist to PostgreSQL and interact with S3, SQS, OCR, and notifications
 6. the OCR adapter selects Tesseract or PaddleOCR by configuration and now accepts both raw text and ordered OCR line rows for the evolving OCR pipeline
-7. the standard branch now verifies that flow through Paddle-first integration infrastructure and repo-local wrapper execution
-8. OCR results are stored as receipt summary fields plus `ReceiptLineItem` rows
-9. dashboard and reports format financial data with explicit currency awareness
-10. frontend reflects backend state through TanStack Query and form mutations
+7. Spring reconstructs a geometry-aware line stream before normalization and parsing
+8. the standard branch now verifies that flow through Paddle-first integration infrastructure and repo-local wrapper execution
+9. OCR results are stored as receipt summary fields plus `ReceiptLineItem` rows
+10. dashboard and reports format financial data with explicit currency awareness
+11. frontend reflects backend state through TanStack Query and form mutations
 
 For a deeper view, continue with [architecture-overview.md](architecture-overview.md), [frontend-architecture.md](frontend-architecture.md), and [ocr-flow.md](ocr-flow.md).

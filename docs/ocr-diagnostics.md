@@ -92,7 +92,20 @@ This lets you compare:
 
 Post-OCR normalization is now intentionally outside the helper. Java/Spring owns `normalizedLines[]` so that parser-facing text cleanup, tagging, and future business integration all live on the backend side.
 
-That ownership is now active in the real OCR flow as well: Spring builds a parser-ready normalized line stream from helper `lines[]`, and downstream OCR parsing already consumes that Java-prepared text rather than the raw helper blob.
+That ownership is now active in the real OCR flow as well:
+
+- Spring first runs `ReceiptOcrStructuralReconstructionService` to rebuild a geometry-aware line stream from helper `lines[]`
+- then it builds a parser-ready normalized line stream from those reconstructed lines
+- downstream OCR parsing already consumes that Java-prepared text rather than the raw helper blob
+
+The backend OCR detail response now also exposes:
+
+- `reconstructedLines[]`
+  - `text`
+  - `bbox`
+  - `sourceOrders[]`
+  - `sourceTexts[]`
+  - `structuralTags[]`
 
 The next layer after diagnostics now also lives in Java:
 

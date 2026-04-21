@@ -73,7 +73,7 @@ class ReceiptOcrValidationServiceTests {
         );
 
         ParsedReceiptValidationResult validationResult = validationService.validate(
-            new NormalizedOcrDocument("BROKEN RAW", normalizedLines, normalizedLines, "BROKEN RAW"),
+            new NormalizedOcrDocument("BROKEN RAW", List.of(), normalizedLines, normalizedLines, "BROKEN RAW"),
             parsedDocument
         );
 
@@ -108,7 +108,7 @@ class ReceiptOcrValidationServiceTests {
         );
 
         ParsedReceiptValidationResult validationResult = validationService.validate(
-            new NormalizedOcrDocument("RAW", List.of(), List.of(), ""),
+            new NormalizedOcrDocument("RAW", List.of(), List.of(), List.of(), ""),
             new ParsedReceiptDocument("NOVUS", LocalDate.of(2026, 4, 12), new BigDecimal("103.98"), CurrencyCode.UAH, lineItems)
         );
 

@@ -98,11 +98,22 @@ export interface NormalizedOcrLineResponse {
   ignored: boolean;
 }
 
+export interface ReconstructedOcrLineResponse {
+  text: string;
+  order: number;
+  confidence: number | null;
+  bbox: number[][] | null;
+  sourceOrders: number[];
+  sourceTexts: string[];
+  structuralTags: string[];
+}
+
 export interface ReceiptOcrResponse {
   receiptId: number;
   currency: CurrencyCode;
   ocrStatus: ReceiptOcrStatus;
   rawOcrText: string | null;
+  reconstructedLines?: ReconstructedOcrLineResponse[];
   normalizedLines?: NormalizedOcrLineResponse[];
   receiptCountryHint?: ReceiptCountryHint | null;
   languageDetectionSource?: OcrLanguageDetectionSource | null;

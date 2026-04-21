@@ -262,6 +262,7 @@ Post-OCR normalization now lives in the Spring backend, not in the Python helper
   - raw ordered OCR line extraction
   - engine-side diagnostics
 - Java backend:
+  - layout-aware OCR structural reconstruction
   - conservative line normalization
   - line tagging and lightweight classification
   - parser-ready `normalizedLines[]` construction
@@ -271,6 +272,7 @@ Post-OCR normalization now lives in the Spring backend, not in the Python helper
 In the live OCR processing path, Spring now treats the Java-normalized stream as the primary post-OCR artifact:
 
 - raw helper `lines[]` are normalized in `ReceiptOcrLineNormalizationService`
+- before normalization, `ReceiptOcrStructuralReconstructionService` rebuilds a safer line stream from OCR geometry and line metadata
 - a parser-ready line stream is built from non-ignored normalized lines
 - the baseline Java parser now consumes that normalized downstream stream instead of the raw OCR blob
 - the receipt persistence layer now stores the same downstream OCR artifacts that power retrieval and receipt detail
@@ -285,6 +287,7 @@ In the live OCR processing path, Spring now treats the Java-normalized stream as
 Persisted receipt OCR artifacts now include:
 
 - raw OCR text
+- reconstructed OCR lines as JSON
 - Java `normalizedLines[]` as JSON
 - Java parser-ready text
 - parsed store name
@@ -319,6 +322,16 @@ The same OCR response now also exposes validation output:
 - `bbox`
 - `tags`
 - `ignored`
+
+The same OCR response now also includes `reconstructedLines[]` for structural debugging:
+
+- `text`
+- `order`
+- `confidence`
+- `bbox`
+- `sourceOrders`
+- `sourceTexts`
+- `structuralTags`
 
 The OCR response also exposes `parsedCurrency` so the baseline parser result is easier to inspect without any UI work.
 

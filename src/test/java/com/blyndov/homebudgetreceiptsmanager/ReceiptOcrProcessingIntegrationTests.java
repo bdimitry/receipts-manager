@@ -121,6 +121,7 @@ class ReceiptOcrProcessingIntegrationTests extends AbstractPostgresIntegrationTe
         Receipt processedReceipt = awaitReceiptStatus(uploadResponse.getBody().id(), ReceiptOcrStatus.DONE);
         assertThat(processedReceipt.getRawOcrText()).isNotBlank();
         assertThat(processedReceipt.getRawOcrText().toUpperCase()).contains("FRESH");
+        assertThat(processedReceipt.getReconstructedOcrLinesJson()).isNotBlank();
         assertThat(processedReceipt.getNormalizedOcrLinesJson()).isNotBlank();
         assertThat(processedReceipt.getParserReadyText()).contains("FRESH MARKET");
         assertThat(processedReceipt.getReceiptCountryHint()).isNull();
@@ -159,6 +160,7 @@ class ReceiptOcrProcessingIntegrationTests extends AbstractPostgresIntegrationTe
         assertThat(ocrResponse.getBody().currency()).isEqualTo(CurrencyCode.UAH);
         assertThat(ocrResponse.getBody().ocrStatus()).isEqualTo(ReceiptOcrStatus.DONE);
         assertThat(ocrResponse.getBody().rawOcrText()).containsIgnoringCase("FRESH");
+        assertThat(ocrResponse.getBody().reconstructedLines()).isNotEmpty();
         assertThat(ocrResponse.getBody().normalizedLines()).isNotEmpty();
         assertThat(ocrResponse.getBody().receiptCountryHint()).isNull();
         assertThat(ocrResponse.getBody().languageDetectionSource()).isEqualTo(OcrLanguageDetectionSource.DEFAULT_FALLBACK);

@@ -3,6 +3,7 @@ package com.blyndov.homebudgetreceiptsmanager.service;
 import com.blyndov.homebudgetreceiptsmanager.client.OcrExtractionLine;
 import com.blyndov.homebudgetreceiptsmanager.client.OcrExtractionResult;
 import com.blyndov.homebudgetreceiptsmanager.dto.NormalizedOcrLineResponse;
+import com.blyndov.homebudgetreceiptsmanager.dto.ReconstructedOcrLineResponse;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -43,11 +44,22 @@ public class ReceiptOcrLineNormalizationService {
         List<NormalizedOcrLineResponse> normalizedLines = extractionResult == null
             ? List.of()
             : normalizeLines(extractionResult.lines());
-        return buildDocument(rawText, normalizedLines);
+        return buildDocument(rawText, List.of(), normalizedLines);
+    }
+
+    public NormalizedOcrDocument normalizeDocument(ReconstructedOcrDocument reconstructedDocument) {
+        String rawText = reconstructedDocument == null ? null : reconstructedDocument.rawText();
+        List<ReconstructedOcrLineResponse> reconstructedLines = reconstructedDocument == null
+            ? List.of()
+            : reconstructedDocument.reconstructedLines();
+        List<NormalizedOcrLineResponse> normalizedLines = reconstructedDocument == null
+            ? List.of()
+            : normalizeReconstructedLines(reconstructedLines);
+        return buildDocument(rawText, reconstructedLines, normalizedLines);
     }
 
     public NormalizedOcrDocument normalizeRawTextDocument(String rawText) {
-        return buildDocument(rawText, normalizeRawText(rawText));
+        return buildDocument(rawText, List.of(), normalizeRawText(rawText));
     }
 
     public List<NormalizedOcrLineResponse> normalizeLines(List<OcrExtractionLine> lines) {
@@ -97,7 +109,44 @@ public class ReceiptOcrLineNormalizationService {
         return normalizeLines(rawLines);
     }
 
-    private NormalizedOcrDocument buildDocument(String rawText, List<NormalizedOcrLineResponse> normalizedLines) {
+    private List<NormalizedOcrLineResponse> normalizeReconstructedLines(List<ReconstructedOcrLineResponse> lines) {
+        if (lines == null || lines.isEmpty()) {
+            return List.of();
+        }
+
+        List<ReconstructedOcrLineResponse> orderedLines = lines.stream()
+            .sorted(Comparator.comparing(line -> line.order() == null ? Integer.MAX_VALUE : line.order()))
+            .toList();
+
+        int totalLines = orderedLines.size();
+        List<NormalizedOcrLineResponse> normalized = new ArrayList<>(totalLines);
+
+        for (int index = 0; index < orderedLines.size(); index++) {
+            ReconstructedOcrLineResponse line = orderedLines.get(index);
+            String normalizedText = normalizeText(line.text());
+            List<String> tags = mergeTags(classify(normalizedText, index, totalLines), line.structuralTags());
+            boolean ignored = tags.contains("noise") || tags.contains("barcode_like");
+            normalized.add(
+                new NormalizedOcrLineResponse(
+                    line.text(),
+                    normalizedText,
+                    line.order() == null ? index : line.order(),
+                    line.confidence(),
+                    line.bbox(),
+                    tags,
+                    ignored
+                )
+            );
+        }
+
+        return normalized;
+    }
+
+    private NormalizedOcrDocument buildDocument(
+        String rawText,
+        List<ReconstructedOcrLineResponse> reconstructedLines,
+        List<NormalizedOcrLineResponse> normalizedLines
+    ) {
         List<NormalizedOcrLineResponse> parserReadyLines = normalizedLines.stream()
             .filter(line -> !line.ignored())
             .filter(line -> StringUtils.hasText(line.normalizedText()))
@@ -117,10 +166,19 @@ public class ReceiptOcrLineNormalizationService {
 
         return new NormalizedOcrDocument(
             rawText,
+            reconstructedLines,
             normalizedLines,
             parserReadyLines,
             parserReadyText
         );
+    }
+
+    private List<String> mergeTags(List<String> normalizedTags, List<String> structuralTags) {
+        LinkedHashSet<String> merged = new LinkedHashSet<>(normalizedTags);
+        if (structuralTags != null) {
+            merged.addAll(structuralTags);
+        }
+        return List.copyOf(merged);
     }
 
     private String normalizeText(String text) {

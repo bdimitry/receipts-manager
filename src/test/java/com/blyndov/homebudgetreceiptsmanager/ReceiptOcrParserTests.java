@@ -10,6 +10,7 @@ import com.blyndov.homebudgetreceiptsmanager.service.ParsedReceiptLineItem;
 import com.blyndov.homebudgetreceiptsmanager.service.ReceiptOcrKeywordLexicon;
 import com.blyndov.homebudgetreceiptsmanager.service.ReceiptOcrLineNormalizationService;
 import com.blyndov.homebudgetreceiptsmanager.service.ReceiptOcrParser;
+import com.blyndov.homebudgetreceiptsmanager.service.ReceiptOcrStructuralReconstructionService;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -23,12 +24,14 @@ class ReceiptOcrParserTests {
 
     private ReceiptOcrLineNormalizationService normalizationService;
     private ReceiptOcrParser parser;
+    private ReceiptOcrStructuralReconstructionService reconstructionService;
 
     @BeforeEach
     void setUp() {
         ReceiptOcrKeywordLexicon keywordLexicon = new ReceiptOcrKeywordLexicon();
         normalizationService = new ReceiptOcrLineNormalizationService(keywordLexicon);
         parser = new ReceiptOcrParser(keywordLexicon);
+        reconstructionService = new ReceiptOcrStructuralReconstructionService(keywordLexicon);
     }
 
     @Test
@@ -114,6 +117,7 @@ class ReceiptOcrParserTests {
         ParsedReceiptDocument parsed = parser.parse(
             new NormalizedOcrDocument(
                 "BROKEN RAW OCR",
+                List.of(),
                 normalizedLines,
                 normalizedLines.stream().filter(line -> !line.ignored()).toList(),
                 ""
@@ -177,6 +181,7 @@ class ReceiptOcrParserTests {
         ParsedReceiptDocument parsed = parser.parse(
             new NormalizedOcrDocument(
                 "BROKEN RAW OCR THAT SHOULD NOT DRIVE THE PARSER",
+                List.of(),
                 normalizedLines,
                 normalizedLines,
                 "BROKEN RAW OCR THAT SHOULD NOT DRIVE THE PARSER"
@@ -189,11 +194,58 @@ class ReceiptOcrParserTests {
         assertThat(parsed.lineItems()).extracting(ParsedReceiptLineItem::title).containsExactly("Bread");
     }
 
+    @Test
+    void parserBenefitsFromStructuralReconstructionForDetachedAmountRows() {
+        var reconstructed = reconstructionService.reconstruct(
+            new com.blyndov.homebudgetreceiptsmanager.client.OcrExtractionResult(
+                "49.99 A\nWTPHX KOA 5449000130389\nHanin ra3.Coca-Co1a 1,75n nET\nHanin ra3.Fanta Orange 1,75n nET 53.99 A\nTOTAL 103.98",
+                List.of(
+                    rawLineWithBbox("49.99 A", 0, 440, 20, 520, 40),
+                    rawLineWithBbox("WTPHX KOA 5449000130389", 1, 40, 44, 520, 62),
+                    rawLineWithBbox("Hanin ra3.Coca-Co1a 1,75n nET", 2, 42, 66, 410, 86),
+                    rawLineWithBbox("Hanin ra3.Fanta Orange 1,75n nET 53.99 A", 3, 40, 94, 520, 116),
+                    rawLineWithBbox("TOTAL 103.98", 4, 40, 150, 280, 170)
+                )
+            )
+        );
+
+        ParsedReceiptDocument parsed = parser.parse(normalizationService.normalizeDocument(reconstructed));
+
+        assertThat(parsed.totalAmount()).isEqualByComparingTo("103.98");
+        assertThat(parsed.lineItems()).hasSize(2);
+        assertThat(parsed.lineItems()).extracting(ParsedReceiptLineItem::title)
+            .anyMatch(title -> title.contains("Coca"))
+            .anyMatch(title -> title.contains("Fanta"));
+        assertThat(parsed.lineItems()).extracting(ParsedReceiptLineItem::lineTotal)
+            .contains(new BigDecimal("49.99"), new BigDecimal("53.99"));
+    }
+
     private String fixture(String path) throws IOException {
         return new ClassPathResource(path).getContentAsString(StandardCharsets.UTF_8);
     }
 
     private NormalizedOcrLineResponse normalizedLine(String text, int order, List<String> tags, boolean ignored) {
         return new NormalizedOcrLineResponse(text, text, order, 0.99d, null, tags, ignored);
+    }
+
+    private com.blyndov.homebudgetreceiptsmanager.client.OcrExtractionLine rawLineWithBbox(
+        String text,
+        int order,
+        double left,
+        double top,
+        double right,
+        double bottom
+    ) {
+        return new com.blyndov.homebudgetreceiptsmanager.client.OcrExtractionLine(
+            text,
+            0.99d,
+            order,
+            List.of(
+                List.of(left, top),
+                List.of(right, top),
+                List.of(right, bottom),
+                List.of(left, bottom)
+            )
+        );
     }
 }

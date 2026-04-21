@@ -14,6 +14,7 @@ public record ReceiptOcrResponse(
     CurrencyCode currency,
     ReceiptOcrStatus ocrStatus,
     String rawOcrText,
+    List<ReconstructedOcrLineResponse> reconstructedLines,
     List<NormalizedOcrLineResponse> normalizedLines,
     ReceiptCountryHint receiptCountryHint,
     OcrLanguageDetectionSource languageDetectionSource,

@@ -114,6 +114,7 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         assertThat(uploadResponse.getBody().currency()).isEqualTo(CurrencyCode.UAH);
 
         Receipt processedReceipt = awaitReceiptStatus(uploadResponse.getBody().id(), ReceiptOcrStatus.DONE);
+        assertThat(processedReceipt.getReconstructedOcrLinesJson()).isNotBlank();
         assertThat(processedReceipt.getNormalizedOcrLinesJson()).isNotBlank();
         assertThat(processedReceipt.getParserReadyText()).isNotBlank();
         assertThat(processedReceipt.getReceiptCountryHint()).isNull();
@@ -137,6 +138,7 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         assertThat(ocrResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(ocrResponse.getBody()).isNotNull();
         assertThat(ocrResponse.getBody().currency()).isEqualTo(CurrencyCode.UAH);
+        assertThat(ocrResponse.getBody().reconstructedLines()).isNotEmpty();
         assertThat(ocrResponse.getBody().normalizedLines()).isNotEmpty();
         assertThat(ocrResponse.getBody().receiptCountryHint()).isNull();
         assertThat(ocrResponse.getBody().languageDetectionSource()).isEqualTo(OcrLanguageDetectionSource.AUTO_DETECTED);
@@ -177,6 +179,7 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         );
 
         Receipt processedReceipt = awaitReceiptStatus(uploadResponse.getBody().id(), ReceiptOcrStatus.DONE);
+        assertThat(processedReceipt.getReconstructedOcrLinesJson()).isNotBlank();
         assertThat(processedReceipt.getNormalizedOcrLinesJson()).contains("FRESH MARKET");
         assertThat(processedReceipt.getParserReadyText()).contains("FRESH MARKET");
         assertThat(processedReceipt.getLanguageDetectionSource()).isEqualTo(OcrLanguageDetectionSource.DEFAULT_FALLBACK);
@@ -195,6 +198,7 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         );
 
         assertThat(ocrResponse.getBody()).isNotNull();
+        assertThat(ocrResponse.getBody().reconstructedLines()).isNotEmpty();
         assertThat(ocrResponse.getBody().normalizedLines()).extracting(line -> line.normalizedText())
             .contains("FRESH MARKET", "TOTAL. 210.40", "THANK YOU");
         assertThat(ocrResponse.getBody().languageDetectionSource()).isEqualTo(OcrLanguageDetectionSource.DEFAULT_FALLBACK);

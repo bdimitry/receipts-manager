@@ -84,6 +84,9 @@ public class Receipt {
     @Column(name = "normalized_ocr_lines_json", columnDefinition = "TEXT")
     private String normalizedOcrLinesJson;
 
+    @Column(name = "reconstructed_ocr_lines_json", columnDefinition = "TEXT")
+    private String reconstructedOcrLinesJson;
+
     @Column(name = "parser_ready_text", columnDefinition = "TEXT")
     private String parserReadyText;
 
@@ -247,6 +250,14 @@ public class Receipt {
 
     public void setNormalizedOcrLinesJson(String normalizedOcrLinesJson) {
         this.normalizedOcrLinesJson = normalizedOcrLinesJson;
+    }
+
+    public String getReconstructedOcrLinesJson() {
+        return reconstructedOcrLinesJson;
+    }
+
+    public void setReconstructedOcrLinesJson(String reconstructedOcrLinesJson) {
+        this.reconstructedOcrLinesJson = reconstructedOcrLinesJson;
     }
 
     public String getParserReadyText() {
