@@ -79,6 +79,63 @@ class ReceiptOcrStructuralReconstructionServiceTests {
         assertThat(reconstructed.reconstructedLines().get(1).structuralTags()).contains("summary_like");
     }
 
+    @Test
+    void separatesServiceFragmentsInsideMixedRowWithoutDestroyingItemText() {
+        var reconstructed = reconstructionService.reconstruct(
+            new OcrExtractionResult(
+                "1234567890123\nCola 1.75L\n49.99",
+                List.of(
+                    rawLine("1234567890123", 0, bbox(40, 20, 270, 40)),
+                    rawLine("Cola 1.75L", 1, bbox(300, 21, 560, 40)),
+                    rawLine("49.99", 2, bbox(700, 22, 790, 40))
+                )
+            )
+        );
+
+        assertThat(reconstructed.reconstructedLines()).extracting(line -> line.text())
+            .containsExactly("1234567890123", "Cola 1.75L 49.99");
+        assertThat(reconstructed.reconstructedLines().getFirst().structuralTags()).contains("service_like");
+        assertThat(reconstructed.reconstructedLines().get(1).structuralTags()).contains("title_like", "merged");
+    }
+
+    @Test
+    void pairsAmountThatAppearsBeforeSummaryLabel() {
+        var reconstructed = reconstructionService.reconstruct(
+            new OcrExtractionResult(
+                "CARD\n103.98\nCyma",
+                List.of(
+                    rawLine("KAPTKA", 0, bbox(40, 20, 170, 42)),
+                    rawLine("103.98", 1, bbox(420, 48, 520, 70)),
+                    rawLine("Cyma", 2, bbox(40, 78, 160, 102))
+                )
+            )
+        );
+
+        assertThat(reconstructed.reconstructedLines()).extracting(line -> line.text())
+            .containsExactly("KAPTKA", "Cyma 103.98");
+        assertThat(reconstructed.reconstructedLines().get(1).structuralTags()).contains("summary_like", "merged");
+    }
+
+    @Test
+    void separatesOverclusteredSummaryAndTaxAmountsByVerticalOffset() {
+        var reconstructed = reconstructionService.reconstruct(
+            new OcrExtractionResult(
+                "Cyma\n103.98\nnAB A=.20.00%\n17.33",
+                List.of(
+                    rawLine("Cyma", 0, bbox(40, 120, 150, 150)),
+                    rawLine("103.98", 1, bbox(420, 112, 520, 172)),
+                    rawLine("nAB A=.20.00%", 2, bbox(240, 190, 420, 222)),
+                    rawLine("17.33", 3, bbox(450, 186, 520, 224))
+                )
+            )
+        );
+
+        assertThat(reconstructed.reconstructedLines()).extracting(line -> line.text())
+            .containsExactly("Cyma 103.98", "nAB A=.20.00% 17.33");
+        assertThat(reconstructed.reconstructedLines().getFirst().structuralTags()).contains("summary_like", "merged");
+        assertThat(reconstructed.reconstructedLines().get(1).structuralTags()).contains("summary_like", "merged");
+    }
+
     private OcrExtractionLine rawLine(String text, int order, List<List<Double>> bbox) {
         return new OcrExtractionLine(text, 0.98d, order, bbox);
     }

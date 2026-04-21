@@ -21,6 +21,9 @@ public class ReceiptOcrStructuralReconstructionService {
     );
     private static final Pattern LONG_DIGITS_PATTERN = Pattern.compile("\\d{8,}");
     private static final Pattern LETTER_PATTERN = Pattern.compile("\\p{L}");
+    private static final Pattern BASE64ISH_PATTERN = Pattern.compile("(?i)^[A-Za-z0-9+/=]{10,}$");
+    private static final Pattern TECHNICAL_MARKER_PATTERN = Pattern.compile("[#\\[\\]{}]|\\b(?:id|txn|ref|chek|yek)\\b", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+    private static final Pattern PERCENT_PATTERN = Pattern.compile("%");
 
     private final ReceiptOcrKeywordLexicon keywordLexicon;
 
@@ -105,6 +108,14 @@ public class ReceiptOcrStructuralReconstructionService {
                     consumed[nextTitleIndex.get()] = true;
                     continue;
                 }
+
+                Optional<Integer> nextSummaryIndex = findAdjacentSummary(rows, consumed, index);
+                if (nextSummaryIndex.isPresent()) {
+                    rebuilt.add(rows.get(nextSummaryIndex.get()).mergeWith(current, true));
+                    consumed[index] = true;
+                    consumed[nextSummaryIndex.get()] = true;
+                    continue;
+                }
             }
 
             if (current.isSummaryLike()) {
@@ -117,7 +128,7 @@ public class ReceiptOcrStructuralReconstructionService {
                 }
             }
 
-            if (current.isTitleLike()) {
+            if (current.isTitleLike() && current.isLikelyItemLike()) {
                 Optional<Integer> nextAmountIndex = findAttachableTarget(rows, consumed, index, false);
                 if (nextAmountIndex.isPresent()) {
                     rebuilt.add(current.mergeWith(rows.get(nextAmountIndex.get()), false));
@@ -143,16 +154,27 @@ public class ReceiptOcrStructuralReconstructionService {
                 continue;
             }
 
-            List<LineBox> serviceFragments = row.members.stream().filter(this::isServiceFragment).toList();
-            List<LineBox> contentFragments = row.members.stream().filter(fragment -> !isServiceFragment(fragment)).toList();
-
-            if (serviceFragments.isEmpty() || contentFragments.isEmpty()) {
+            List<Row> segments = groupAdjacent(row.members);
+            if (segments.size() <= 1) {
                 expanded.add(row);
                 continue;
             }
 
-            expanded.add(rowFrom(contentFragments));
-            expanded.addAll(groupAdjacent(serviceFragments));
+            boolean hasServiceSegment = segments.stream().anyMatch(Row::isServiceLike);
+            boolean hasNonServiceSegment = segments.stream().anyMatch(segment -> !segment.isServiceLike());
+            boolean hasAmountSegment = segments.stream().anyMatch(Row::isAmountOnly);
+
+            if (hasAmountSegment) {
+                expanded.addAll(segments);
+                continue;
+            }
+
+            if (!hasServiceSegment || !hasNonServiceSegment) {
+                expanded.add(row);
+                continue;
+            }
+
+            expanded.addAll(segments);
         }
 
         expanded.forEach(Row::finalizeGeometry);
@@ -175,7 +197,12 @@ public class ReceiptOcrStructuralReconstructionService {
 
             LineBox previous = currentGroup.getLast();
             double gap = fragment.left() - previous.right();
-            if (gap <= Math.max(24d, previous.width() * 0.35d)) {
+            double centerDelta = Math.abs(previous.centerY() - fragment.centerY());
+            double rowThreshold = Math.max(12d, Math.min((previous.bottom() - previous.top()) * 0.5d, 24d));
+            boolean serviceBoundary = isServiceFragment(previous) != isServiceFragment(fragment);
+            if (!serviceBoundary
+                && centerDelta <= rowThreshold
+                && gap <= Math.max(24d, previous.width() * 0.35d)) {
                 currentGroup.add(fragment);
                 continue;
             }
@@ -212,12 +239,15 @@ public class ReceiptOcrStructuralReconstructionService {
             || keywordLexicon.containsBarcodeKeyword(text)
             || keywordLexicon.containsAccountKeyword(text)
             || LONG_DIGITS_PATTERN.matcher(text).find()
+            || BASE64ISH_PATTERN.matcher(text.replace(" ", "")).matches()
             || (digitCount >= 10 && digitCount >= letterCount * 2);
     }
 
     private Optional<Integer> findAttachableTarget(List<Row> rows, boolean[] consumed, int index, boolean amountBeforeTitle) {
         Row source = rows.get(index);
         int skippedServiceRows = 0;
+        Integer bestCandidateIndex = null;
+        double bestScore = Double.NEGATIVE_INFINITY;
 
         for (int candidateIndex = index + 1; candidateIndex < rows.size() && candidateIndex <= index + 3; candidateIndex++) {
             if (consumed[candidateIndex]) {
@@ -237,17 +267,57 @@ public class ReceiptOcrStructuralReconstructionService {
                 continue;
             }
 
-            if (amountBeforeTitle && candidate.isTitleLike()) {
-                return Optional.of(candidateIndex);
+            if (amountBeforeTitle && candidate.isTitleLike() && candidate.isLikelyItemLike()) {
+                double score = source.attachmentScore(candidate);
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestCandidateIndex = candidateIndex;
+                }
+                continue;
             }
 
             if (!amountBeforeTitle && candidate.isAmountOnly()) {
-                return Optional.of(candidateIndex);
+                double score = source.attachmentScore(candidate);
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestCandidateIndex = candidateIndex;
+                }
+                continue;
             }
 
             break;
         }
 
+        return Optional.ofNullable(bestCandidateIndex);
+    }
+
+    private Optional<Integer> findAdjacentSummary(List<Row> rows, boolean[] consumed, int index) {
+        Row source = rows.get(index);
+        int skippedServiceRows = 0;
+        for (int candidateIndex = index + 1; candidateIndex < rows.size() && candidateIndex <= index + 3; candidateIndex++) {
+            if (consumed[candidateIndex]) {
+                continue;
+            }
+
+            Row candidate = rows.get(candidateIndex);
+            if (!source.isCloseTo(candidate)) {
+                break;
+            }
+
+            if (candidate.isServiceLike()) {
+                skippedServiceRows++;
+                if (skippedServiceRows > 1) {
+                    break;
+                }
+                continue;
+            }
+
+            if (candidate.isSummaryLike()) {
+                return Optional.of(candidateIndex);
+            }
+
+            break;
+        }
         return Optional.empty();
     }
 
@@ -294,9 +364,12 @@ public class ReceiptOcrStructuralReconstructionService {
                 return false;
             }
 
+            double lineHeight = Math.max(1d, line.bottom() - line.top());
             double overlap = Math.min(bottom, line.bottom()) - Math.max(top, line.top());
-            double threshold = Math.max(8d, Math.min(height() * 0.65d, 26d));
-            return overlap >= 2d || Math.abs(centerY - line.centerY()) <= threshold;
+            double minHeight = Math.min(height(), lineHeight);
+            double minRequiredOverlap = Math.max(4d, Math.min(minHeight * 0.35d, 14d));
+            double centerThreshold = Math.max(10d, Math.min(minHeight * 0.5d, 16d));
+            return overlap >= minRequiredOverlap || Math.abs(centerY - line.centerY()) <= centerThreshold;
         }
 
         private void finalizeGeometry() {
@@ -354,7 +427,9 @@ public class ReceiptOcrStructuralReconstructionService {
 
         private boolean isSummaryLike() {
             String text = text();
-            return keywordLexicon.containsSummaryKeyword(text) || keywordLexicon.containsTaxKeyword(text);
+            return keywordLexicon.containsSummaryKeyword(text)
+                || keywordLexicon.containsTaxKeyword(text)
+                || PERCENT_PATTERN.matcher(text).find();
         }
 
         private boolean isServiceLike() {
@@ -374,6 +449,20 @@ public class ReceiptOcrStructuralReconstructionService {
                 && !isServiceLike();
         }
 
+        private boolean isLikelyItemLike() {
+            String text = text();
+            if (!isTitleLike() || !StringUtils.hasText(text)) {
+                return false;
+            }
+
+            long digitCount = text.chars().filter(Character::isDigit).count();
+            long letterCount = text.codePoints().filter(Character::isLetter).count();
+            return !TECHNICAL_MARKER_PATTERN.matcher(text).find()
+                && !LONG_DIGITS_PATTERN.matcher(text).find()
+                && (letterCount >= 4)
+                && digitCount <= Math.max(6L, letterCount);
+        }
+
         private boolean isCloseTo(Row other) {
             if (!hasGeometry() || !other.hasGeometry()) {
                 return Math.abs(minOrder() - other.minOrder()) <= 2;
@@ -381,6 +470,16 @@ public class ReceiptOcrStructuralReconstructionService {
 
             double verticalGap = Math.max(0d, other.top - bottom);
             return verticalGap <= Math.max(18d, Math.max(height(), other.height()) * 1.35d);
+        }
+
+        private double attachmentScore(Row other) {
+            if (!hasGeometry() || !other.hasGeometry()) {
+                return -Math.abs(minOrder() - other.minOrder());
+            }
+
+            double overlap = Math.min(bottom, other.bottom) - Math.max(top, other.top);
+            double verticalGap = Math.max(0d, other.top - bottom);
+            return overlap - verticalGap - Math.abs(centerY - other.centerY) * 0.35d;
         }
 
         private Row mergeWith(Row other, boolean appendAmountAtEnd) {

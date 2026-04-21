@@ -227,6 +227,8 @@ Current responsibilities:
 - reconnect detached amount rows with nearby item-title rows
 - reconnect title rows with following standalone amount rows
 - preserve summary lines such as `TOTAL` or `Cyma` without flattening them into item rows
+- split visually stacked numeric fragments apart when OCR geometry accidentally collapses tax and total amounts into one row
+- let summary or percent-like tax rows pair with their own nearby amount instead of blending into one ambiguous summary block
 
 Current debug artifact:
 

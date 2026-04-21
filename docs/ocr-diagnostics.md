@@ -97,6 +97,7 @@ That ownership is now active in the real OCR flow as well:
 - Spring first runs `ReceiptOcrStructuralReconstructionService` to rebuild a geometry-aware line stream from helper `lines[]`
 - then it builds a parser-ready normalized line stream from those reconstructed lines
 - downstream OCR parsing already consumes that Java-prepared text rather than the raw helper blob
+- recent reconstruction hardening also splits vertically stacked numeric fragments that were being over-clustered into one row and keeps summary/tax amount pairing separate
 
 The backend OCR detail response now also exposes:
 
