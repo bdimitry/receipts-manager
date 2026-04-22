@@ -60,6 +60,7 @@ public abstract class AbstractPostgresIntegrationTest {
             .withFileFromPath("requirements.txt", Paths.get("docker/paddleocr-service/requirements.txt"))
             .withFileFromPath("app.py", Paths.get("docker/paddleocr-service/app.py"))
             .withFileFromPath("diagnostics.py", Paths.get("docker/paddleocr-service/diagnostics.py"))
+            .withFileFromPath("header_rescue.py", Paths.get("docker/paddleocr-service/header_rescue.py"))
             .withFileFromPath("ocr_engine.py", Paths.get("docker/paddleocr-service/ocr_engine.py"))
             .withFileFromPath("preprocessing.py", Paths.get("docker/paddleocr-service/preprocessing.py"))
             .withFileFromPath("profiles.py", Paths.get("docker/paddleocr-service/profiles.py"))

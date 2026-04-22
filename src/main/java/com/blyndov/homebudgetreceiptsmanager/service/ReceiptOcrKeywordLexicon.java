@@ -157,7 +157,7 @@ public class ReceiptOcrKeywordLexicon {
     private static final Map<Pattern, String> MERCHANT_ALIASES = new LinkedHashMap<>();
 
     static {
-        MERCHANT_ALIASES.put(Pattern.compile("(?iu)\\bn[o0]vus\\b|\\bnoyus\\b|\\bnovus\\b"), "NOVUS");
+        MERCHANT_ALIASES.put(Pattern.compile("(?iu)\\bn[o0]vus\\b|\\bnoyus\\b|\\bnovus\\b|\\bhobyc\\b"), "NOVUS");
         MERCHANT_ALIASES.put(Pattern.compile("(?iu)ukrsib\\s*bank|\u0443\u043a\u0440\u0441\u0438\u0431"), "UkrsibBank");
     }
 

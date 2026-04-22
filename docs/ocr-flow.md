@@ -219,6 +219,14 @@ Before normalization, Spring now runs a dedicated layout-aware structural recons
 
 Its job is not business parsing. Instead, it uses OCR geometry and line metadata to recover a better parser-ready line stream while preserving traceability.
 
+Current reconstruction policy is intentionally general, not receipt-specific:
+
+- geometry and row clustering stay primary
+- detached amount recovery and summary pairing are generic row-structure rules
+- service and barcode isolation rely on reusable payment, barcode, and header patterns
+- canonical OCR cleanup is limited to generic receipt labels and payment-service phrases
+- exact merchant-address transcripts are not injected from a memorized sample
+
 Current responsibilities:
 
 - cluster OCR fragments into visual rows using bbox overlap and line center proximity

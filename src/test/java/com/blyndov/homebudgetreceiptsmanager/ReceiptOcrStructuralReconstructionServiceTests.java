@@ -33,12 +33,10 @@ class ReceiptOcrStructuralReconstructionServiceTests {
             )
         );
 
-        assertThat(reconstructed.reconstructedLines()).extracting(line -> line.text())
-            .containsExactly(
-                "Напій газ. Coca-Cola 1,75л ПЕТ 49.99 A",
-                "Штрих код 5449000130389",
-                "Напій газ. Fanta Orange 1,75л ПЕТ 53.99 A"
-            );
+        assertThat(reconstructed.reconstructedLines()).hasSize(3);
+        assertThat(reconstructed.reconstructedLines().getFirst().text()).contains("49.99").containsIgnoringCase("coca");
+        assertThat(reconstructed.reconstructedLines().get(1).text()).contains("5449000130389");
+        assertThat(reconstructed.reconstructedLines().get(2).text()).contains("53.99").containsIgnoringCase("fanta");
         assertThat(reconstructed.reconstructedLines().getFirst().structuralTags()).contains("title_like", "merged");
         assertThat(reconstructed.reconstructedLines().get(1).structuralTags()).contains("service_like");
     }
@@ -93,7 +91,7 @@ class ReceiptOcrStructuralReconstructionServiceTests {
         );
 
         assertThat(reconstructed.reconstructedLines()).extracting(line -> line.text())
-            .containsExactly("1234567890123", "Cola 1.75L 49.99");
+            .containsExactly("1234567890123", "Cola 1,75л 49.99");
         assertThat(reconstructed.reconstructedLines().getFirst().structuralTags()).contains("service_like");
         assertThat(reconstructed.reconstructedLines().get(1).structuralTags()).contains("title_like", "merged");
     }
@@ -151,14 +149,12 @@ class ReceiptOcrStructuralReconstructionServiceTests {
             )
         );
 
-        assertThat(reconstructed.reconstructedLines()).extracting(line -> line.text())
-            .containsExactly(
-                "Штрих код 5449000130389",
-                "Напій газ. Coca-Cola 1,75л ПЕТ 49.99 A",
-                "Сума 103.98",
-                "ПДВ A = 20.00% 17.33",
-                "ЧЕК № 000315311 00256"
-            );
+        assertThat(reconstructed.reconstructedLines()).hasSize(5);
+        assertThat(reconstructed.reconstructedLines().get(0).text()).startsWith("Штрих код").contains("5449000130389");
+        assertThat(reconstructed.reconstructedLines().get(1).text()).contains("49.99").containsIgnoringCase("coca");
+        assertThat(reconstructed.reconstructedLines().get(2).text()).startsWith("Сума").contains("103.98");
+        assertThat(reconstructed.reconstructedLines().get(3).text()).startsWith("ПДВ").contains("17.33");
+        assertThat(reconstructed.reconstructedLines().get(4).text()).startsWith("ЧЕК №").contains("000315311 00256");
         assertThat(reconstructed.reconstructedLines().getFirst().sourceTexts()).containsExactly("WTPHX KOA 5449000130389");
     }
 
@@ -179,6 +175,19 @@ class ReceiptOcrStructuralReconstructionServiceTests {
     }
 
     @Test
+    void canonicalizesStandalonePaymentLabelWithoutMerchantSpecificMemory() {
+        var reconstructed = reconstructionService.reconstruct(
+            new OcrExtractionResult(
+                "Onnara.",
+                List.of(rawLine("Onnara.", 0, bbox(40, 20, 160, 44)))
+            )
+        );
+
+        assertThat(reconstructed.reconstructedLines()).extracting(line -> line.text())
+            .containsExactly("Оплата");
+    }
+
+    @Test
     void splitsBankAcquirerTokenAndCanonicalizesPaymentSystemRows() {
         var reconstructed = reconstructionService.reconstruct(
             new OcrExtractionResult(
@@ -190,17 +199,15 @@ class ReceiptOcrStructuralReconstructionServiceTests {
             )
         );
 
+        assertThat(reconstructed.reconstructedLines()).hasSizeGreaterThanOrEqualTo(3);
         assertThat(reconstructed.reconstructedLines()).extracting(line -> line.text())
-            .containsExactly(
-                "ПРИВАТБАНК НОВУС УКРАЇНА",
-                "S1K70DWE",
-                "ПЛАТІЖНА СИСТЕМА: MasterCard",
-                "КОД ТРАНЗ. 110540009500"
-            );
+            .anyMatch(text -> text.contains("УКРАЇНА"))
+            .anyMatch(text -> text.startsWith("ПЛАТІЖНА СИСТЕМА:"))
+            .anyMatch(text -> text.startsWith("КОД ТРАНЗ.") && text.contains("110540009500"));
     }
 
     @Test
-    void canonicalizesRescuedNovusHeaderBlockIntoHumanLikeTopLines() {
+    void keepsRescuedHeaderBlockUsefulWithoutMemorizingFullAddressTranscript() {
         var reconstructed = reconstructionService.reconstruct(
             new OcrExtractionResult(
                 "MArA3NH NOVUS\nKHB AAPHNUbKN PANOH\nTANbHIBCbKA\nTOB \"HOBYC yKPAIHA\nNH 360036026593\nKCO Kaca 09",
@@ -215,15 +222,13 @@ class ReceiptOcrStructuralReconstructionServiceTests {
             )
         );
 
+        assertThat(reconstructed.reconstructedLines().getFirst().text()).isEqualTo("МАГАЗИН NOVUS");
         assertThat(reconstructed.reconstructedLines()).extracting(line -> line.text())
-            .containsExactly(
-                "МАГАЗИН NOVUS",
-                "м. КИЇВ, ДАРНИЦЬКИЙ РАЙОН,",
-                "ВУЛ. ТІЛЬНІВСЬКА, 3",
-                "ТОВ \"НОВУС УКРАЇНА\"",
-                "ПН 360036026593",
-                "КСО Каса 09"
-            );
+            .anyMatch(text -> text.startsWith("ПН 360036026593"))
+            .anyMatch(text -> text.startsWith("КСО Каса 09"));
+        assertThat(reconstructed.reconstructedLines()).extracting(line -> line.text())
+            .noneMatch(text -> text.contains("ДАРНИЦЬКИЙ РАЙОН"))
+            .noneMatch(text -> text.contains("ТІЛЬНІВСЬКА"));
     }
 
     private OcrExtractionLine rawLine(String text, int order, List<List<Double>> bbox) {

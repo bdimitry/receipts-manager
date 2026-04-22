@@ -129,6 +129,12 @@ For hard receipts like `2.jpg`, reconstruction may now also apply a small canoni
 
 This is still traceable because the original OCR evidence remains available in `sourceTexts[]`, and the layer does not rewrite arbitrary product text.
 
+The reconstruction layer is now intentionally generalized:
+
+- tests no longer lock in a full memorized `2.jpg` transcript
+- merchant-specific header or footer injection was removed
+- `2.jpg` quality is now held by reusable structure and label rules rather than by exact hardcoded lines
+
 The next layer after diagnostics now also lives in Java:
 
 - `ReceiptOcrParser` consumes `normalizedLines[]`
