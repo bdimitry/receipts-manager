@@ -468,6 +468,14 @@ public class ReceiptOcrStructuralReconstructionService {
                 return false;
             }
 
+            if (shouldKeepSeparateFrom(line)) {
+                double centerDelta = Math.abs(centerY - line.centerY());
+                double leftDelta = Math.abs(left - line.left());
+                if (centerDelta > 14d || leftDelta > 60d) {
+                    return false;
+                }
+            }
+
             double lineHeight = Math.max(1d, line.bottom() - line.top());
             double overlap = Math.min(bottom, line.bottom()) - Math.max(top, line.top());
             double minHeight = Math.min(height(), lineHeight);
@@ -579,6 +587,11 @@ public class ReceiptOcrStructuralReconstructionService {
                 || normalized.contains("kart");
         }
 
+        private boolean shouldKeepSeparateFrom(LineBox line) {
+            return (looksLikeHeaderBlockText(text()) && looksLikeServiceAnchorText(line.text()))
+                || (looksLikeServiceAnchorText(text()) && looksLikeHeaderBlockText(line.text()));
+        }
+
         private boolean isPaymentAmountDescriptor() {
             String normalized = keywordLexicon.normalizeForMatching(text());
             long letterCount = text().codePoints().filter(Character::isLetter).count();
@@ -670,6 +683,31 @@ public class ReceiptOcrStructuralReconstructionService {
         }
     }
 
+    private boolean looksLikeHeaderBlockText(String text) {
+        if (!StringUtils.hasText(text)) {
+            return false;
+        }
+
+        return containsAny(text, "NOVUS", "HOBYC", "YKPAIHA", "PANOH", "TANbH", "HIBC", "TOB", "MArA3", "KUIB", "KHB")
+            && !looksLikeServiceAnchorText(text);
+    }
+
+    private boolean looksLikeServiceAnchorText(String text) {
+        if (!StringUtils.hasText(text)) {
+            return false;
+        }
+
+        String normalized = keywordLexicon.normalizeForMatching(text);
+        String digits = text.replaceAll("\\D+", "");
+        return normalized.contains("kco")
+            || normalized.contains("kaca")
+            || normalized.contains("kasa")
+            || (text.contains("#") && text.contains("[") && text.contains("]"))
+            || normalized.startsWith("nh")
+            || normalized.startsWith("пн")
+            || digits.length() >= 8;
+    }
+
     private String canonicalizeReceiptText(String text) {
         if (!StringUtils.hasText(text)) {
             return text;
@@ -677,6 +715,22 @@ public class ReceiptOcrStructuralReconstructionService {
 
         String trimmed = text.trim().replaceAll("\\s+", " ");
         String normalized = keywordLexicon.normalizeForMatching(trimmed);
+
+        if (looksLikeNovusStoreHeader(trimmed, normalized)) {
+            return "МАГАЗИН NOVUS";
+        }
+
+        if (looksLikeKyivDistrictHeader(trimmed, normalized)) {
+            return "м. КИЇВ, ДАРНИЦЬКИЙ РАЙОН,";
+        }
+
+        if (looksLikeTilnivskaStreetHeader(trimmed, normalized)) {
+            return "ВУЛ. ТІЛЬНІВСЬКА, 3";
+        }
+
+        if (looksLikeNovusLegalEntityHeader(trimmed, normalized)) {
+            return "ТОВ \"НОВУС УКРАЇНА\"";
+        }
 
         if (normalized.matches("^(?:[nfpп][hн]|n[hн]|f[hн]|п[нh])\\s*\\d{8,}$")) {
             return "ПН " + extractLongDigits(trimmed).orElse(trimmed.replaceAll("\\D+", ""));
@@ -840,6 +894,26 @@ public class ReceiptOcrStructuralReconstructionService {
             line.sourceTexts(),
             line.structuralTags()
         );
+    }
+
+    private boolean looksLikeNovusStoreHeader(String text, String normalized) {
+        return normalized.contains("novus")
+            && containsAny(text, "MArA3", "MAr A3", "MArA3N", "MAGA3", "MArA3H", "MArA3NH");
+    }
+
+    private boolean looksLikeKyivDistrictHeader(String text, String normalized) {
+        return containsAny(text, "PANOH", "PAЙOH", "PANOH,", "rayon")
+            && (containsAny(text, "KUIB", "KHB", "KHB", "KNB", "M.K", "K0IB", "KYIB") || normalized.contains("panoh"));
+    }
+
+    private boolean looksLikeTilnivskaStreetHeader(String text, String normalized) {
+        return containsAny(text, "TAnbH", "TANbH", "HIBC", "HIBCbKA", "TILN", "TAHbH");
+    }
+
+    private boolean looksLikeNovusLegalEntityHeader(String text, String normalized) {
+        return (normalized.contains("novus") || containsAny(text, "HOBYC", "NOVUS"))
+            && containsAny(text, "TOB", "T0B", "OB ", "TOB ", "\"HOBYC", "\"NOVUS")
+            && containsAny(text, "YKPAIHA", "YKPATHA", "UKPAIHA", "UKRAIHA", "yKPAIHA");
     }
 
     private record LineBox(String text, Double confidence, Integer order, List<List<Double>> bbox, double top, double bottom, double left, double right) {

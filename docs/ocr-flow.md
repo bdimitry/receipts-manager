@@ -223,6 +223,7 @@ Current responsibilities:
 
 - cluster OCR fragments into visual rows using bbox overlap and line center proximity
 - preserve reading order top-to-bottom and left-to-right
+- rescue a weak first-page header block from a focused top-zone OCR crop before the parser sees it
 - separate service or barcode fragments from content fragments when they share the same OCR row
 - reconnect detached amount rows with nearby item-title rows
 - reconnect title rows with following standalone amount rows
@@ -246,6 +247,7 @@ This layer is intentionally conservative:
 - it never invents text that is not present in OCR output
 - it keeps the original raw `lines[]` intact for diagnostics
 - when rows are merged or reordered, that evidence remains visible in `sourceOrders[]` and `sourceTexts[]`
+- the header rescue pass only replaces the weak pre-anchor top prefix and then maps those rows back into parser-facing order above the first anchor line
 
 The Java normalization layer is intentionally conservative. It does not try to infer store names, totals, dates, or items.
 

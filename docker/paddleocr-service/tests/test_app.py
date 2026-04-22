@@ -63,6 +63,7 @@ class PaddleOcrAppTests(unittest.TestCase):
         self.assertEqual(body["profile"], "en")
         self.assertNotIn("normalizedLines", body)
         self.assertTrue(body["preprocessingApplied"])
+        self.assertFalse(body["headerRescueApplied"])
         self.assertEqual(len(body["lines"]), 3)
         self.assertEqual(
             [line["text"] for line in body["lines"]],
@@ -97,8 +98,10 @@ class PaddleOcrAppTests(unittest.TestCase):
         self.assertEqual(body["diagnostics"]["rawEngineText"], "MILK 42.50\nTOTAL 132.60\nSTORE")
         self.assertEqual(body["diagnostics"]["mappedRawText"], "STORE\nMILK 42.50\nTOTAL 132.60")
         self.assertEqual(body["diagnostics"]["mappedLines"][1]["text"], "MILK 42.50")
+        self.assertFalse(body["diagnostics"]["headerRescue"][0]["applied"])
         self.assertNotIn("normalizedLines", body["diagnostics"])
-        self.assertEqual(engine.language_overrides, ["en"])
+        self.assertTrue(engine.language_overrides)
+        self.assertTrue(all(language == "en" for language in engine.language_overrides))
 
     def test_ocr_profile_override_uses_requested_profile(self):
         engine = FakeEngine()
@@ -119,7 +122,8 @@ class PaddleOcrAppTests(unittest.TestCase):
         body = response.get_json()
         self.assertEqual(body["profile"], "cyrillic")
         self.assertEqual(body["diagnostics"]["engineConfig"]["profile"], "cyrillic")
-        self.assertEqual(engine.profile_overrides, ["cyrillic"])
+        self.assertTrue(engine.profile_overrides)
+        self.assertTrue(all(profile == "cyrillic" for profile in engine.profile_overrides))
 
     def test_ocr_endpoint_allows_disabling_preprocessing_for_baseline_comparison(self):
         engine = FakeEngine()
@@ -177,6 +181,10 @@ class FakeEngine:
             self.profile_overrides.append(profile_override)
         if language_override is not None:
             self.language_overrides.append(language_override)
+        if self.calls > 1:
+            return [[
+                [[[10, 20], [220, 20], [220, 60], [10, 60]], ("STORE", 0.9912)],
+            ]]
         return [[
             [[[15, 160], [200, 160], [200, 200], [15, 200]], ("MILK 42.50", 0.9888)],
             [[[15, 250], [240, 250], [240, 288], [15, 288]], ("TOTAL 132.60", 0.9821)],

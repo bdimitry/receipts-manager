@@ -35,6 +35,9 @@ class PreprocessedReceiptImage:
     size_after: ImageSize
     strategy: str
     steps_applied: tuple[str, ...]
+    upscale_factor: float
+    crop_box: tuple[int, int, int, int] | None
+    deskew_applied: bool
 
     def to_response(self, page_index: int) -> dict:
         return {
@@ -49,6 +52,9 @@ class PreprocessedReceiptImage:
             },
             "strategy": self.strategy,
             "stepsApplied": list(self.steps_applied),
+            "upscaleFactor": self.upscale_factor,
+            "cropBox": list(self.crop_box) if self.crop_box else None,
+            "deskewApplied": self.deskew_applied,
         }
 
 
@@ -70,17 +76,20 @@ class ReceiptImagePreprocessor:
                 size_after=size_before,
                 strategy="disabled",
                 steps_applied=tuple(),
+                upscale_factor=1.0,
+                crop_box=None,
+                deskew_applied=False,
             )
 
         working = _pil_to_bgr(normalized)
         steps: list[str] = []
         initial_quality = self._analyze_image(working)
 
-        working, upscaled = self._upscale_if_needed(working, initial_quality)
+        working, upscaled, upscale_factor = self._upscale_if_needed(working, initial_quality)
         if upscaled:
             steps.append("upscale")
 
-        working, cropped = self._crop_receipt_region(working)
+        working, cropped, crop_box = self._crop_receipt_region(working)
         if cropped:
             steps.append("crop_receipt")
 
@@ -102,13 +111,16 @@ class ReceiptImagePreprocessor:
             size_after=size_after,
             strategy=strategy,
             steps_applied=tuple(steps),
+            upscale_factor=upscale_factor,
+            crop_box=crop_box,
+            deskew_applied=deskewed,
         )
 
-    def _upscale_if_needed(self, image: np.ndarray, quality: ImageQualityProfile) -> tuple[np.ndarray, bool]:
+    def _upscale_if_needed(self, image: np.ndarray, quality: ImageQualityProfile) -> tuple[np.ndarray, bool, float]:
         height, width = image.shape[:2]
         long_edge = max(width, height)
         if long_edge >= self.target_long_edge:
-            return image, False
+            return image, False, 1.0
 
         target_long_edge = self.target_long_edge
         if quality.looks_clean:
@@ -118,16 +130,16 @@ class ReceiptImagePreprocessor:
         max_scale = 2.25 if quality.looks_clean else 2.0
         scale = min(scale, max_scale)
         if scale < 1.15:
-            return image, False
+            return image, False, 1.0
 
         resized = cv2.resize(
             image,
             (int(round(width * scale)), int(round(height * scale))),
             interpolation=cv2.INTER_LANCZOS4,
         )
-        return resized, True
+        return resized, True, scale
 
-    def _crop_receipt_region(self, image: np.ndarray) -> tuple[np.ndarray, bool]:
+    def _crop_receipt_region(self, image: np.ndarray) -> tuple[np.ndarray, bool, tuple[int, int, int, int] | None]:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         blurred = cv2.GaussianBlur(gray, (5, 5), 0)
         edges = cv2.Canny(blurred, 50, 150)
@@ -147,7 +159,7 @@ class ReceiptImagePreprocessor:
             if len(approximation) == 4:
                 warped = _four_point_warp(image, approximation.reshape(4, 2).astype("float32"))
                 if warped is not None:
-                    return warped, True
+                    return warped, True, None
 
             x, y, box_width, box_height = cv2.boundingRect(contour)
             if box_width * box_height >= image_area * 0.35:
@@ -158,9 +170,9 @@ class ReceiptImagePreprocessor:
                 box_height = min(height - y, box_height + 2 * margin)
                 cropped = image[y : y + box_height, x : x + box_width]
                 if cropped.size > 0:
-                    return cropped, True
+                    return cropped, True, (x, y, box_width, box_height)
 
-        return image, False
+        return image, False, None
 
     def _deskew(self, image: np.ndarray) -> tuple[np.ndarray, bool]:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)

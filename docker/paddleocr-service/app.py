@@ -8,6 +8,7 @@ import numpy as np
 from flask import Flask, current_app, jsonify, request
 from PIL import Image
 
+from header_rescue import HeaderBlockRescue
 from ocr_engine import PaddleOcrEngine
 from preprocessing import ReceiptImagePreprocessor
 from profiles import DEFAULT_OCR_PROFILE, OCR_PROFILES, available_profiles, resolve_profile
@@ -34,6 +35,7 @@ def create_app(
         target_long_edge=PADDLE_OCR_TARGET_LONG_EDGE,
     )
     application.config["OCR_RESPONSE_MAPPER"] = PaddleOcrResponseMapper()
+    application.config["HEADER_BLOCK_RESCUE"] = HeaderBlockRescue()
 
     if not PADDLE_OCR_SKIP_WARMUP:
         application.config["OCR_ENGINE"].warm_up()
@@ -73,9 +75,16 @@ def create_app(
         language_override = _resolve_language_override(request)
 
         try:
-            processed_pages = _processed_page_images(content, content_type, preprocess_enabled)
+            page_images = _page_images(content, content_type)
+            processed_pages = _processed_page_images(page_images, preprocess_enabled)
             raw_engine_pages = _raw_engine_pages(processed_pages, profile_override, language_override)
-            mapped_lines = _extract_lines(raw_engine_pages)
+            mapped_lines, header_rescue_results = _extract_lines(
+                page_images,
+                processed_pages,
+                raw_engine_pages,
+                profile_override,
+                language_override,
+            )
             lines = [line.to_response() for line in mapped_lines]
             raw_text = "\n".join(line["text"] for line in lines)
             payload = {
@@ -83,11 +92,25 @@ def create_app(
                 "lines": lines,
                 "profile": profile_override or current_app.config["OCR_DEFAULT_PROFILE"],
                 "preprocessingApplied": any(page.applied for page in processed_pages),
-                "pages": [page.to_response(index) for index, page in enumerate(processed_pages)],
+                "headerRescueApplied": any(result.applied for result in header_rescue_results),
+                "pages": [
+                    {
+                        **page.to_response(index),
+                        "headerRescueApplied": header_rescue_results[index].applied,
+                        "headerRescueStrategy": header_rescue_results[index].strategy if header_rescue_results[index].applied else None,
+                    }
+                    for index, page in enumerate(processed_pages)
+                ],
             }
 
             if debug_enabled:
-                payload["diagnostics"] = _build_diagnostics(raw_engine_pages, profile_override, language_override)
+                payload["diagnostics"] = _build_diagnostics(
+                    page_images,
+                    processed_pages,
+                    raw_engine_pages,
+                    profile_override,
+                    language_override,
+                )
 
             return jsonify(payload)
         except Exception as exception:
@@ -154,11 +177,11 @@ def _page_images(content: bytes, content_type: str) -> list[Image.Image]:
     return [Image.open(io.BytesIO(content)).convert("RGB")]
 
 
-def _processed_page_images(content: bytes, content_type: str, preprocess_enabled: bool | None):
+def _processed_page_images(page_images: list[Image.Image], preprocess_enabled: bool | None):
     preprocessor: ReceiptImagePreprocessor = current_app.config["IMAGE_PREPROCESSOR"]
     return [
         preprocessor.preprocess(image, enabled_override=preprocess_enabled)
-        for image in _page_images(content, content_type)
+        for image in page_images
     ]
 
 
@@ -174,18 +197,53 @@ def _raw_engine_pages(processed_pages, profile_override: str | None, language_ov
     ]
 
 
-def _extract_lines(raw_engine_pages):
+def _extract_lines(
+    page_images: list[Image.Image],
+    processed_pages,
+    raw_engine_pages,
+    profile_override: str | None = None,
+    language_override: str | None = None,
+):
+    ocr_engine: PaddleOcrEngine = current_app.config["OCR_ENGINE"]
     response_mapper: PaddleOcrResponseMapper = current_app.config["OCR_RESPONSE_MAPPER"]
+    header_block_rescue: HeaderBlockRescue = current_app.config["HEADER_BLOCK_RESCUE"]
     lines = []
+    header_rescue_results = []
     order_offset = 0
-    for raw_engine_page in raw_engine_pages:
-        page_lines = response_mapper.map_page_lines(raw_engine_page, order_offset=order_offset)
+    for page_index, raw_engine_page in enumerate(raw_engine_pages):
+        page_lines = response_mapper.map_page_lines(raw_engine_page)
+        header_rescue_result = header_block_rescue.rescue_page_lines(
+            page_index=page_index,
+            original_image=page_images[page_index],
+            processed_page=processed_pages[page_index],
+            existing_lines=page_lines,
+            ocr_engine=ocr_engine,
+            response_mapper=response_mapper,
+            profile_override=profile_override,
+            language_override=language_override,
+        )
+        page_lines = [
+            type(line)(
+                text=line.text,
+                confidence=line.confidence,
+                order=order_offset + index,
+                bbox=line.bbox,
+            )
+            for index, line in enumerate(header_rescue_result.lines)
+        ]
         lines.extend(page_lines)
         order_offset += len(page_lines)
-    return lines
+        header_rescue_results.append(header_rescue_result)
+    return lines, header_rescue_results
 
 
-def _build_diagnostics(raw_engine_pages, profile_override: str | None, language_override: str | None) -> dict:
+def _build_diagnostics(
+    page_images: list[Image.Image],
+    processed_pages,
+    raw_engine_pages,
+    profile_override: str | None,
+    language_override: str | None,
+) -> dict:
     ocr_engine: PaddleOcrEngine = current_app.config["OCR_ENGINE"]
     response_mapper: PaddleOcrResponseMapper = current_app.config["OCR_RESPONSE_MAPPER"]
     raw_engine_lines = []
@@ -195,13 +253,20 @@ def _build_diagnostics(raw_engine_pages, profile_override: str | None, language_
         for line in raw_lines:
             raw_engine_lines.append({"pageIndex": page_index, **line})
 
-    mapped_lines = _extract_lines(raw_engine_pages)
+    mapped_lines, header_rescue_results = _extract_lines(
+        page_images,
+        processed_pages,
+        raw_engine_pages,
+        profile_override,
+        language_override,
+    )
     return {
         "engineConfig": ocr_engine.describe(profile_override, language_override),
         "rawEngineLines": raw_engine_lines,
         "rawEngineText": "\n".join(line["text"] for line in raw_engine_lines),
         "mappedLines": [line.to_response() for line in mapped_lines],
         "mappedRawText": "\n".join(line.text for line in mapped_lines),
+        "headerRescue": [result.to_response(index) for index, result in enumerate(header_rescue_results)],
     }
 
 

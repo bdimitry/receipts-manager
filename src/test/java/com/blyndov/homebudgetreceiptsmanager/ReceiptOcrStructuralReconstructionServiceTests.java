@@ -199,6 +199,33 @@ class ReceiptOcrStructuralReconstructionServiceTests {
             );
     }
 
+    @Test
+    void canonicalizesRescuedNovusHeaderBlockIntoHumanLikeTopLines() {
+        var reconstructed = reconstructionService.reconstruct(
+            new OcrExtractionResult(
+                "MArA3NH NOVUS\nKHB AAPHNUbKN PANOH\nTANbHIBCbKA\nTOB \"HOBYC yKPAIHA\nNH 360036026593\nKCO Kaca 09",
+                List.of(
+                    rawLine("MArA3NH NOVUS", 0, bbox(386, 92, 836, 132)),
+                    rawLine("KHB AAPHNUbKN PANOH", 1, bbox(180, 142, 910, 182)),
+                    rawLine("TANbHIBCbKA", 2, bbox(260, 192, 760, 232)),
+                    rawLine("TOB \"HOBYC yKPAIHA", 3, bbox(250, 242, 780, 282)),
+                    rawLine("NH 360036026593", 4, bbox(364, 252, 707, 335)),
+                    rawLine("KCO Kaca 09", 5, bbox(409, 309, 662, 386))
+                )
+            )
+        );
+
+        assertThat(reconstructed.reconstructedLines()).extracting(line -> line.text())
+            .containsExactly(
+                "МАГАЗИН NOVUS",
+                "м. КИЇВ, ДАРНИЦЬКИЙ РАЙОН,",
+                "ВУЛ. ТІЛЬНІВСЬКА, 3",
+                "ТОВ \"НОВУС УКРАЇНА\"",
+                "ПН 360036026593",
+                "КСО Каса 09"
+            );
+    }
+
     private OcrExtractionLine rawLine(String text, int order, List<List<Double>> bbox) {
         return new OcrExtractionLine(text, 0.98d, order, bbox);
     }

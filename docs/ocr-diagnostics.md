@@ -77,18 +77,31 @@ The Paddle helper exposes two diagnostic-friendly entry points:
   - `profile`
   - `rawText`
   - `lines[]`
+  - `headerRescueApplied`
+  - `pages[].headerRescueApplied`
+  - `pages[].headerRescueStrategy`
 - diagnostics:
   - `engineConfig`
   - `rawEngineLines[]`
   - `rawEngineText`
   - `mappedLines[]`
   - `mappedRawText`
+  - `headerRescue[]`
 
 This lets you compare:
 
 1. raw PaddleOCR output
 2. mapped line output
 3. helper `rawText` assembly
+
+For receipts whose first header rows are much weaker than the rest of the document, the helper now also runs a conservative first-page header rescue pass:
+
+- it OCRs the top crop of the original first page at `2x`
+- it keeps only the pre-anchor header prefix
+- it reprojects those rescued rows into processed-page reading order using the first anchor row
+- it leaves the rest of the receipt untouched
+
+This keeps the rescue traceable in diagnostics without turning the whole receipt into a second OCR pass.
 
 Post-OCR normalization is now intentionally outside the helper. Java/Spring owns `normalizedLines[]` so that parser-facing text cleanup, tagging, and future business integration all live on the backend side.
 
