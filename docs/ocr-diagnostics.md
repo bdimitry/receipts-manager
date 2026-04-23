@@ -143,6 +143,13 @@ The next layer after diagnostics now also lives in Java:
 - `ReceiptOcrKeywordLexicon` provides a tiny explicit English/Ukrainian/Russian keyword registry for safe summary, payment, barcode, and merchant heuristics
 - no parser logic lives in the Python helper anymore
 
+Recent downstream hardening on top of the generalized reconstructed stream now also:
+
+- rejects address- and contact-like header lines as merchant candidates
+- allows explicit payment or account summary amount carriers to surface totals on bank-like documents
+- avoids treating old but otherwise plausible receipt dates as suspicious by default
+- delays item-total mismatch warnings until parsed item coverage is meaningful enough to judge the document total
+
 ## Diagnostic Corpus
 
 The reproducible comparison corpus is generated inside the helper and currently contains:

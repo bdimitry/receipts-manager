@@ -269,6 +269,38 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         assertThat(processedReceipt.getOcrProfileUsed()).isIn("en", "cyrillic");
     }
 
+    @Test
+    void bankLikeSummaryAmountIsPersistedAndReturnedViaApi() throws Exception {
+        String rawText = new ClassPathResource("fixtures/ocr/real-receipt-6-lines.txt").getContentAsString(StandardCharsets.UTF_8);
+        when(ocrClient.extractResult(any(), any(), any(), any())).thenReturn(mapResult(rawText));
+        String accessToken = registerAndLogin(uniqueEmail("ocr-bank"), "P@ssword123");
+
+        ResponseEntity<ReceiptResponse> uploadResponse = restTemplate.exchange(
+            "/api/receipts/upload",
+            HttpMethod.POST,
+            multipartEntity("receipt6.pdf", MediaType.APPLICATION_PDF, "pdf".getBytes(StandardCharsets.UTF_8), CurrencyCode.UAH, accessToken),
+            ReceiptResponse.class
+        );
+
+        Receipt processedReceipt = awaitReceiptStatus(uploadResponse.getBody().id(), ReceiptOcrStatus.DONE);
+        assertThat(processedReceipt.getParsedStoreName()).isEqualTo("UkrsibBank");
+        assertThat(processedReceipt.getParsedTotalAmount()).isEqualByComparingTo("5480.00");
+        assertThat(processedReceipt.getParsedPurchaseDate()).isEqualTo(java.time.LocalDate.of(2026, 4, 2));
+        assertThat(processedReceipt.getLineItems()).isEmpty();
+
+        ResponseEntity<ReceiptOcrResponse> ocrResponse = restTemplate.exchange(
+            "/api/receipts/" + processedReceipt.getId() + "/ocr",
+            HttpMethod.GET,
+            authorizedEntity(accessToken),
+            ReceiptOcrResponse.class
+        );
+
+        assertThat(ocrResponse.getBody()).isNotNull();
+        assertThat(ocrResponse.getBody().parsedStoreName()).isEqualTo("UkrsibBank");
+        assertThat(ocrResponse.getBody().parsedTotalAmount()).isEqualByComparingTo("5480.00");
+        assertThat(ocrResponse.getBody().parseWarnings()).doesNotContain("SUSPICIOUS_TOTAL");
+    }
+
     private Receipt awaitReceiptStatus(Long receiptId, ReceiptOcrStatus expectedStatus) {
         Awaitility.await()
             .atMost(Duration.ofSeconds(20))

@@ -35,6 +35,9 @@ public class ReceiptOcrValidationService {
         "receipt", "cash receipt", "document", "thank you", "дякуємо", "спасибо"
     );
     private static final Set<String> TRUSTED_MERCHANTS = Set.of("novus", "ukrsibbank", "fresh market", "coffee house");
+    private static final Pattern ADDRESS_CONTACT_PATTERN = Pattern.compile(
+        "(?iu)(?:^|\\b)(address|adress|addr|street|st\\.?|phone|tel|tc\\d*|contact|вул\\.?|район|адрес|тел\\.?|контакт)(?:\\b|\\d)"
+    );
     private final ReceiptOcrKeywordLexicon keywordLexicon;
 
     public ReceiptOcrValidationService(ReceiptOcrKeywordLexicon keywordLexicon) {
@@ -89,6 +92,7 @@ public class ReceiptOcrValidationService {
             || TOTAL_KEYWORDS.stream().anyMatch(normalizedMerchant::contains)
             || keywordLexicon.containsPaymentKeyword(normalizedMerchant)
             || keywordLexicon.containsSummaryKeyword(normalizedMerchant);
+        boolean addressLike = looksLikeAddressOrContactText(normalizedMerchant);
 
         Optional<NormalizedOcrLineResponse> sourceLine = document.normalizedLines().stream()
             .limit(10)
@@ -107,6 +111,7 @@ public class ReceiptOcrValidationService {
             || shortLeadWord
             || genericHeader
             || serviceLike
+            || addressLike
             || suspiciousSourceLine
             || (wordCount == 1 && merchantName.length() <= 4)) {
             return Optional.of(ReceiptParseWarningCode.SUSPICIOUS_MERCHANT);
@@ -123,8 +128,7 @@ public class ReceiptOcrValidationService {
 
         LocalDate now = LocalDate.now();
         if (purchaseDate.isAfter(now.plusDays(1))
-            || purchaseDate.getYear() < 2000
-            || purchaseDate.isBefore(now.minusYears(5))) {
+            || purchaseDate.getYear() < 2000) {
             return Optional.of(ReceiptParseWarningCode.SUSPICIOUS_DATE);
         }
 
@@ -171,7 +175,11 @@ public class ReceiptOcrValidationService {
         if (itemSum.compareTo(BigDecimal.ZERO) > 0) {
             BigDecimal difference = itemSum.subtract(totalAmount).abs();
             BigDecimal tolerance = new BigDecimal("1.00").max(totalAmount.multiply(new BigDecimal("0.15")));
-            if (difference.compareTo(tolerance) > 0) {
+            BigDecimal coverageRatio = totalAmount.compareTo(BigDecimal.ZERO) > 0
+                ? itemSum.divide(totalAmount, 4, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+            boolean enoughCoverageForMathCheck = coverageRatio.compareTo(new BigDecimal("0.60")) >= 0;
+            if (difference.compareTo(tolerance) > 0 && enoughCoverageForMathCheck) {
                 warnings.add(ReceiptParseWarningCode.ITEM_TOTAL_MISMATCH);
                 warnings.add(ReceiptParseWarningCode.SUSPICIOUS_TOTAL);
             }
@@ -297,6 +305,17 @@ public class ReceiptOcrValidationService {
             .count();
 
         return bankishLines >= 3;
+    }
+
+    private boolean looksLikeAddressOrContactText(String value) {
+        if (!StringUtils.hasText(value)) {
+            return false;
+        }
+
+        return ADDRESS_CONTACT_PATTERN.matcher(value).find()
+            || value.startsWith("adress")
+            || value.startsWith("address")
+            || value.startsWith("addr");
     }
 
     private List<BigDecimal> extractDayMonthAmounts(String text) {

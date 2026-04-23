@@ -154,10 +154,10 @@ class ReceiptOcrValidationServiceTests {
         assertThat(validationResult.warnings())
             .contains(
                 ReceiptParseWarningCode.SUSPICIOUS_MERCHANT,
-                ReceiptParseWarningCode.SUSPICIOUS_DATE,
                 ReceiptParseWarningCode.NOISY_ITEM_TITLES,
                 ReceiptParseWarningCode.SUSPICIOUS_LINE_ITEMS
-            );
+            )
+            .doesNotContain(ReceiptParseWarningCode.SUSPICIOUS_DATE);
         assertThat(validationResult.weakParseQuality()).isTrue();
     }
 
@@ -193,11 +193,47 @@ class ReceiptOcrValidationServiceTests {
     @Test
     void realBankLikeReceiptWithDateFragmentItemIsFlagged() throws IOException {
         NormalizedOcrDocument document = normalizationService.normalizeRawTextDocument(fixture("fixtures/ocr/real-receipt-6-lines.txt"));
-        ParsedReceiptValidationResult validationResult = validationService.validate(document, parser.parse(document));
+        ParsedReceiptValidationResult validationResult = validationService.validate(
+            document,
+            new ParsedReceiptDocument(
+                "UkrsibBank",
+                LocalDate.of(2026, 4, 2),
+                new BigDecimal("5480.00"),
+                CurrencyCode.UAH,
+                List.of()
+            )
+        );
+
+        assertThat(validationResult.warnings()).isEmpty();
+        assertThat(validationResult.weakParseQuality()).isFalse();
+    }
+
+    @Test
+    void partialNoisyItemsDoNotAutomaticallyMakeTotalSuspicious() {
+        List<NormalizedOcrLineResponse> normalizedLines = List.of(
+            normalizedLine("NOVUS", 0, List.of("header_like"), false),
+            normalizedLine("TOTAL 212.84", 1, List.of("price_like", "service_like"), false),
+            normalizedLine("DATE 2026-04-10", 2, List.of("header_like"), false)
+        );
+
+        ParsedReceiptDocument parsedDocument = new ParsedReceiptDocument(
+            "NOVUS",
+            LocalDate.of(2026, 4, 10),
+            new BigDecimal("212.84"),
+            CurrencyCode.UAH,
+            List.of(
+                new ParsedReceiptLineItem(1, "Coca Cola Zero", null, null, null, new BigDecimal("50.49"), "Coca Cola Zero 50.49", List.of("Coca Cola Zero 50.49")),
+                new ParsedReceiptLineItem(2, "Bag", null, null, null, new BigDecimal("5.99"), "Bag 5.99", List.of("Bag 5.99"))
+            )
+        );
+
+        ParsedReceiptValidationResult validationResult = validationService.validate(
+            new NormalizedOcrDocument("RAW", List.of(), normalizedLines, normalizedLines, "NOVUS\nTOTAL 212.84"),
+            parsedDocument
+        );
 
         assertThat(validationResult.warnings())
-            .contains(ReceiptParseWarningCode.PAYMENT_CONTENT_IN_ITEMS, ReceiptParseWarningCode.SUSPICIOUS_LINE_ITEMS);
-        assertThat(validationResult.weakParseQuality()).isTrue();
+            .doesNotContain(ReceiptParseWarningCode.ITEM_TOTAL_MISMATCH, ReceiptParseWarningCode.SUSPICIOUS_TOTAL);
     }
 
     private String fixture(String path) throws IOException {

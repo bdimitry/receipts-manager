@@ -353,8 +353,11 @@ Current parser rules focus on:
 - pairing title lines with following amount-only lines
 - ignoring barcode/service/noise lines as item candidates
 - rejecting weak short merchant fragments before they can become parsed store names
+- rejecting address- and contact-like header lines before they can become parsed store names
 - preferring explicit merchant aliases like `NOVUS` and `UkrsibBank` when OCR noise breaks header candidates
 - treating plain late amount lines as totals only when they are connected to summary context, not as a global fallback
+- allowing explicit payment or account summary amount carriers such as `... грн` to surface totals on bank-like documents
+- skipping retail line-item extraction when a document looks bank-like and the OCR stream contains no real item signal
 - filtering payment/card/promo fragments out of item extraction so they do not pollute parsed line items
 
 The parser uses `normalizedLines[]` as its primary input. Raw OCR text remains stored for diagnostics and compatibility, but it is no longer the main parsing artifact.
@@ -403,6 +406,12 @@ Current validation checks include:
 - payment or service content leaking into items
 - noisy item titles
 - inconsistent quantity, unit price, and line total math
+
+Recent validation hardening on this branch also means:
+
+- old but otherwise plausible receipt dates are no longer treated as suspicious by default
+- merchant candidates that still look like address or contact lines are flagged as suspicious
+- item-total mismatch warnings are delayed until parsed item coverage is meaningful enough to judge the document total
 
 Current persisted validation artifacts:
 

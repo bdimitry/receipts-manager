@@ -345,8 +345,11 @@ Current Java normalization stays intentionally conservative:
 Current Java baseline parser hardening on noisy receipts additionally:
 
 - rejects weak short merchant candidates such as broken header fragments
+- rejects address- or contact-like header lines from becoming parsed merchants on clean receipts
 - prefers explicit merchant aliases like `NOVUS` and `UkrsibBank` over noisier header fallbacks
 - extracts totals only from summary-context lines instead of late standalone amounts
+- promotes explicit payment or account summary amount carriers such as `... грн` when the document is clearly bank-like
+- avoids inventing retail line items for bank-like and payment-style documents when the OCR stream contains no real item signal
 - keeps payment, promo, card, and barcode/service fragments out of parsed line items
 - pairs split item title and amount lines more safely for real-world OCR output
 
@@ -356,6 +359,8 @@ Current Java validation and sanity checks now additionally:
 - flag totals that look like date fragments or that conflict with item sums
 - flag suspicious line items when payment or service fragments leak into parsed goods
 - flag noisy item titles and inconsistent quantity or unit-price math
+- do not flag historical clean receipt dates only because they are old
+- only raise item-sum mismatch warnings when parsed line-item coverage is meaningful enough to judge the document total
 - keep the best-effort parsed result instead of hard-failing OCR processing
 
 The `lines[]` collection is now the main structured OCR output for downstream parsing work:

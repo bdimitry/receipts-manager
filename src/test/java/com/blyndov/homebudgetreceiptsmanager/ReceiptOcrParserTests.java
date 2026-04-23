@@ -169,6 +169,33 @@ class ReceiptOcrParserTests {
     }
 
     @Test
+    void parserKeepsCleanSyntheticReceipt5TotalsButRejectsAddressLineAsMerchant() throws IOException {
+        ParsedReceiptDocument parsed = parser.parse(
+            normalizationService.normalizeRawTextDocument(fixture("fixtures/ocr/real-receipt-5-lines.txt"))
+        );
+
+        assertThat(parsed.merchantName()).isNull();
+        assertThat(parsed.totalAmount()).isEqualByComparingTo("84.80");
+        assertThat(parsed.purchaseDate()).isEqualTo(LocalDate.of(2018, 1, 1));
+        assertThat(parsed.lineItems()).hasSize(7);
+        assertThat(parsed.lineItems()).extracting(ParsedReceiptLineItem::title)
+            .contains("Ipsum")
+            .doesNotContain("CASH RECEIPT", "Adress1234Lorem Lpsum Dolor", "THANK YOU");
+    }
+
+    @Test
+    void parserSurfacesBankLikeSummaryAmountForRealReceipt6() throws IOException {
+        ParsedReceiptDocument parsed = parser.parse(
+            normalizationService.normalizeRawTextDocument(fixture("fixtures/ocr/real-receipt-6-lines.txt"))
+        );
+
+        assertThat(parsed.merchantName()).isEqualTo("UkrsibBank");
+        assertThat(parsed.totalAmount()).isEqualByComparingTo("5480.00");
+        assertThat(parsed.purchaseDate()).isEqualTo(LocalDate.of(2026, 4, 2));
+        assertThat(parsed.lineItems()).isEmpty();
+    }
+
+    @Test
     void parserUsesNormalizedLinesAsPrimaryInputNotRawTextBlob() {
         List<NormalizedOcrLineResponse> normalizedLines = List.of(
             normalizedLine("RECEIPT", 0, List.of("header_like"), false),
