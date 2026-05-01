@@ -27,6 +27,24 @@ export interface CurrentUserResponse {
   id: number;
   email: string;
   createdAt: string;
+  role: "USER" | "ADMIN";
+  admin: boolean;
+}
+
+export interface AdminUserResponse {
+  id: number;
+  email: string;
+  role: "USER" | "ADMIN";
+  authProvider: "PASSWORD" | "GOOGLE";
+  createdAt: string;
+}
+
+export interface AdminOverviewResponse {
+  usersCount: number;
+  purchasesCount: number;
+  receiptsCount: number;
+  reportJobsCount: number;
+  recentUsers: AdminUserResponse[];
 }
 
 export interface NotificationSettingsResponse {
