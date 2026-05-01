@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { createReport, downloadReportFile, getReportDownload, getReports } from "../api";
+import { getCurrentUser } from "../../user/api";
 import type { ReportFormat, ReportType } from "../../../shared/api/types";
 import { useI18n } from "../../../shared/i18n/I18nContext";
 import {
@@ -72,6 +73,11 @@ export function ReportsPage() {
         ? 3_000
         : false,
   });
+  const currentUserQuery = useQuery({
+    queryKey: ["current-user"],
+    queryFn: getCurrentUser,
+  });
+  const isAdmin = Boolean(currentUserQuery.data?.admin);
 
   const createMutation = useMutation({
     mutationFn: createReport,
@@ -163,10 +169,12 @@ export function ReportsPage() {
               {getReportFormatLabel(selectedReport.reportFormat)}
             </p>
             <dl className="detail-grid">
-              <div>
-                <dt>{t("s3Key")}</dt>
-                <dd>{selectedReport.s3Key ?? "-"}</dd>
-              </div>
+              {isAdmin ? (
+                <div>
+                  <dt>{t("s3Key")}</dt>
+                  <dd>{selectedReport.s3Key ?? "-"}</dd>
+                </div>
+              ) : null}
               <div>
                 <dt>{t("errorLabel")}</dt>
                 <dd>{selectedReport.errorMessage ?? "-"}</dd>

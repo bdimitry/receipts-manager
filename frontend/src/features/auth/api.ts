@@ -14,6 +14,10 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface GoogleAuthRequest {
+  credential: string;
+}
+
 export function registerUser(request: RegisterRequest) {
   return apiFetch<CurrentUserResponse>("/api/auth/register", {
     method: "POST",
@@ -26,6 +30,16 @@ export function registerUser(request: RegisterRequest) {
 
 export function loginUser(request: LoginRequest) {
   return apiFetch<AuthResponse>("/api/auth/login", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+}
+
+export function loginWithGoogle(request: GoogleAuthRequest) {
+  return apiFetch<AuthResponse>("/api/auth/google", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

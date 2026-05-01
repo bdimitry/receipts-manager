@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { getReceipt, getReceiptOcr } from "../api";
+import { getCurrentUser } from "../../user/api";
 import { useI18n } from "../../../shared/i18n/I18nContext";
 import { getCategoryLabel, getOcrStatusLabel } from "../../../shared/lib/domain";
 import { formatCurrency, formatDate, formatDateTime } from "../../../shared/lib/format";
@@ -46,6 +47,10 @@ export function ReceiptDetailPage() {
     refetchInterval: (query) =>
       query.state.data?.ocrStatus === "NEW" || query.state.data?.ocrStatus === "PROCESSING" ? 3_000 : false,
   });
+  const currentUserQuery = useQuery({
+    queryKey: ["current-user"],
+    queryFn: getCurrentUser,
+  });
 
   if (receiptQuery.isLoading || ocrQuery.isLoading) {
     return <LoadingState label={t("loading")} />;
@@ -62,6 +67,8 @@ export function ReceiptDetailPage() {
 
   const receipt = receiptQuery.data;
   const ocr = ocrQuery.data;
+  const currentUser = currentUserQuery.data;
+  const isAdmin = Boolean(currentUser?.admin);
 
   if (!receipt || !ocr) {
     return <ErrorState title={t("errorTitle")} message={t("noData")} />;
@@ -107,10 +114,12 @@ export function ReceiptDetailPage() {
             <dt>{t("purchaseDate")}</dt>
             <dd>{ocr.parsedPurchaseDate ? formatDate(ocr.parsedPurchaseDate, language) : "-"}</dd>
           </div>
-          <div>
-            <dt>{t("s3Key")}</dt>
-            <dd>{receipt.s3Key}</dd>
-          </div>
+          {isAdmin ? (
+            <div>
+              <dt>{t("s3Key")}</dt>
+              <dd>{receipt.s3Key}</dd>
+            </div>
+          ) : null}
         </dl>
       </Card>
       <Card>
@@ -150,7 +159,7 @@ export function ReceiptDetailPage() {
                       ? ` / ${formatCurrency(lineItem.unitPrice, language, ocr.currency)}`
                       : ""}
                   </span>
-                  {lineItem.rawFragment ? <span>{lineItem.rawFragment}</span> : null}
+                  {isAdmin && lineItem.rawFragment ? <span>{lineItem.rawFragment}</span> : null}
                 </div>
                 <div className="list-row__meta">
                   <span>{t("lineTotal")}</span>
@@ -167,15 +176,17 @@ export function ReceiptDetailPage() {
           <EmptyState message={t("noLineItems")} />
         )}
       </Card>
-      <Card>
-        <h2>{t("rawOcrText")}</h2>
-        <p className="field-hint">{t("rawTextHint")}</p>
-        {ocr.rawOcrText ? (
-          <pre className="code-panel">{ocr.rawOcrText}</pre>
-        ) : (
-          <EmptyState message={ocr.ocrStatus === "FAILED" ? t("ocrFailed") : t("ocrPending")} />
-        )}
-      </Card>
+      {isAdmin ? (
+        <Card>
+          <h2>{t("rawOcrText")}</h2>
+          <p className="field-hint">{t("rawTextHint")}</p>
+          {ocr.rawOcrText ? (
+            <pre className="code-panel">{ocr.rawOcrText}</pre>
+          ) : (
+            <EmptyState message={ocr.ocrStatus === "FAILED" ? t("ocrFailed") : t("ocrPending")} />
+          )}
+        </Card>
+      ) : null}
     </div>
   );
 }

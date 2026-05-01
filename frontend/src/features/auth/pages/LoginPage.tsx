@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { loginUser } from "../api";
+import { GoogleSignInButton } from "../GoogleSignInButton";
 import { useAuth } from "../../../shared/auth/AuthContext";
 import { useI18n } from "../../../shared/i18n/I18nContext";
 import { Button } from "../../../shared/ui/Button";
@@ -75,6 +76,8 @@ export function LoginPage() {
             {t("login")}
           </Button>
         </form>
+        <div className="auth-divider">{t("or")}</div>
+        <GoogleSignInButton />
         <Link className="auth-link" to="/register">
           {t("authRegisterLink")}
         </Link>

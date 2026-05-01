@@ -1,11 +1,15 @@
 package com.blyndov.homebudgetreceiptsmanager.service;
 
+import com.blyndov.homebudgetreceiptsmanager.config.AuthProperties;
 import com.blyndov.homebudgetreceiptsmanager.dto.AuthResponse;
 import com.blyndov.homebudgetreceiptsmanager.dto.CurrentUserResponse;
+import com.blyndov.homebudgetreceiptsmanager.dto.GoogleAuthRequest;
+import com.blyndov.homebudgetreceiptsmanager.dto.GoogleTokenInfoResponse;
 import com.blyndov.homebudgetreceiptsmanager.dto.LoginRequest;
 import com.blyndov.homebudgetreceiptsmanager.dto.RegisterRequest;
 import com.blyndov.homebudgetreceiptsmanager.entity.NotificationChannel;
 import com.blyndov.homebudgetreceiptsmanager.entity.User;
+import com.blyndov.homebudgetreceiptsmanager.entity.UserRole;
 import com.blyndov.homebudgetreceiptsmanager.exception.EmailAlreadyExistsException;
 import com.blyndov.homebudgetreceiptsmanager.exception.InvalidCredentialsException;
 import com.blyndov.homebudgetreceiptsmanager.repository.UserRepository;
@@ -18,6 +22,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 @Service
 @Transactional(readOnly = true)
@@ -26,15 +32,21 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final AuthProperties authProperties;
+    private final RestClient restClient;
 
     public AuthService(
         UserRepository userRepository,
         PasswordEncoder passwordEncoder,
-        JwtService jwtService
+        JwtService jwtService,
+        AuthProperties authProperties,
+        RestClient.Builder restClientBuilder
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.authProperties = authProperties;
+        this.restClient = restClientBuilder.build();
     }
 
     @Transactional
@@ -47,6 +59,7 @@ public class AuthService {
         User user = new User();
         user.setEmail(normalizedEmail);
         user.setPasswordHash(passwordEncoder.encode(request.password()));
+        user.setRole(resolveRole(normalizedEmail));
         user.setPreferredNotificationChannel(NotificationChannel.EMAIL);
         user.setCreatedAt(Instant.now());
 
@@ -59,9 +72,22 @@ public class AuthService {
         User user = userRepository.findByEmail(normalizedEmail)
             .orElseThrow(() -> new InvalidCredentialsException("Invalid email or password"));
 
-        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        if (user.getPasswordHash() == null || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw new InvalidCredentialsException("Invalid email or password");
         }
+
+        return new AuthResponse(jwtService.generateAccessToken(user), "Bearer");
+    }
+
+    @Transactional
+    public AuthResponse loginWithGoogle(GoogleAuthRequest request) {
+        GoogleTokenInfoResponse tokenInfo = verifyGoogleCredential(request.credential());
+        String normalizedEmail = normalizeEmail(tokenInfo.email());
+
+        User user = userRepository.findByGoogleSubject(tokenInfo.sub())
+            .or(() -> userRepository.findByEmail(normalizedEmail))
+            .map(existingUser -> linkGoogleAccount(existingUser, tokenInfo.sub()))
+            .orElseGet(() -> createGoogleUser(normalizedEmail, tokenInfo.sub()));
 
         return new AuthResponse(jwtService.generateAccessToken(user), "Bearer");
     }
@@ -81,10 +107,73 @@ public class AuthService {
     }
 
     private CurrentUserResponse mapToCurrentUserResponse(User user) {
-        return new CurrentUserResponse(user.getId(), user.getEmail(), user.getCreatedAt());
+        UserRole role = user.getRole() == null ? UserRole.USER : user.getRole();
+        return new CurrentUserResponse(
+            user.getId(),
+            user.getEmail(),
+            user.getCreatedAt(),
+            role.name(),
+            role == UserRole.ADMIN
+        );
     }
 
     private String normalizeEmail(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private UserRole resolveRole(String normalizedEmail) {
+        return authProperties.getAdminEmails().stream()
+            .map(this::normalizeEmail)
+            .anyMatch(normalizedEmail::equals)
+            ? UserRole.ADMIN
+            : UserRole.USER;
+    }
+
+    private User linkGoogleAccount(User user, String googleSubject) {
+        if (user.getGoogleSubject() == null) {
+            user.setGoogleSubject(googleSubject);
+        }
+        if (user.getRole() == null) {
+            user.setRole(resolveRole(user.getEmail()));
+        }
+        return user;
+    }
+
+    private User createGoogleUser(String normalizedEmail, String googleSubject) {
+        User user = new User();
+        user.setEmail(normalizedEmail);
+        user.setGoogleSubject(googleSubject);
+        user.setRole(resolveRole(normalizedEmail));
+        user.setPreferredNotificationChannel(NotificationChannel.EMAIL);
+        user.setCreatedAt(Instant.now());
+        return userRepository.save(user);
+    }
+
+    private GoogleTokenInfoResponse verifyGoogleCredential(String credential) {
+        String clientId = authProperties.getGoogle().getClientId();
+        if (clientId == null || clientId.isBlank()) {
+            throw new InvalidCredentialsException("Google sign-in is not configured");
+        }
+
+        try {
+            GoogleTokenInfoResponse tokenInfo = restClient.get()
+                .uri(authProperties.getGoogle().getTokenInfoUrl() + "?id_token={credential}", credential)
+                .retrieve()
+                .body(GoogleTokenInfoResponse.class);
+
+            if (
+                tokenInfo == null ||
+                    tokenInfo.sub() == null ||
+                    tokenInfo.email() == null ||
+                    !tokenInfo.isEmailVerified() ||
+                    !clientId.equals(tokenInfo.aud())
+            ) {
+                throw new InvalidCredentialsException("Invalid Google credential");
+            }
+
+            return tokenInfo;
+        } catch (RestClientException exception) {
+            throw new InvalidCredentialsException("Invalid Google credential");
+        }
     }
 }

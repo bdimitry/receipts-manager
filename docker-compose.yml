@@ -113,6 +113,8 @@ services:
       NOTIFICATION_TELEGRAM_CONNECT_TOKEN_TTL: ${NOTIFICATION_TELEGRAM_CONNECT_TOKEN_TTL:-PT15M}
       JWT_SECRET: ${JWT_SECRET:-change-me-please-use-a-very-secret-32-byte-key}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-PT1H}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     ports:
       - "${APP_PORT:-8080}:8080"
     depends_on:
@@ -131,6 +133,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     container_name: home-budget-frontend
     ports:
       - "${FRONTEND_PORT:-3000}:80"

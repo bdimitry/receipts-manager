@@ -454,6 +454,13 @@ export const translationDictionary = {
     quantityUnavailable: "Quantity unavailable",
     recognizedItems: "items",
     mixedCurrencyWarning: "Totals stay separated by currency. The chart reflects the selected currency only.",
+    admin: "Admin",
+    adminSubtitle: "Read-only operations view for users, receipts, purchases, and report jobs.",
+    users: "Users",
+    recentUsers: "Recent users",
+    adminUsersHint: "Account provider and role summary for support checks.",
+    googleUnavailable: "Google sign-in needs a client ID",
+    or: "or",
   },
 } satisfies Record<LanguageCode, Record<string, string>>;
 

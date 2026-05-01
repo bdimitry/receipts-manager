@@ -22,8 +22,15 @@ public class User {
     @Column(nullable = false, unique = true, length = 255)
     private String email;
 
-    @Column(name = "password_hash", nullable = false, length = 255)
+    @Column(name = "password_hash", length = 255)
     private String passwordHash;
+
+    @Column(name = "google_subject", length = 255)
+    private String googleSubject;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private UserRole role;
 
     @Column(name = "telegram_chat_id", length = 255)
     private String telegramChatId;
@@ -60,6 +67,22 @@ public class User {
 
     public void setPasswordHash(String passwordHash) {
         this.passwordHash = passwordHash;
+    }
+
+    public String getGoogleSubject() {
+        return googleSubject;
+    }
+
+    public void setGoogleSubject(String googleSubject) {
+        this.googleSubject = googleSubject;
+    }
+
+    public UserRole getRole() {
+        return role;
+    }
+
+    public void setRole(UserRole role) {
+        this.role = role;
     }
 
     public String getTelegramChatId() {
@@ -101,6 +124,9 @@ public class User {
         }
         if (preferredNotificationChannel == null) {
             preferredNotificationChannel = NotificationChannel.EMAIL;
+        }
+        if (role == null) {
+            role = UserRole.USER;
         }
     }
 }
