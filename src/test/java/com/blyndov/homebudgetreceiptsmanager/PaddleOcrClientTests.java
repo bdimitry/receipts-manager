@@ -3,6 +3,7 @@ package com.blyndov.homebudgetreceiptsmanager;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.blyndov.homebudgetreceiptsmanager.client.OcrExtractionResult;
+import com.blyndov.homebudgetreceiptsmanager.client.OcrRequestOptions;
 import com.blyndov.homebudgetreceiptsmanager.client.PaddleOcrClient;
 import com.blyndov.homebudgetreceiptsmanager.config.OcrClientProperties;
 import com.sun.net.httpserver.HttpExchange;
@@ -56,6 +57,24 @@ class PaddleOcrClientTests {
             java.util.List.of(220.0d, 60.0d),
             java.util.List.of(10.0d, 60.0d)
         );
+        assertThat(response.rawArtifact()).isNotNull();
+        assertThat(response.rawArtifact().engineName()).isEqualTo("PaddleOCR");
+        assertThat(response.rawArtifact().engineVersion()).isEqualTo("PP-OCRv4");
+        assertThat(response.rawArtifact().engineModelSnapshot()).contains("en_PP-OCRv4_rec_infer");
+        assertThat(response.rawArtifact().language()).isEqualTo("en");
+        assertThat(response.rawArtifact().profile()).isEqualTo("en");
+        assertThat(response.rawArtifact().preprocessingApplied()).isTrue();
+        assertThat(response.rawArtifact().preprocessingProfile()).isEqualTo("soft");
+        assertThat(response.rawArtifact().preprocessingSteps()).containsExactly("crop_receipt", "deskew", "contrast");
+        assertThat(response.rawArtifact().preprocessingWarnings()).containsExactly("possible_blur");
+        assertThat(response.rawArtifact().pages()).hasSize(1);
+        assertThat(response.rawArtifact().pages().getFirst().imageSizeBefore())
+            .containsEntry("width", 1200)
+            .containsEntry("height", 1800);
+        assertThat(response.rawArtifact().pages().getFirst().imageDiagnosticsBefore())
+            .containsEntry("visualClassification", "balanced");
+        assertThat(response.rawArtifact().lines()).hasSize(2);
+        assertThat(response.rawArtifact().diagnostics()).containsKey("rawEngineText");
         assertThat(lastRequestPath.get()).isEqualTo("/ocr");
         assertThat(client.extractText("receipt.png", "image/png", "fake-image".getBytes(StandardCharsets.UTF_8)))
             .isEqualTo("STORE\nTOTAL 123.45");
@@ -76,11 +95,39 @@ class PaddleOcrClientTests {
             "receipt.png",
             "image/png",
             "fake-image".getBytes(StandardCharsets.UTF_8),
-            new com.blyndov.homebudgetreceiptsmanager.client.OcrRequestOptions("cyrillic")
+            new OcrRequestOptions("cyrillic")
         );
 
         assertThat(response.rawText()).isEqualTo("STORE\nTOTAL 123.45");
         assertThat(lastRequestPath.get()).isEqualTo("/ocr?profile=cyrillic");
+    }
+
+    @Test
+    void extractResultBuildsDiagnosticArtifactForMinimalLegacyHelperResponse() throws Exception {
+        server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext("/ocr", this::handleMinimalOcrRequest);
+        server.start();
+
+        OcrClientProperties properties = new OcrClientProperties();
+        properties.setPaddleBaseUrl("http://127.0.0.1:" + server.getAddress().getPort());
+
+        PaddleOcrClient client = new PaddleOcrClient(RestClient.builder(), properties);
+
+        OcrExtractionResult response = client.extractResult(
+            "legacy-receipt.png",
+            "image/png",
+            "fake-image".getBytes(StandardCharsets.UTF_8)
+        );
+
+        assertThat(response.rawText()).isEqualTo("LEGACY STORE\nTOTAL 7.25");
+        assertThat(response.rawArtifact()).isNotNull();
+        assertThat(response.rawArtifact().engineName()).isEqualTo("PaddleOCR");
+        assertThat(response.rawArtifact().engineVersion()).isNull();
+        assertThat(response.rawArtifact().preprocessingProfile()).isNull();
+        assertThat(response.rawArtifact().preprocessingSteps()).isEmpty();
+        assertThat(response.rawArtifact().pages()).isEmpty();
+        assertThat(response.rawArtifact().rawText()).isEqualTo("LEGACY STORE\nTOTAL 7.25");
+        assertThat(response.rawArtifact().lines()).hasSize(2);
     }
 
     private void handleOcrRequest(HttpExchange exchange) throws IOException {
@@ -88,13 +135,42 @@ class PaddleOcrClientTests {
         byte[] responseBody = """
             {
               "rawText": "STORE\\nTOTAL 123.45",
+              "profile": "en",
+              "engine": {
+                "name": "PaddleOCR",
+                "version": "PP-OCRv4",
+                "model": "Multilingual_PP-OCRv3_det_infer+en_PP-OCRv4_rec_infer+ch_ppocr_mobile_v2.0_cls_infer",
+                "language": "en",
+                "profile": "en",
+                "config": {
+                  "language": "en",
+                  "recModelName": "en_PP-OCRv4_rec_infer"
+                }
+              },
+              "preprocessing": {
+                "applied": true,
+                "profile": "soft",
+                "steps": ["crop_receipt", "deskew", "contrast"],
+                "warnings": ["possible_blur"]
+              },
               "preprocessingApplied": true,
               "pages": [
                 {
                   "pageIndex": 0,
                   "imageSizeBefore": { "width": 1200, "height": 1800 },
                   "imageSizeAfter": { "width": 960, "height": 1600 },
-                  "stepsApplied": ["crop_receipt", "deskew", "contrast", "threshold"]
+                  "strategy": "soft",
+                  "stepsApplied": ["crop_receipt", "deskew", "contrast", "threshold"],
+                  "imageDiagnosticsBefore": {
+                    "contrastStd": 41.0,
+                    "laplacianVariance": 125.0,
+                    "visualClassification": "balanced"
+                  },
+                  "imageDiagnosticsAfter": {
+                    "contrastStd": 52.0,
+                    "laplacianVariance": 240.0,
+                    "visualClassification": "balanced"
+                  }
                 }
               ],
               "diagnostics": {
@@ -116,6 +192,35 @@ class PaddleOcrClientTests {
                   "confidence": 0.9821,
                   "order": 1,
                   "bbox": [[12, 180], [260, 180], [260, 220], [12, 220]]
+                }
+              ]
+            }
+            """.getBytes(StandardCharsets.UTF_8);
+
+        exchange.getResponseHeaders().add("Content-Type", "application/json");
+        exchange.sendResponseHeaders(200, responseBody.length);
+        try (OutputStream outputStream = exchange.getResponseBody()) {
+            outputStream.write(responseBody);
+        } finally {
+            exchange.close();
+        }
+    }
+
+    private void handleMinimalOcrRequest(HttpExchange exchange) throws IOException {
+        lastRequestPath.set(exchange.getRequestURI().toString());
+        byte[] responseBody = """
+            {
+              "rawText": "LEGACY STORE\\nTOTAL 7.25",
+              "lines": [
+                {
+                  "text": "LEGACY STORE",
+                  "confidence": 0.88,
+                  "order": 0
+                },
+                {
+                  "text": "TOTAL 7.25",
+                  "confidence": 0.87,
+                  "order": 1
                 }
               ]
             }

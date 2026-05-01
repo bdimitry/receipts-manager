@@ -4,6 +4,14 @@
 
 This runbook helps a developer quickly understand where to look when the local full-stack flow is not behaving as expected.
 
+For the broader AI-assisted operating model around this repo, also see:
+
+- [skills-catalog.md](skills-catalog.md)
+- [agent-roster.md](agent-roster.md)
+- [mcp-stack.md](mcp-stack.md)
+- [development-workflow.md](development-workflow.md)
+- [playwright-ocr-smoke.md](playwright-ocr-smoke.md)
+
 ## Start And Stop
 
 Start:
@@ -126,6 +134,23 @@ Check:
 - OCR detail in `GET /api/receipts/{id}/ocr`
 - backend logs around receipt OCR consumer
 - OCR helper logs
+
+## If OCR Changed And The Branch Looks Green
+
+Do not stop at backend tests alone.
+
+Run the browser-level OCR smoke flow from:
+
+- [playwright-ocr-smoke.md](playwright-ocr-smoke.md)
+
+Minimum requirement after OCR or parser changes:
+
+1. open the live frontend
+2. upload a real receipt from `C:\Users\dmitr\Pictures\чеки`
+3. wait for OCR to complete
+4. inspect parsed fields and raw OCR text on the receipt detail page
+
+If browser-visible parsing looks wrong, treat that as a real regression even when unit tests are green.
 
 ## If Report Job Looks Stuck
 

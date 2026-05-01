@@ -26,6 +26,19 @@ class ImageQualityProfile:
     looks_like_white_page: bool
     visual_classification: str
 
+    def to_response(self) -> dict:
+        return {
+            "contrastStd": self.contrast_std,
+            "laplacianVariance": self.laplacian_variance,
+            "darkRatio": self.dark_ratio,
+            "brightRatio": self.bright_ratio,
+            "edgeRatio": self.edge_ratio,
+            "entropy": self.entropy,
+            "looksClean": self.looks_clean,
+            "looksLikeWhitePage": self.looks_like_white_page,
+            "visualClassification": self.visual_classification,
+        }
+
 
 @dataclass(frozen=True)
 class PreprocessedReceiptImage:
@@ -38,6 +51,8 @@ class PreprocessedReceiptImage:
     upscale_factor: float
     crop_box: tuple[int, int, int, int] | None
     deskew_applied: bool
+    quality_before: ImageQualityProfile | None
+    quality_after: ImageQualityProfile | None
 
     def to_response(self, page_index: int) -> dict:
         return {
@@ -55,6 +70,8 @@ class PreprocessedReceiptImage:
             "upscaleFactor": self.upscale_factor,
             "cropBox": list(self.crop_box) if self.crop_box else None,
             "deskewApplied": self.deskew_applied,
+            "imageDiagnosticsBefore": self.quality_before.to_response() if self.quality_before else None,
+            "imageDiagnosticsAfter": self.quality_after.to_response() if self.quality_after else None,
         }
 
 
@@ -67,8 +84,10 @@ class ReceiptImagePreprocessor:
         effective_enabled = self.enabled if enabled_override is None else enabled_override
         normalized = image.convert("RGB")
         size_before = ImageSize(width=normalized.width, height=normalized.height)
+        working = _pil_to_bgr(normalized)
 
         if not effective_enabled:
+            quality = self._analyze_image(working)
             return PreprocessedReceiptImage(
                 image=normalized,
                 applied=False,
@@ -79,9 +98,10 @@ class ReceiptImagePreprocessor:
                 upscale_factor=1.0,
                 crop_box=None,
                 deskew_applied=False,
+                quality_before=quality,
+                quality_after=quality,
             )
 
-        working = _pil_to_bgr(normalized)
         steps: list[str] = []
         initial_quality = self._analyze_image(working)
 
@@ -100,6 +120,7 @@ class ReceiptImagePreprocessor:
         quality = self._analyze_image(working)
         working, strategy, enhanced_steps = self._enhance_for_ocr(working, quality)
         steps.extend(enhanced_steps)
+        final_quality = self._analyze_image(working)
 
         processed_image = _bgr_to_pil(working)
         size_after = ImageSize(width=processed_image.width, height=processed_image.height)
@@ -114,6 +135,8 @@ class ReceiptImagePreprocessor:
             upscale_factor=upscale_factor,
             crop_box=crop_box,
             deskew_applied=deskewed,
+            quality_before=initial_quality,
+            quality_after=final_quality,
         )
 
     def _upscale_if_needed(self, image: np.ndarray, quality: ImageQualityProfile) -> tuple[np.ndarray, bool, float]:

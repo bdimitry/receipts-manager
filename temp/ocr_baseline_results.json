@@ -1,0 +1,372 @@
+﻿[
+    {
+        "sample":  "1.jpg",
+        "receiptId":  276,
+        "ocrStatus":  "DONE",
+        "rawOcrText":  "MB AEKA AHI\nAITEKA N 14\nAXMATUBOIBVA\n34\nAHHM\nnH 335496326579\nIA 33549639\nWK 4823045290077\nHERESPEKC\u0027 K JOOUD\nN20\n593 808\n234\nOOB\nEKB.ELEGANT GRUPPSG\n....\nTEPMIHAN: SIKSOSHL\nnEODAK\ncn35332xxxxxxxxxXx\nKON ABT.:374184\nREN: 110569362743\nSESTOTIBKDBA\nOnJATA\n827.80rEH\nHTACVHOK YEKA\nSACOENOIJIATM\nKAPTA,\nEn3\nCYMA\n827.80 TOh\nnAB B 7*\nNOAATKH\n/54.16\nYEK\u0027N:\nGVRG4EJ59PC\n13.04.2026\n17-47-37\nOHJAMH\n#H nePo\nPICKAJOHW\n4000154870\nMEK\nCASHDESK\nHEOrEAMA JOAJLHOCTT\nTEJIEQOH:\n05003**06\nHAPAXOBAHO:\nFAJIAHC:\ntx*HF\u0027sMIHHA TYFAMAY BIJL AHIL TA II\n1ANTODILA\nIE FAl\nHPOMURUJ HA sHh*RyTYd k HAhO A!\nHJAHPpMoK+yI He HA HEthE\n3AMogIEHHt At H+4 1 M+.It h?\nk1\u0027sUTIt Y HJA HPM 4PMIIEHHI HA\nHAtAIATUFII\u0027HIHA HASHITE IPUMOKO\nH 159\nIEITE!",
+        "reconstructedText":  "MB AEKA AHI AITEKA N 14\nAXMATUBOIBVA AHHM\nnH 335496326579 34\nIA 33549639\nWK 4823045290077\nHERESPEKC\u0027 K JOOUD 593 808 234 OOB\n.... N20\nEKB.ELEGANT GRUPPSG\nTEPMIHAN: SIKSOSHL\nnEODAK\ncn35332xxxxxxxxxXx\nÐÐÐ ÐÐÐ¢. 374184\nREN: 110569362743\nOnJATA 827.80rEH\nSACOENOIJIATM SESTOTIBKDBA\nHTACVHOK YEKA KAPTA, En3\nÐ¡ÑÐ¼Ð° 827.80\nNOAATKH\nnAB B 7* /54.16\nYEK\u0027N: GVRG4EJ59PC\n13.04.2026 17-47-37\nOHJAMH\n#H nePo\n4000154870\nPICKAJOHW\nMEK CASHDESK\nHEOrEAMA JOAJLHOCTT\nTEJIEQOH: 05003**06\nHAPAXOBAHO:\nFAJIAHC:\ntx*HF\u0027sMIHHA TYFAMAY BIJL AHIL TA II\n1ANTODILA IE FAl\nHPOMURUJ HA sHh*RyTYd k HAhO A!\nHJAHPpMoK+yI He HA HEthE\n3AMogIEHHt At H+4 1 M+.It h?\nk1\u0027sUTIt Y HJA HPM 4PMIIEHHI HA\nHAtAIATUFII\u0027HIHA HASHITE IPUMOKO\nH 159\nIEITE!",
+        "normalizedText":  "MB AEKA AHI AITEKA N 14\nAXMATUBOIBVA AHHM\nnH 335496326579 34\nIA 33549639\nWK 4823045290077\nHERESPEKC\u0027 K JOOUD 593 808 234 OOB\nN20\nEKB ELEGANT GRUPPSG\nTEPMIHAN: SIKSOSHL\nnEODAK\ncn35332xxxxxxxxxXx\nÐÐÐ ÐÐÐ¢. 374184\nREN: 110569362743\nOnJATA 827.80rEH\nSACOENOIJIATM SESTOTIBKDBA\nHTACVHOK YEKA KAPTA, En3\nÐ¡ÑÐ¼Ð° 827.80\nNOAATKH\nnAB B 7* /54.16\nYEK\u0027N: GVRG4EJ59PC\n13.04.2026 17-47-37\nOHJAMH\n#H nePo\n4000154870\nPICKAJOHW\nMEK CASHDESK\nHEOrEAMA JOAJLHOCTT\nTEJIEQOH: 05003**06\nHAPAXOBAHO\nFAJIAHC\ntx*HF\u0027sMIHHA TYFAMAY BIJL AHIL TA II\n1ANTODILA IE FAl\nHPOMURUJ HA sHh*RyTYd k HAhO A!\nHJAHPpMoK+yI He HA HEthE\n3AMogIEHHt At H+4 1 M+.It h?\nk1\u0027sUTIt Y HJA HPM 4PMIIEHHI HA\nHAtAIATUFII\u0027HIHA HASHITE IPUMOKO\nH 159\nIEITE!",
+        "parsedStoreName":  "AXMATUBOIBVA AHHM",
+        "parsedTotalAmount":  827.80,
+        "parsedCurrency":  null,
+        "parsedPurchaseDate":  "2026-04-13",
+        "parseWarnings":  [
+
+                          ],
+        "weakParseQuality":  false,
+        "lineItemCount":  0,
+        "lineItems":  [
+
+                      ],
+        "receiptSummary":  {
+                               "id":  276,
+                               "purchaseId":  null,
+                               "originalFileName":  "1.jpg",
+                               "contentType":  "image/jpeg",
+                               "fileSize":  564947,
+                               "currency":  "UAH",
+                               "receiptCountryHint":  null,
+                               "s3Key":  "receipts/94/8683fd99-05e5-4971-a7e5-79d47964c8a6-1.jpg",
+                               "uploadedAt":  "2026-04-24T13:09:38.849419Z",
+                               "ocrStatus":  "DONE",
+                               "parsedStoreName":  "AXMATUBOIBVA AHHM",
+                               "parsedTotalAmount":  827.80,
+                               "parsedPurchaseDate":  "2026-04-13",
+                               "parsedLineItemCount":  0,
+                               "ocrErrorMessage":  null,
+                               "ocrProcessedAt":  "2026-04-24T13:09:43.017964Z"
+                           }
+    },
+    {
+        "sample":  "2.jpg",
+        "receiptId":  277,
+        "ocrStatus":  "DONE",
+        "rawOcrText":  "MArA3NH NOVUS\nKHBHAPHNUBK PANOH\nTAN6HIBCbKA\nTOB \"HOBYC yKPAIHA\nnH360036026593\nKCO Kaca 09\nyek #_[1050:9.1120.262]\n01050000090112000262\n49.99 A\nWTPHX KOA 5449000130389\nHanin ra3.Coca-Co1a 1,75n nET\nHanin ra3.Fanta Orange 1,75n nET 53.99 A\nUTPHX KOA 5449000132499\nKynYi OHNAUH HA NOVUS.ZAKAZ.UA\nnPHBATGAHK HOBYC yKPAIHA\nS1K70DWE\nROATIRHA CHCTEMA:MasterCard\nE13 533273455XXXXXX5\nOnnara.\nKOATPAH3.*110540009500\nKOA A8T118182\n103.98 rPH\nGE3rOTIBKOBA\nKAPTKA\n103.98\nCyma\nnAB A=.20.00%\n17.33\n4EK Ib 000315311 00256\n12.04.2026 20:41:09\nHAC=ABoAAAONAAAAABYAEdckAASRYwIaL9PE9ZVy\nfhQ=\n3H Cn802407669\nQH 3001049016\nDy\nbTCKAnbHW0 yEK",
+        "reconstructedText":  "MArA3NH NOVUS\nKHBHAPHNUBK PANOH\nTAN6HIBCbKA\nTOB \"HOBYC yKPAIHA\nÐÐ 360036026593\nÐÐ¡Ð ÐÐ°ÑÐ° 09\nÐ§ÐµÐº # [1050:9.1120.262]\n01050000090112000262\nHanin ra3.Coca-Co1a 1,75n nET 49.99 A\nÐ¨ÑÑÐ¸Ñ\u0085 ÐºÐ¾Ð´ 5449000130389\nÐ¨ÑÑÐ¸Ñ\u0085 ÐºÐ¾Ð´ 5449000132499\nHanin ra3.Fanta Orange 1,75n nET 53.99 A\nKynYi OHNAUH HA NOVUS.ZAKAZ.UA\nnPHBATGAHK HOBYC yKPAIHA\nS1K70DWE\nÐÐ¿Ð»Ð°ÑÐ°\nÐÐÐ 533273455XXXXXX5\nÐÐÐÐ¢ÐÐÐÐ Ð¡ÐÐ¡Ð¢ÐÐÐ: MasterCard\nÐÐÐ Ð¢Ð ÐÐÐ. 110540009500\nÐÐÐ ÐÐÐ¢. 118182\nÐÐÐÐÐÐ¢ÐÐÐÐÐÐ ÐÐÐ Ð¢ÐÐ 103.98 Ð³ÑÐ½\nÐ¡ÑÐ¼Ð° 103.98\nÐÐÐ A = 20.00% 17.33\nÐ§ÐÐ â 000315311 00256\n12.04.2026 20:41:09",
+        "normalizedText":  "MArA3NH NOVUS\nKHBHAPHNUBK PANOH\nTAN6HIBCbKA\nTOB \"HOBYC yKPAIHA\nÐÐ 360036026593\nÐÐ¡Ð ÐÐ°ÑÐ° 09\nÐ§ÐµÐº # [1050: 9.1120.262]\n01050000090112000262\nHanin ra3.Coca-Co1a 1,75n nET 49.99 A\nÐ¨ÑÑÐ¸Ñ\u0085 ÐºÐ¾Ð´ 5449000130389\nÐ¨ÑÑÐ¸Ñ\u0085 ÐºÐ¾Ð´ 5449000132499\nHanin ra3.Fanta Orange 1,75n nET 53.99 A\nKynYi OHNAUH HA NOVUS ZAKAZ UA\nnPHBATGAHK HOBYC yKPAIHA\nS1K70DWE\nÐÐ¿Ð»Ð°ÑÐ°\nÐÐÐ 533273455XXXXXX5\nÐÐÐÐ¢ÐÐÐÐ Ð¡ÐÐ¡Ð¢ÐÐÐ: MasterCard\nÐÐÐ Ð¢Ð ÐÐÐ. 110540009500\nÐÐÐ ÐÐÐ¢. 118182\nÐÐÐÐÐÐ¢ÐÐÐÐÐÐ ÐÐÐ Ð¢ÐÐ 103.98 Ð³ÑÐ½\nÐ¡ÑÐ¼Ð° 103.98\nÐÐÐ A= 20.00% 17.33\nÐ§ÐÐ â 000315311 00256\n12.04.2026 20: 41: 09",
+        "parsedStoreName":  "NOVUS",
+        "parsedTotalAmount":  103.98,
+        "parsedCurrency":  "UAH",
+        "parsedPurchaseDate":  "2026-04-12",
+        "parseWarnings":  [
+
+                          ],
+        "weakParseQuality":  false,
+        "lineItemCount":  2,
+        "lineItems":  [
+                          {
+                              "title":  "Hanin ra3.Coca-Co1a",
+                              "quantity":  null,
+                              "unit":  null,
+                              "unitPrice":  1.75,
+                              "lineTotal":  49.99,
+                              "rawFragment":  "Hanin ra3.Coca-Co1a 1,75n nET 49.99 A"
+                          },
+                          {
+                              "title":  "Hanin ra3.Fanta Orange",
+                              "quantity":  null,
+                              "unit":  null,
+                              "unitPrice":  1.75,
+                              "lineTotal":  53.99,
+                              "rawFragment":  "Hanin ra3.Fanta Orange 1,75n nET 53.99 A"
+                          }
+                      ],
+        "receiptSummary":  {
+                               "id":  277,
+                               "purchaseId":  null,
+                               "originalFileName":  "2.jpg",
+                               "contentType":  "image/jpeg",
+                               "fileSize":  621559,
+                               "currency":  "UAH",
+                               "receiptCountryHint":  null,
+                               "s3Key":  "receipts/94/b8b6809f-fe24-4ce3-af32-49d90fe9ea2f-2.jpg",
+                               "uploadedAt":  "2026-04-24T13:09:45.168133Z",
+                               "ocrStatus":  "DONE",
+                               "parsedStoreName":  "NOVUS",
+                               "parsedTotalAmount":  103.98,
+                               "parsedPurchaseDate":  "2026-04-12",
+                               "parsedLineItemCount":  2,
+                               "ocrErrorMessage":  null,
+                               "ocrProcessedAt":  "2026-04-24T13:09:48.921289Z"
+                           }
+    },
+    {
+        "sample":  "3.jpg",
+        "receiptId":  278,
+        "ocrStatus":  "DONE",
+        "rawOcrText":  "PANOH,\n3680366265\nxCO Kaca 10\nYex #105010\nat 40r\n49.99 A\nmo 1kr\n26.99 A\nHanin ra3.Coca-Co1a Zero125n nET\n50.49A\nMonoko 2.5% Organic Miik/ner nn.g\nTPHX K0A4820178811040\nTpNxKOA 4820062770163\nnor.\n59:99 A\n6opouHo nwennyHe Marka Promo 1kr/19.39\nA\nTpHx-x0A 4823088805055\nNaket cepeAHin.34*55 Novus 7kr\n5.99 A\nKynyN OHNANH HA NOVUS.ZAKAZ.UA\nAPHBATGAHK HOBYC YKPAIHA\n$1K70DWD\nOnnara\nEN34054226\nXXX5\n6E3rOTIBKOBA\nKOA ART.150900\nKAPTKA\n212.84TPH\nCyma\n212.84\nNAB A=20.00%\n35.47\n4EK K 000321587 00109\n10.04.202614:23:25\nIc iG3Sa?cHyI 9PE90yY",
+        "reconstructedText":  "PANOH,\n3680366265\nÐÐ¡Ð ÐÐ°ÑÐ° 10\nYex #105010\n49.99 A\nat 40r\nmo 1kr 26.99 A\nHanin ra3.Coca-Co1a Zero125n nET 50.49A\nTPHX K0A4820178811040\nMonoko 2.5% Organic Miik/ner nn.g\n59:99 A\nnor.\nÐ¨ÑÑÐ¸Ñ\u0085 ÐºÐ¾Ð´ 4820062770163\n6opouHo nwennyHe Marka Promo 1kr/19.39\nA\nTpHx-x0A 4823088805055\nNaket cepeAHin.34*55 Novus 7kr 5.99 A\nKynyN OHNANH HA NOVUS.ZAKAZ.UA\nAPHBATGAHK HOBYC YKPAIHA\n$1K70DWD\nÐÐ¿Ð»Ð°ÑÐ°\nEN34054226\nXXX5\n6E3rOTIBKOBA KOA ART.150900 212.84TPH\nKAPTKA\nÐ¡ÑÐ¼Ð° 212.84\nÐÐÐ A = 20.00% 35.47\nÐ§ÐÐ â 000321587 00109\n10.04.2026 14:23:25\nIc iG3Sa?cHyI 9PE90yY",
+        "normalizedText":  "PANOH,\n3680366265\nÐÐ¡Ð ÐÐ°ÑÐ° 10\nYex #105010\n49.99 A\nat 40r\nmo 1kr 26.99 A\nHanin ra3.Coca-Co1a Zero125n nET 50.49A\nTPHX K0A4820178811040\nMonoko 2.5% Organic Miik/ner nn g\n59: 99 A\nnor.\nÐ¨ÑÑÐ¸Ñ\u0085 ÐºÐ¾Ð´ 4820062770163\n6opouHo nwennyHe Marka Promo 1kr/19.39\nA\nTpHx-x0A 4823088805055\nNaket cepeAHin.34*55 Novus 7kr 5.99 A\nKynyN OHNANH HA NOVUS ZAKAZ UA\nAPHBATGAHK HOBYC YKPAIHA\n$1K70DWD\nÐÐ¿Ð»Ð°ÑÐ°\nEN34054226\nXXX5\n6E3rOTIBKOBA KOA ART.150900 212.84TPH\nKAPTKA\nÐ¡ÑÐ¼Ð° 212.84\nÐÐÐ A= 20.00% 35.47\nÐ§ÐÐ â 000321587 00109\n10.04.2026 14: 23: 25\nIc iG3Sa?cHyI 9PE90yY",
+        "parsedStoreName":  "NOVUS",
+        "parsedTotalAmount":  212.84,
+        "parsedCurrency":  null,
+        "parsedPurchaseDate":  "2026-04-10",
+        "parseWarnings":  [
+
+                          ],
+        "weakParseQuality":  false,
+        "lineItemCount":  2,
+        "lineItems":  [
+                          {
+                              "title":  "Hanin ra3.Coca-Co1a Zero125n nET",
+                              "quantity":  null,
+                              "unit":  null,
+                              "unitPrice":  null,
+                              "lineTotal":  50.49,
+                              "rawFragment":  "Hanin ra3.Coca-Co1a Zero125n nET 50.49A"
+                          },
+                          {
+                              "title":  "Naket cepeAHin.34*55 Novus 7kr",
+                              "quantity":  null,
+                              "unit":  null,
+                              "unitPrice":  null,
+                              "lineTotal":  5.99,
+                              "rawFragment":  "Naket cepeAHin.34*55 Novus 7kr 5.99 A"
+                          }
+                      ],
+        "receiptSummary":  {
+                               "id":  278,
+                               "purchaseId":  null,
+                               "originalFileName":  "3.jpg",
+                               "contentType":  "image/jpeg",
+                               "fileSize":  569736,
+                               "currency":  "UAH",
+                               "receiptCountryHint":  null,
+                               "s3Key":  "receipts/94/5e3c61c8-b1b2-4109-8391-c209fd5857f1-3.jpg",
+                               "uploadedAt":  "2026-04-24T13:09:49.381610Z",
+                               "ocrStatus":  "DONE",
+                               "parsedStoreName":  "NOVUS",
+                               "parsedTotalAmount":  212.84,
+                               "parsedPurchaseDate":  "2026-04-10",
+                               "parsedLineItemCount":  2,
+                               "ocrErrorMessage":  null,
+                               "ocrProcessedAt":  "2026-04-24T13:09:52.800616Z"
+                           }
+    },
+    {
+        "sample":  "4.jpg",
+        "receiptId":  279,
+        "ocrStatus":  "DONE",
+        "rawOcrText":  "NAIA3H.NOVUS\nPANOH,\nTOB HOBYC yKPA\n50.49 A\n2.5k\n89.99 A\nKCO Kaca 09\nyek105\n0105000009011070015\nTPx KOA4823080805444\n50.49A\n25kr\n89.99 A\nTpxk04820112652722\n2.uTX.104.00\n275r\n208.00 A\nTpNx KOA 4820179162912\n350r\nTPX KOA4820239248235\n46.99A\n2.TX53.\n159.98A\npxKDA4820199870743\nPAHnRn3/3ryW.Bap.MOnOKOM 5KK 240\nTpHX KO4820174308940\n107.98A\nJaBa MiHi Knachynn KynHnyi 180r\n19.03-01.04.26 cne4.4iHa 13 3acto\n38.79A\nCyHKOM:5.80\n3.TX42.99\nWTPNX KOA 4823088805048\nHonoko 26% Novus 870r nnauka\n128.97 A\nyyiHKa noK-20%=8.60\nTpNX KOA4820279610139\nya yopHn AHrniicbkn Graff 20*2\n88.99A\nWTpX KOg 4820175460456\nKoB6aca Aporo6nu.ykpnpoMnocray B/c\n249.00A\nTpNX KOA 4820191570016\n410r\n6gPOuHO nWeHNyHe ArpapHn QOHA B/r\n1 kr\n20.99 A\nWTpX KOA 4820061502147\n159.00 A\nTPX K0A 4820205580048\nAupaH Typeybkun OHyp.1_n\n62.99 A\nCup_nn.45%President i3 cnpon Maa3g\nTpx KOA4823065733425\n19.03-01.04.26 cne4.uiHa i3 3acto\nam150r\n69.99 A\nWTpNX KOA 4823065731797\nCyHKOM:20.00",
+        "reconstructedText":  "NAIA3H.NOVUS\nPANOH,\nTOB HOBYC yKPA 50.49 A\n2.5k\nÐÐ¡Ð ÐÐ°ÑÐ°\nyek105\n0105000009011070015\n50.49A\nÐ¨ÑÑÐ¸Ñ\u0085 ÐºÐ¾Ð´ 4823080805444\n25kr\n89.99 A\n2.uTX.104.00\nTpxk04820112652722\n275r\n208.00 A\nÐ¨ÑÑÐ¸Ñ\u0085 ÐºÐ¾Ð´ 4820179162912\n350r\n46.99A\nÐ¨ÑÑÐ¸Ñ\u0085 ÐºÐ¾Ð´ 4820239248235\n159.98A\n2.TX53.\npxKDA4820199870743\nPAHnRn3/3ryW.Bap.MOnOKOM 5KK 240 107.98A\nTpHX KO4820174308940\nJaBa MiHi Knachynn KynHnyi 180r 38.79A\n19.03-01.04.26 cne4.4iHa 13 3acto\nCyHKOM:5.80\n3.TX42.99\nÐ¨ÑÑÐ¸Ñ\u0085 ÐºÐ¾Ð´ 4823088805048\nÐÐÐ A = 26% 128.97\nÐÐÐ A = 20% 8.60\nÐ¨ÑÑÐ¸Ñ\u0085 ÐºÐ¾Ð´ 4820279610139\nya yopHn AHrniicbkn Graff 20*2 88.99A\nWTpX KOg 4820175460456\nKoB6aca Aporo6nu.ykpnpoMnocray B/c 249.00A\n410r\nÐ¨ÑÑÐ¸Ñ\u0085 ÐºÐ¾Ð´ 4820191570016\n6gPOuHO nWeHNyHe ArpapHn QOHA B/r 20.99 A\n1 kr\nÐ¨ÑÑÐ¸Ñ\u0085 ÐºÐ¾Ð´ 4820061502147\nAupaH Typeybkun OHyp.1_n 159.00 A\nTPX K0A 4820205580048\nÐÐÐ A = 45% 62.99\nÐ¨ÑÑÐ¸Ñ\u0085 ÐºÐ¾Ð´ 4823065733425\n69.99 A\nam150r\n19.03-01.04.26 cne4.uiHa i3 3acto CyHKOM:20.00\nÐ¨ÑÑÐ¸Ñ\u0085 ÐºÐ¾Ð´ 4823065731797",
+        "normalizedText":  "NAIA3H NOVUS\nPANOH,\nTOB HOBYC yKPA 50.49 A\n2.5k\nÐÐ¡Ð ÐÐ°ÑÐ°\nyek105\n0105000009011070015\n50.49A\nÐ¨ÑÑÐ¸Ñ\u0085 ÐºÐ¾Ð´ 4823080805444\n25kr\n89.99 A\n2.uTX.104.00\nTpxk04820112652722\n275r\n208.00 A\nÐ¨ÑÑÐ¸Ñ\u0085 ÐºÐ¾Ð´ 4820179162912\n350r\n46.99A\nÐ¨ÑÑÐ¸Ñ\u0085 ÐºÐ¾Ð´ 4820239248235\n159.98A\n2.TX53\npxKDA4820199870743\nPAHnRn3/3ryW Bap MOnOKOM 5KK 240 107.98A\nTpHX KO4820174308940\nJaBa MiHi Knachynn KynHnyi 180r 38.79A\n19.03-01.04.26 cne4.4iHa 13 3acto\nCyHKOM: 5.80\n3.TX42.99\nÐ¨ÑÑÐ¸Ñ\u0085 ÐºÐ¾Ð´ 4823088805048\nÐÐÐ A= 26% 128.97\nÐÐÐ A= 20% 8.60\nÐ¨ÑÑÐ¸Ñ\u0085 ÐºÐ¾Ð´ 4820279610139\nya yopHn AHrniicbkn Graff 20*2 88.99A\nWTpX KOg 4820175460456\nKoB6aca Aporo6nu ykpnpoMnocray B/c 249.00A\n410r\nÐ¨ÑÑÐ¸Ñ\u0085 ÐºÐ¾Ð´ 4820191570016\n6gPOuHO nWeHNyHe ArpapHn QOHA B/r 20.99 A\n1 kr\nÐ¨ÑÑÐ¸Ñ\u0085 ÐºÐ¾Ð´ 4820061502147\nAupaH Typeybkun OHyp.1_n 159.00 A\nTPX K0A 4820205580048\nÐÐÐ A= 45% 62.99\nÐ¨ÑÑÐ¸Ñ\u0085 ÐºÐ¾Ð´ 4823065733425\n69.99 A\nam150r\n19.03-01.04.26 cne4.uiHa i3 3acto CyHKOM: 20.00\nÐ¨ÑÑÐ¸Ñ\u0085 ÐºÐ¾Ð´ 4823065731797",
+        "parsedStoreName":  "NOVUS",
+        "parsedTotalAmount":  null,
+        "parsedCurrency":  null,
+        "parsedPurchaseDate":  null,
+        "parseWarnings":  [
+                              "SUSPICIOUS_TOTAL",
+                              "SUSPICIOUS_LINE_ITEMS",
+                              "NOISY_ITEM_TITLES"
+                          ],
+        "weakParseQuality":  true,
+        "lineItemCount":  7,
+        "lineItems":  [
+                          {
+                              "title":  "TOB HOBYC yKPA",
+                              "quantity":  null,
+                              "unit":  null,
+                              "unitPrice":  null,
+                              "lineTotal":  50.49,
+                              "rawFragment":  "TOB HOBYC yKPA 50.49 A"
+                          },
+                          {
+                              "title":  "PAHnRn3/3ryW Bap MOnOKOM 5KK",
+                              "quantity":  null,
+                              "unit":  null,
+                              "unitPrice":  null,
+                              "lineTotal":  240107.98,
+                              "rawFragment":  "PAHnRn3/3ryW.Bap.MOnOKOM 5KK 240 107.98A"
+                          },
+                          {
+                              "title":  "JaBa MiHi Knachynn KynHnyi 180r",
+                              "quantity":  null,
+                              "unit":  null,
+                              "unitPrice":  null,
+                              "lineTotal":  38.79,
+                              "rawFragment":  "JaBa MiHi Knachynn KynHnyi 180r 38.79A"
+                          },
+                          {
+                              "title":  "ya yopHn AHrniicbkn Graff 20*2",
+                              "quantity":  null,
+                              "unit":  null,
+                              "unitPrice":  null,
+                              "lineTotal":  88.99,
+                              "rawFragment":  "ya yopHn AHrniicbkn Graff 20*2 88.99A"
+                          },
+                          {
+                              "title":  "KoB6aca Aporo6nu ykpnpoMnocray B/c",
+                              "quantity":  null,
+                              "unit":  null,
+                              "unitPrice":  null,
+                              "lineTotal":  249.00,
+                              "rawFragment":  "KoB6aca Aporo6nu.ykpnpoMnocray B/c 249.00A"
+                          },
+                          {
+                              "title":  "6gPOuHO nWeHNyHe ArpapHn QOHA B/r",
+                              "quantity":  null,
+                              "unit":  null,
+                              "unitPrice":  null,
+                              "lineTotal":  20.99,
+                              "rawFragment":  "6gPOuHO nWeHNyHe ArpapHn QOHA B/r 20.99 A"
+                          },
+                          {
+                              "title":  "AupaH Typeybkun OHyp.1_n",
+                              "quantity":  null,
+                              "unit":  null,
+                              "unitPrice":  null,
+                              "lineTotal":  159.00,
+                              "rawFragment":  "AupaH Typeybkun OHyp.1_n 159.00 A"
+                          }
+                      ],
+        "receiptSummary":  {
+                               "id":  279,
+                               "purchaseId":  null,
+                               "originalFileName":  "4.jpg",
+                               "contentType":  "image/jpeg",
+                               "fileSize":  212690,
+                               "currency":  "UAH",
+                               "receiptCountryHint":  null,
+                               "s3Key":  "receipts/94/b7ba4424-f92e-40b1-915c-1cee0abed47b-4.jpg",
+                               "uploadedAt":  "2026-04-24T13:09:53.592994Z",
+                               "ocrStatus":  "DONE",
+                               "parsedStoreName":  "NOVUS",
+                               "parsedTotalAmount":  null,
+                               "parsedPurchaseDate":  null,
+                               "parsedLineItemCount":  7,
+                               "ocrErrorMessage":  null,
+                               "ocrProcessedAt":  "2026-04-24T13:09:57.244550Z"
+                           }
+    },
+    {
+        "sample":  "5.jpg",
+        "receiptId":  280,
+        "ocrStatus":  "DONE",
+        "rawOcrText":  "CASH RECEIPT\nAdress1234Lorem Lpsum.Dolor\nTc1123-456-7890\nDate:01-01-2018\n10:35\nLorem\n6.50\nIpsum\n7.50\nDolorSit\n48.00\nAmet\n9.30\nConsectetur\n11.90\nAdipiscing Elit\n1.20\nSedDo\n0.40\nTotal\n84.80\nSub-total\n76.80\nSales Tax\n8.00\nBalance\n84.80\nTHANK YOU",
+        "reconstructedText":  "CASH RECEIPT\nAdress1234Lorem Lpsum.Dolor\nTc1123-456-7890\nDate:01-01-2018 10:35\nLorem 6.50\nIpsum 7.50\nDolorSit 48.00\nAmet 9.30\nConsectetur 11.90\nAdipiscing Elit 1.20\nSedDo 0.40\nTotal 84.80\nSub-total 76.80\nSales Tax 8.00\nBalance 84.80\nTHANK YOU",
+        "normalizedText":  "CASH RECEIPT\nAdress1234Lorem Lpsum Dolor\nTc1123-456-7890\nDate: 01-01-2018 10: 35\nLorem 6.50\nIpsum 7.50\nDolorSit 48.00\nAmet 9.30\nConsectetur 11.90\nAdipiscing Elit 1.20\nSedDo 0.40\nTotal 84.80\nSub-total 76.80\nSales Tax 8.00\nBalance 84.80\nTHANK YOU",
+        "parsedStoreName":  null,
+        "parsedTotalAmount":  84.80,
+        "parsedCurrency":  null,
+        "parsedPurchaseDate":  "2018-01-01",
+        "parseWarnings":  [
+                              "SUSPICIOUS_MERCHANT"
+                          ],
+        "weakParseQuality":  true,
+        "lineItemCount":  7,
+        "lineItems":  [
+                          {
+                              "title":  "Lorem",
+                              "quantity":  null,
+                              "unit":  null,
+                              "unitPrice":  null,
+                              "lineTotal":  6.50,
+                              "rawFragment":  "Lorem 6.50"
+                          },
+                          {
+                              "title":  "Ipsum",
+                              "quantity":  null,
+                              "unit":  null,
+                              "unitPrice":  null,
+                              "lineTotal":  7.50,
+                              "rawFragment":  "Ipsum 7.50"
+                          },
+                          {
+                              "title":  "DolorSit",
+                              "quantity":  null,
+                              "unit":  null,
+                              "unitPrice":  null,
+                              "lineTotal":  48.00,
+                              "rawFragment":  "DolorSit 48.00"
+                          },
+                          {
+                              "title":  "Amet",
+                              "quantity":  null,
+                              "unit":  null,
+                              "unitPrice":  null,
+                              "lineTotal":  9.30,
+                              "rawFragment":  "Amet 9.30"
+                          },
+                          {
+                              "title":  "Consectetur",
+                              "quantity":  null,
+                              "unit":  null,
+                              "unitPrice":  null,
+                              "lineTotal":  11.90,
+                              "rawFragment":  "Consectetur 11.90"
+                          },
+                          {
+                              "title":  "Adipiscing Elit",
+                              "quantity":  null,
+                              "unit":  null,
+                              "unitPrice":  null,
+                              "lineTotal":  1.20,
+                              "rawFragment":  "Adipiscing Elit 1.20"
+                          },
+                          {
+                              "title":  "SedDo",
+                              "quantity":  null,
+                              "unit":  null,
+                              "unitPrice":  null,
+                              "lineTotal":  0.40,
+                              "rawFragment":  "SedDo 0.40"
+                          }
+                      ],
+        "receiptSummary":  {
+                               "id":  280,
+                               "purchaseId":  null,
+                               "originalFileName":  "5.jpg",
+                               "contentType":  "image/jpeg",
+                               "fileSize":  12861,
+                               "currency":  "UAH",
+                               "receiptCountryHint":  null,
+                               "s3Key":  "receipts/94/88ee28bd-b95b-48aa-b2af-bdfa6cb17e77-5.jpg",
+                               "uploadedAt":  "2026-04-24T13:09:57.763694Z",
+                               "ocrStatus":  "DONE",
+                               "parsedStoreName":  null,
+                               "parsedTotalAmount":  84.80,
+                               "parsedPurchaseDate":  "2018-01-01",
+                               "parsedLineItemCount":  7,
+                               "ocrErrorMessage":  null,
+                               "ocrProcessedAt":  "2026-04-24T13:09:59.810796Z"
+                           }
+    },
+    {
+        "sample":  "6.pdf",
+        "receiptId":  281,
+        "ocrStatus":  "DONE",
+        "rawOcrText":  "UKRSIBBANK\nBNPPARIBAS GROUP\nBIANPABHUK\nBnuhgob Mukona Banmobuy\n3 paxyhky:\nAT \u003cYKPC055AHK\u003e\nOTP0MYBAY\nTOB \"CEPBICH00 CBIT\"\nHa paxyhok:\nAT K5 \"NpuBatbaHK\"\nAenaptameht onepayinHnx\nPemoht npnctpoio,Snuhob Mukona Banmobuy\nNP03HA4EHHA\npo3paxyHxie\nUKRSIBBANK\nokymeHT N 260417524\nBNP PARIBAS GROUP\nBIANPABHUK\nSnuHoB Mukona BanmoBuy\n3 paxyHky:\nUA083510050000026208806360358\nIH/EPOy 2934823272\nAT \u003cYKPC055AHK\u003e\nOTPUMYBAY\nTOB \"CEPBICH0 CBIT\"\nHa paxyhok:u\nUA733052990000026003000114703\nInH/EPnOy 40362178\nAT K5 \"pnBaT5aHK\"\nAenaprameht onepayiaHnx\nP03HA4EHH9  PemOhT npncTpoio,5nuHOB Mukona Banmobuy\np03paxyHxiB\nATYKPC066AHK\nM351005,k0A09807750\nOnepayia Bukohaha B cucTemi\nata npoBeehHA\n\"UKRSIB online\u0027\n02.04.202619:03\nCyma: 5 480,00 rpH",
+        "reconstructedText":  "UKRSIBBANK\nUKRSIBBANK BNPPARIBAS GROUP okymeHT N 260417524\nBNP PARIBAS GROUP BIANPABHUK\nBnuhgob Mukona Banmobuy\nBIANPABHUK 3 paxyhky: SnuHoB Mukona BanmoBuy\n3 paxyHky:\nAT \u003cYKPC055AHK\u003e\nUA083510050000026208806360358\nOTP0MYBAY\nIH/EPOy 2934823272\nTOB \"CEPBICH00 CBIT\" AT \u003cYKPC055AHK\u003e\nOTPUMYBAY Ha paxyhok: TOB \"CEPBICH0 CBIT\"\nAT K5 \"NpuBatbaHK\" Ha paxyhok:u\nUA733052990000026003000114703\nAenaptameht onepayinHnx\nInH/EPnOy 40362178\nPemoht npnctpoio,Snuhob Mukona Banmobuy\nAT K5 \"pnBaT5aHK\"\nAenaprameht onepayiaHnx NP03HA4EHHA\np03paxyHxiB po3paxyHxie P03HA4EHH9 PemOhT npncTpoio,5nuHOB Mukona Banmobuy\nATYKPC066AHK\nM351005,k0A09807750\nOnepayia Bukohaha B cucTemi ata npoBeehHA\nÐÐÐÐÐÐ¢ÐÐÐÐÐÐ ÐÐÐ Ð¢ÐÐ 5480.00 Ð³ÑÐ½\n02.04.2026 19:03\n\"UKRSIB online\u0027",
+        "normalizedText":  "UKRSIBBANK\nUKRSIBBANK BNPPARIBAS GROUP okymeHT N 260417524\nBNP PARIBAS GROUP BIANPABHUK\nBnuhgob Mukona Banmobuy\nBIANPABHUK 3 paxyhky: SnuHoB Mukona BanmoBuy\n3 paxyHky\nAT \u003cYKPC055AHK\u003e\nUA083510050000026208806360358\nOTP0MYBAY\nIH/EPOy 2934823272\nTOB \"CEPBICH00 CBIT\" AT \u003cYKPC055AHK\u003e\nOTPUMYBAY Ha paxyhok: TOB \"CEPBICH0 CBIT\nAT K5 \"NpuBatbaHK\" Ha paxyhok u\nUA733052990000026003000114703\nAenaptameht onepayinHnx\nInH/EPnOy 40362178\nPemoht npnctpoio,Snuhob Mukona Banmobuy\nAT K5 \"pnBaT5aHK\nAenaprameht onepayiaHnx NP03HA4EHHA\np03paxyHxiB po3paxyHxie P03HA4EHH9 PemOhT npncTpoio,5nuHOB Mukona Banmobuy\nATYKPC066AHK\nM351005,k0A09807750\nOnepayia Bukohaha B cucTemi ata npoBeehHA\nÐÐÐÐÐÐ¢ÐÐÐÐÐÐ ÐÐÐ Ð¢ÐÐ 5480.00 Ð³ÑÐ½\n02.04.2026 19: 03\nUKRSIB online",
+        "parsedStoreName":  "UkrsibBank",
+        "parsedTotalAmount":  5480.00,
+        "parsedCurrency":  "UAH",
+        "parsedPurchaseDate":  "2026-04-02",
+        "parseWarnings":  [
+
+                          ],
+        "weakParseQuality":  false,
+        "lineItemCount":  0,
+        "lineItems":  [
+
+                      ],
+        "receiptSummary":  {
+                               "id":  281,
+                               "purchaseId":  null,
+                               "originalFileName":  "6.pdf",
+                               "contentType":  "application/pdf",
+                               "fileSize":  36105,
+                               "currency":  "UAH",
+                               "receiptCountryHint":  null,
+                               "s3Key":  "receipts/94/e5e46752-123e-4172-ac99-f367a7f21e1e-6.pdf",
+                               "uploadedAt":  "2026-04-24T13:10:01.915343Z",
+                               "ocrStatus":  "DONE",
+                               "parsedStoreName":  "UkrsibBank",
+                               "parsedTotalAmount":  5480.00,
+                               "parsedPurchaseDate":  "2026-04-02",
+                               "parsedLineItemCount":  0,
+                               "ocrErrorMessage":  null,
+                               "ocrProcessedAt":  "2026-04-24T13:10:06.317386Z"
+                           }
+    }
+]

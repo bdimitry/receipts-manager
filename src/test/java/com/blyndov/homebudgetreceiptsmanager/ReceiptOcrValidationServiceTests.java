@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.blyndov.homebudgetreceiptsmanager.dto.NormalizedOcrLineResponse;
 import com.blyndov.homebudgetreceiptsmanager.entity.CurrencyCode;
+import com.blyndov.homebudgetreceiptsmanager.entity.ReceiptProcessingDecision;
 import com.blyndov.homebudgetreceiptsmanager.service.NormalizedOcrDocument;
 import com.blyndov.homebudgetreceiptsmanager.service.ParsedReceiptDocument;
 import com.blyndov.homebudgetreceiptsmanager.service.ParsedReceiptLineItem;
@@ -53,6 +54,8 @@ class ReceiptOcrValidationServiceTests {
 
         assertThat(validationResult.warnings()).isEmpty();
         assertThat(validationResult.weakParseQuality()).isFalse();
+        assertThat(validationResult.processingDecision()).isEqualTo(ReceiptProcessingDecision.PARSED_OK);
+        assertThat(validationResult.confidence().overallReceiptConfidence()).isGreaterThanOrEqualTo(0.85d);
     }
 
     @Test
@@ -80,6 +83,45 @@ class ReceiptOcrValidationServiceTests {
         assertThat(validationResult.warnings())
             .contains(ReceiptParseWarningCode.SUSPICIOUS_MERCHANT, ReceiptParseWarningCode.SUSPICIOUS_TOTAL);
         assertThat(validationResult.weakParseQuality()).isTrue();
+        assertThat(validationResult.processingDecision()).isEqualTo(ReceiptProcessingDecision.NEEDS_REVIEW);
+        assertThat(validationResult.confidence().businessConsistencyConfidence()).isLessThan(0.75d);
+    }
+
+    @Test
+    void missingRequiredFieldsMakeProcessingDecisionNeedsReview() {
+        List<NormalizedOcrLineResponse> normalizedLines = List.of(
+            normalizedLine("FRESH MARKET", 0, List.of("header_like"), false),
+            normalizedLine("DATE 2026-04-10", 1, List.of("header_like"), false),
+            normalizedLine("TOTAL", 2, List.of("summary_like"), false)
+        );
+
+        ParsedReceiptValidationResult validationResult = validationService.validate(
+            new NormalizedOcrDocument("RAW", List.of(), normalizedLines, normalizedLines, "FRESH MARKET\nDATE 2026-04-10\nTOTAL"),
+            new ParsedReceiptDocument("FRESH MARKET", LocalDate.of(2026, 4, 10), null, CurrencyCode.UAH, List.of())
+        );
+
+        assertThat(validationResult.warnings()).contains(ReceiptParseWarningCode.SUSPICIOUS_TOTAL);
+        assertThat(validationResult.processingDecision()).isEqualTo(ReceiptProcessingDecision.NEEDS_REVIEW);
+        assertThat(validationResult.confidence().fieldExtractionConfidence()).isLessThan(0.75d);
+    }
+
+    @Test
+    void lowOcrConfidenceReducesReceiptConfidenceWithoutInventingWarnings() {
+        List<NormalizedOcrLineResponse> normalizedLines = List.of(
+            normalizedLine("FRESH MARKET", 0, 0.42d, List.of("header_like"), false),
+            normalizedLine("DATE 2026-04-10", 1, 0.38d, List.of("header_like"), false),
+            normalizedLine("TOTAL 124.90", 2, 0.41d, List.of("summary_like"), false)
+        );
+
+        ParsedReceiptValidationResult validationResult = validationService.validate(
+            new NormalizedOcrDocument("RAW", List.of(), normalizedLines, normalizedLines, "FRESH MARKET\nDATE 2026-04-10\nTOTAL 124.90"),
+            new ParsedReceiptDocument("FRESH MARKET", LocalDate.of(2026, 4, 10), new BigDecimal("124.90"), CurrencyCode.UAH, List.of())
+        );
+
+        assertThat(validationResult.warnings()).isEmpty();
+        assertThat(validationResult.processingDecision()).isEqualTo(ReceiptProcessingDecision.PARSED_LOW_CONFIDENCE);
+        assertThat(validationResult.confidence().ocrConfidence()).isLessThan(0.6d);
+        assertThat(validationResult.confidence().overallReceiptConfidence()).isLessThan(0.8d);
     }
 
     @Test
@@ -241,6 +283,10 @@ class ReceiptOcrValidationServiceTests {
     }
 
     private NormalizedOcrLineResponse normalizedLine(String text, int order, List<String> tags, boolean ignored) {
-        return new NormalizedOcrLineResponse(text, text, order, 0.99d, null, tags, ignored);
+        return normalizedLine(text, order, 0.99d, tags, ignored);
+    }
+
+    private NormalizedOcrLineResponse normalizedLine(String text, int order, Double confidence, List<String> tags, boolean ignored) {
+        return new NormalizedOcrLineResponse(text, text, order, confidence, null, tags, ignored);
     }
 }

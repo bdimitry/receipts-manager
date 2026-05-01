@@ -87,10 +87,13 @@ def create_app(
             )
             lines = [line.to_response() for line in mapped_lines]
             raw_text = "\n".join(line["text"] for line in lines)
+            engine_config = current_app.config["OCR_ENGINE"].describe(profile_override, language_override)
             payload = {
                 "rawText": raw_text,
                 "lines": lines,
                 "profile": profile_override or current_app.config["OCR_DEFAULT_PROFILE"],
+                "engine": _engine_snapshot(engine_config),
+                "preprocessing": _preprocessing_snapshot(processed_pages),
                 "preprocessingApplied": any(page.applied for page in processed_pages),
                 "headerRescueApplied": any(result.applied for result in header_rescue_results),
                 "pages": [
@@ -117,6 +120,53 @@ def create_app(
             return jsonify({"message": f"PaddleOCR extraction failed: {exception}"}), 500
 
     return application
+
+
+def _engine_snapshot(engine_config: dict) -> dict:
+    model_names = [
+        value
+        for value in (
+            engine_config.get("detModelName"),
+            engine_config.get("recModelName"),
+            engine_config.get("clsModelName"),
+        )
+        if value
+    ]
+    return {
+        "name": "PaddleOCR",
+        "version": engine_config.get("ocrVersion"),
+        "model": "+".join(model_names) if model_names else None,
+        "language": engine_config.get("language"),
+        "profile": engine_config.get("profile"),
+        "config": engine_config,
+    }
+
+
+def _preprocessing_snapshot(processed_pages) -> dict:
+    steps = []
+    warnings = []
+    profiles = []
+    for page in processed_pages:
+        profiles.append(page.strategy)
+        for step in page.steps_applied:
+            if step not in steps:
+                steps.append(step)
+        if page.quality_before and page.quality_before.laplacian_variance < 80:
+            warnings.append("possible_blur")
+        if page.quality_before and page.quality_before.contrast_std < 35:
+            warnings.append("low_contrast")
+
+    unique_profiles = []
+    for profile in profiles:
+        if profile and profile not in unique_profiles:
+            unique_profiles.append(profile)
+
+    return {
+        "applied": any(page.applied for page in processed_pages),
+        "profile": "+".join(unique_profiles) if unique_profiles else None,
+        "steps": steps,
+        "warnings": sorted(set(warnings)),
+    }
 
 
 def _resolve_boolean_flag(http_request, parameter_name: str) -> bool | None:

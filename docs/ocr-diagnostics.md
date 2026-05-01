@@ -42,6 +42,8 @@ The product flow now persists OCR routing metadata so the selected route is diag
 - `ocrProfileStrategy`
 - `ocrProfileUsed`
 
+The product flow also persists `rawOcrArtifactJson`, a Java-side snapshot of the helper evidence for the processed receipt. `GET /api/receipts/{id}/ocr` exposes it as `rawOcrArtifact` with engine metadata, preprocessing metadata, page metadata, image diagnostics where available, and raw OCR lines with confidence and bbox.
+
 Current routing priority:
 
 1. explicit user-selected country hint
@@ -76,10 +78,14 @@ The Paddle helper exposes two diagnostic-friendly entry points:
 - normal OCR payload:
   - `profile`
   - `rawText`
+  - `engine`
+  - `preprocessing`
   - `lines[]`
   - `headerRescueApplied`
   - `pages[].headerRescueApplied`
   - `pages[].headerRescueStrategy`
+  - `pages[].imageDiagnosticsBefore`
+  - `pages[].imageDiagnosticsAfter`
 - diagnostics:
   - `engineConfig`
   - `rawEngineLines[]`
@@ -96,7 +102,9 @@ This lets you compare:
 
 For receipts whose first header rows are much weaker than the rest of the document, the helper now also runs a conservative first-page header rescue pass:
 
-- it OCRs the top crop of the original first page at `2x`
+- it isolates the top zone before the first strong anchor row
+- it tries generic processed-page header candidates first, including a header-enhanced crop for small dense text
+- it keeps an original-page top-crop candidate as a fallback when that wins by generic score
 - it keeps only the pre-anchor header prefix
 - it reprojects those rescued rows into processed-page reading order using the first anchor row
 - it leaves the rest of the receipt untouched
@@ -108,6 +116,7 @@ Post-OCR normalization is now intentionally outside the helper. Java/Spring owns
 That ownership is now active in the real OCR flow as well:
 
 - Spring first runs `ReceiptOcrStructuralReconstructionService` to rebuild a geometry-aware line stream from helper `lines[]`
+- Java then assigns document zones with `ReceiptOcrDocumentZoneClassifier`
 - then it builds a parser-ready normalized line stream from those reconstructed lines
 - downstream OCR parsing already consumes that Java-prepared text rather than the raw helper blob
 - recent reconstruction hardening also splits vertically stacked numeric fragments that were being over-clustered into one row and keeps summary/tax amount pairing separate
@@ -117,9 +126,15 @@ The backend OCR detail response now also exposes:
 - `reconstructedLines[]`
   - `text`
   - `bbox`
+  - `geometry`
+  - `documentZone`
+  - `documentZoneReasons[]`
   - `sourceOrders[]`
   - `sourceTexts[]`
   - `structuralTags[]`
+  - `reconstructionActions[]`
+
+`geometry` normalizes each reconstructed row into stable Java-side coordinates: `minX`, `maxX`, `minY`, `maxY`, `centerX`, `centerY`, `width`, and `height`. `documentZone` is a transparent heuristic label such as `MERCHANT_BLOCK`, `ITEMS`, `TOTALS`, `PAYMENT`, `FOOTER`, or `SERVICE`; `documentZoneReasons[]` records the visible signals behind that label. `reconstructionActions[]` records traceability decisions such as merge, split, pair, service isolation, low-confidence preservation, inferred geometry, and geometry-based reordering.
 
 For hard receipts like `2.jpg`, reconstruction may now also apply a small canonical OCR repair pass on top of the geometry-backed rows:
 
@@ -135,16 +150,26 @@ The reconstruction layer is now intentionally generalized:
 - merchant-specific header or footer injection was removed
 - `2.jpg` quality is now held by reusable structure and label rules rather than by exact hardcoded lines
 
+Recent body/items-zone reconstruction work stays in that same generalized spirit:
+
+- price-like OCR fragments such as `59:99` are normalized into amount candidates before row pairing
+- short measure rows like `350r` or `1 kr` can bridge a title row to a nearby amount row without pulling barcode/service noise into the item text
+- body rows that happen to contain `%` are only canonicalized as tax summaries when they also look tax-like, so product lines with fat-percent text stay in the body zone instead of being rewritten as VAT lines
+
 The next layer after diagnostics now also lives in Java:
 
 - `ReceiptOcrParser` consumes `normalizedLines[]`
-- it returns a baseline `ParsedReceiptDocument`
+- it collects merchant, date, total, payment amount, currency, and item row candidates before selecting fields
+- it returns a candidate-backed `ParsedReceiptDocument`
 - `ReceiptOcrValidationService` marks suspicious parse results with warnings and a weak-quality flag
 - `ReceiptOcrKeywordLexicon` provides a tiny explicit English/Ukrainian/Russian keyword registry for safe summary, payment, barcode, and merchant heuristics
 - no parser logic lives in the Python helper anymore
 
 Recent downstream hardening on top of the generalized reconstructed stream now also:
 
+- records candidate source line order, source zone, normalized value, parser score, and scoring reasons in memory for parser diagnostics
+- records field-context normalization actions on parser candidates, so amount/date OCR digit fixes are traceable without rewriting merchant or item text
+- ranks totals by summary labels, zones, OCR confidence, bottom position, payment agreement, item-sum agreement, and negative service/tax/date signals
 - rejects address- and contact-like header lines as merchant candidates
 - allows explicit payment or account summary amount carriers to surface totals on bank-like documents
 - avoids treating old but otherwise plausible receipt dates as suspicious by default

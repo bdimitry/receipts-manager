@@ -1,7 +1,12 @@
 package com.blyndov.homebudgetreceiptsmanager.client;
 
 import com.blyndov.homebudgetreceiptsmanager.config.OcrClientProperties;
+import com.blyndov.homebudgetreceiptsmanager.dto.RawOcrArtifactResponse;
+import com.blyndov.homebudgetreceiptsmanager.dto.RawOcrLineResponse;
+import com.blyndov.homebudgetreceiptsmanager.dto.RawOcrPageResponse;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.ByteArrayResource;
@@ -52,7 +57,7 @@ public class PaddleOcrClient implements OcrClient {
             throw new IllegalStateException("Paddle OCR service returned an empty response");
         }
 
-        return new OcrExtractionResult(rawText, lines);
+        return new OcrExtractionResult(rawText, lines, mapRawArtifact(response, rawText, lines));
     }
 
     public PaddleOcrServiceResponse extractPaddleResponse(String originalFileName, String contentType, byte[] content) {
@@ -85,12 +90,91 @@ public class PaddleOcrClient implements OcrClient {
             throw new IllegalStateException("Paddle OCR service returned an empty response");
         }
 
-        List<PaddleOcrLineResponse> lines = response.lines() == null ? List.of() : response.lines();
-        return new PaddleOcrServiceResponse(normalize(response.rawText()), lines);
+        return response;
     }
 
     private String normalize(String value) {
         return value == null ? null : value.trim();
+    }
+
+    private RawOcrArtifactResponse mapRawArtifact(
+        PaddleOcrServiceResponse response,
+        String rawText,
+        List<OcrExtractionLine> lines
+    ) {
+        PaddleOcrEngineResponse engine = response.engine();
+        PaddleOcrPreprocessingResponse preprocessing = response.preprocessing();
+        List<PaddleOcrPageResponse> pages = response.pages() == null ? List.of() : response.pages();
+        List<String> preprocessingSteps = preprocessing != null && preprocessing.steps() != null
+            ? preprocessing.steps()
+            : pages.stream()
+                .flatMap(page -> page.stepsApplied() == null ? java.util.stream.Stream.<String>empty() : page.stepsApplied().stream())
+                .distinct()
+                .toList();
+        String preprocessingProfile = preprocessing != null && StringUtils.hasText(preprocessing.profile())
+            ? preprocessing.profile()
+            : pages.stream()
+                .map(PaddleOcrPageResponse::strategy)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .collect(Collectors.joining("+"));
+
+        return new RawOcrArtifactResponse(
+            engine != null && StringUtils.hasText(engine.name()) ? engine.name() : "PaddleOCR",
+            engine == null ? null : engine.version(),
+            engine == null ? null : engine.model(),
+            engine == null ? null : engine.language(),
+            engine != null && StringUtils.hasText(engine.profile()) ? engine.profile() : response.profile(),
+            preprocessing != null && preprocessing.applied() != null ? preprocessing.applied() : response.preprocessingApplied(),
+            StringUtils.hasText(preprocessingProfile) ? preprocessingProfile : null,
+            preprocessingSteps,
+            preprocessing != null && preprocessing.warnings() != null ? preprocessing.warnings() : List.of(),
+            response.headerRescueApplied(),
+            pages.stream().map(this::mapRawPage).toList(),
+            lines.stream()
+                .map(line -> new RawOcrLineResponse(line.text(), line.confidence(), line.order(), line.bbox()))
+                .toList(),
+            rawText,
+            mapDiagnostics(response, engine)
+        );
+    }
+
+    private RawOcrPageResponse mapRawPage(PaddleOcrPageResponse page) {
+        return new RawOcrPageResponse(
+            page.pageIndex(),
+            mapImageSize(page.imageSizeBefore()),
+            mapImageSize(page.imageSizeAfter()),
+            page.strategy(),
+            page.stepsApplied() == null ? List.of() : page.stepsApplied(),
+            page.upscaleFactor(),
+            page.cropBox(),
+            page.deskewApplied(),
+            page.headerRescueApplied(),
+            page.headerRescueStrategy(),
+            page.imageDiagnosticsBefore(),
+            page.imageDiagnosticsAfter()
+        );
+    }
+
+    private Map<String, Object> mapImageSize(PaddleOcrImageSizeResponse imageSize) {
+        if (imageSize == null) {
+            return null;
+        }
+        Map<String, Object> mapped = new LinkedHashMap<>();
+        mapped.put("width", imageSize.width());
+        mapped.put("height", imageSize.height());
+        return mapped;
+    }
+
+    private Map<String, Object> mapDiagnostics(PaddleOcrServiceResponse response, PaddleOcrEngineResponse engine) {
+        Map<String, Object> diagnostics = new LinkedHashMap<>();
+        if (engine != null && engine.config() != null) {
+            diagnostics.put("engineConfig", engine.config());
+        }
+        if (response.diagnostics() != null) {
+            diagnostics.putAll(response.diagnostics());
+        }
+        return diagnostics.isEmpty() ? null : diagnostics;
     }
 
     private static final class NamedByteArrayResource extends ByteArrayResource {

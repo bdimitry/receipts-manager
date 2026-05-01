@@ -41,7 +41,7 @@ class HeaderBlockRescueTests(unittest.TestCase):
         )
 
         self.assertTrue(result.applied)
-        self.assertEqual(result.strategy, "top_crop_raw_2x")
+        self.assertTrue(result.strategy.startswith("processed_top_crop"))
         self.assertGreater(result.score_after, result.score_before)
         self.assertEqual(
             [line.text for line in result.lines[:5]],
@@ -83,6 +83,19 @@ class HeaderBlockRescueTests(unittest.TestCase):
 
         self.assertFalse(result.applied)
         self.assertEqual([line.text for line in result.lines], [line.text for line in existing_lines])
+
+    def test_stops_header_prefix_before_amount_and_quantity_rows(self):
+        rescue = HeaderBlockRescue(crop_fraction=0.30, upscale_factor=2.0)
+        existing_lines = [
+            mapped_line("ST0RE N0VA", 0, bbox(120, 80, 520, 132)),
+            mapped_line('T0B "N0VA YKPAIHA', 1, bbox(120, 150, 620, 202)),
+            mapped_line("49.99 A", 2, bbox(700, 214, 840, 252)),
+            mapped_line("2.5k", 3, bbox(120, 214, 220, 252)),
+            mapped_line("KCO Kaca 09", 4, bbox(120, 290, 360, 336)),
+        ]
+        prefix = rescue._header_prefix(existing_lines)
+
+        self.assertEqual([line.text for line in prefix], ["ST0RE N0VA", 'T0B "N0VA YKPAIHA'])
 
     def test_replaces_header_even_when_processed_page_has_warped_geometry(self):
         rescue = HeaderBlockRescue(crop_fraction=0.30, upscale_factor=2.0)
@@ -151,6 +164,8 @@ def processed_page(image, strategy="disabled"):
         upscale_factor=1.0,
         crop_box=None,
         deskew_applied=False,
+        quality_before=None,
+        quality_after=None,
     )
 
 

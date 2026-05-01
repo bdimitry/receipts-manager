@@ -1,0 +1,4 @@
+interface:
+  display_name: "OCR Implementation"
+  short_description: "Implement OCR-side improvements before parser work"
+  default_prompt: "Use $receipt-ocr-implementation to improve extraction, reconstruction, or canonical OCR text without drifting into parser work."

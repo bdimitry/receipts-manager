@@ -1,0 +1,4 @@
+interface:
+  display_name: "OCR Evaluation"
+  short_description: "Score corpus quality and report practical percentages"
+  default_prompt: "Use $receipt-ocr-evaluation to run the mandatory OCR corpus and report per-receipt and average quality percentages."

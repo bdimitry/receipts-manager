@@ -2,6 +2,7 @@ package com.blyndov.homebudgetreceiptsmanager.service;
 
 import com.blyndov.homebudgetreceiptsmanager.client.OcrExtractionLine;
 import com.blyndov.homebudgetreceiptsmanager.client.OcrExtractionResult;
+import com.blyndov.homebudgetreceiptsmanager.dto.OcrLineGeometryResponse;
 import com.blyndov.homebudgetreceiptsmanager.dto.ReconstructedOcrLineResponse;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -10,6 +11,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -17,22 +19,48 @@ import org.springframework.util.StringUtils;
 public class ReceiptOcrStructuralReconstructionService {
 
     private static final Pattern AMOUNT_ONLY_PATTERN = Pattern.compile(
-        "(?iu)^\\d{1,5}(?:[ \\u00A0]\\d{3})*[\\.,]\\d{2}(?:\\s*[a-z\\p{IsCyrillic}₴$€]+)?$"
+        "(?iu)^\\d{1,5}(?:[ \\u00A0]\\d{3})*[\\.,:]\\d{2}(?:\\s*[a-z\\p{IsCyrillic}\\u20B4$\\u20AC\\u20BD]+)?$"
+    );
+    private static final Pattern MEASURE_ONLY_PATTERN = Pattern.compile(
+        "(?iu)^(?:[a-z\\p{IsCyrillic}]{0,3}\\s*)?\\d{1,4}(?:[\\.,]\\d{1,3})?\\s*[a-z\\p{IsCyrillic}]{1,4}$"
     );
     private static final Pattern LONG_DIGITS_PATTERN = Pattern.compile("\\d{8,}");
     private static final Pattern LETTER_PATTERN = Pattern.compile("\\p{L}");
     private static final Pattern BASE64ISH_PATTERN = Pattern.compile("(?i)^[A-Za-z0-9+/=]{10,}$");
     private static final Pattern TECHNICAL_MARKER_PATTERN = Pattern.compile("[#\\[\\]{}]|\\b(?:id|txn|ref|chek|yek)\\b", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
     private static final Pattern PERCENT_PATTERN = Pattern.compile("%");
-    private static final Pattern AMOUNT_CAPTURE_PATTERN = Pattern.compile("(\\d{1,5}(?:[ \\u00A0]\\d{3})*[\\.,]\\d{2})");
+    private static final Pattern AMOUNT_CAPTURE_PATTERN = Pattern.compile("(\\d{1,5}(?:[ \\u00A0]\\d{3})*[\\.,:]\\d{2})");
     private static final Pattern LONG_DIGIT_CAPTURE_PATTERN = Pattern.compile("(\\d{8,})");
     private static final Pattern MASKED_CARD_CAPTURE_PATTERN = Pattern.compile("(\\d{6,}X{4,}\\d?)", Pattern.CASE_INSENSITIVE);
     private static final Pattern AUTH_CODE_CAPTURE_PATTERN = Pattern.compile("(\\d{5,6})");
+    private static final String CANONICAL_TAX_ID = "\u041F\u041D";
+    private static final String CANONICAL_CASH_DESK = "\u041A\u0421\u041E \u041A\u0430\u0441\u0430";
+    private static final String CANONICAL_CHECK_LABEL = "\u0427\u0435\u043A #";
+    private static final String CANONICAL_PAYMENT_LABEL = "\u041E\u043F\u043B\u0430\u0442\u0430";
+    private static final String CANONICAL_EPZ_LABEL = "\u0415\u041F\u0417";
+    private static final String CANONICAL_PAYMENT_SYSTEM_PREFIX = "\u041F\u041B\u0410\u0422\u0406\u0416\u041D\u0410 \u0421\u0418\u0421\u0422\u0415\u041C\u0410: ";
+    private static final String CANONICAL_TRANSACTION_CODE_LABEL = "\u041A\u041E\u0414 \u0422\u0420\u0410\u041D\u0417.";
+    private static final String CANONICAL_AUTH_CODE_LABEL = "\u041A\u041E\u0414 \u0410\u0412\u0422.";
+    private static final String CANONICAL_BARCODE_LABEL = "\u0428\u0442\u0440\u0438\u0445 \u043A\u043E\u0434";
+    private static final String CANONICAL_NON_CASH_CARD_LABEL = "\u0411\u0415\u0417\u0413\u041E\u0422\u0406\u0412\u041A\u041E\u0412\u0410 \u041A\u0410\u0420\u0422\u041A\u0410";
+    private static final String CANONICAL_TOTAL_LABEL = "\u0421\u0443\u043C\u0430";
+    private static final String CANONICAL_TAX_LABEL = "\u041F\u0414\u0412 A = ";
+    private static final String CANONICAL_CHECK_NUMBER_LABEL = "\u0427\u0415\u041A \u2116";
 
     private final ReceiptOcrKeywordLexicon keywordLexicon;
+    private final ReceiptOcrDocumentZoneClassifier documentZoneClassifier;
+
+    @Autowired
+    public ReceiptOcrStructuralReconstructionService(
+        ReceiptOcrKeywordLexicon keywordLexicon,
+        ReceiptOcrDocumentZoneClassifier documentZoneClassifier
+    ) {
+        this.keywordLexicon = keywordLexicon;
+        this.documentZoneClassifier = documentZoneClassifier;
+    }
 
     public ReceiptOcrStructuralReconstructionService(ReceiptOcrKeywordLexicon keywordLexicon) {
-        this.keywordLexicon = keywordLexicon;
+        this(keywordLexicon, new ReceiptOcrDocumentZoneClassifier(keywordLexicon));
     }
 
     public ReconstructedOcrDocument reconstruct(OcrExtractionResult extractionResult) {
@@ -53,7 +81,7 @@ public class ReceiptOcrStructuralReconstructionService {
             reconstructedLines.add(reconstructedRows.get(index).toResponse(index));
         }
 
-        reconstructedLines = postProcessCanonicalLines(reconstructedLines);
+        reconstructedLines = documentZoneClassifier.classify(postProcessCanonicalLines(reconstructedLines));
 
         String reconstructedText = reconstructedLines.stream()
             .map(ReconstructedOcrLineResponse::text)
@@ -82,18 +110,26 @@ public class ReceiptOcrStructuralReconstructionService {
             String text = line.text();
             String normalized = keywordLexicon.normalizeForMatching(text);
 
+            Optional<List<String>> headerAmountLeakSplit = splitHeaderAmountLeak(text, normalized);
+            if (headerAmountLeakSplit.isPresent()) {
+                for (String splitText : headerAmountLeakSplit.orElseThrow()) {
+                    expanded.add(copyLine(line, splitText, "split_canonical_header_amount"));
+                }
+                continue;
+            }
+
             Optional<ServiceLeadSplit> serviceLeadSplit = extractLeadingTechnicalServiceSplit(text, normalized);
             if (serviceLeadSplit.isPresent()) {
                 ServiceLeadSplit split = serviceLeadSplit.orElseThrow();
-                expanded.add(copyLine(line, split.serviceText()));
-                expanded.add(copyLine(line, split.leadToken()));
+                expanded.add(copyLine(line, split.serviceText(), "split_service_lead"));
+                expanded.add(copyLine(line, split.leadToken(), "split_service_lead"));
                 continue;
             }
 
             Optional<List<String>> combinedServiceSplit = splitCombinedServiceLine(text, normalized);
             if (combinedServiceSplit.isPresent()) {
                 for (String splitText : combinedServiceSplit.orElseThrow()) {
-                    expanded.add(copyLine(line, splitText));
+                    expanded.add(copyLine(line, splitText, "split_service_payment"));
                 }
                 continue;
             }
@@ -102,7 +138,7 @@ public class ReceiptOcrStructuralReconstructionService {
                 && extractAmount(text).isPresent()
                 && looksLikeCardTail(lines.get(index + 1).text())
                 && looksLikePaymentDescriptor(normalized, text)) {
-                expanded.add(copyLine(line, text + " " + lines.get(index + 1).text()));
+                expanded.add(copyLine(line, text + " " + lines.get(index + 1).text(), "paired_payment_card"));
                 index++;
                 afterDateFooter = false;
                 continue;
@@ -118,7 +154,7 @@ public class ReceiptOcrStructuralReconstructionService {
             }
 
             if (looksLikeStandalonePaymentLabel(text, normalized)) {
-                expanded.add(copyLine(line, "Оплата"));
+                expanded.add(copyLine(line, CANONICAL_PAYMENT_LABEL));
                 afterDateFooter = false;
                 continue;
             }
@@ -146,9 +182,13 @@ public class ReceiptOcrStructuralReconstructionService {
                 index,
                 line.confidence(),
                 line.bbox(),
+                line.geometry(),
+                line.documentZone(),
+                line.documentZoneReasons(),
                 line.sourceOrders(),
                 line.sourceTexts(),
-                line.structuralTags()
+                line.structuralTags(),
+                line.reconstructionActions()
             ));
         }
         return reindexed;
@@ -192,17 +232,17 @@ public class ReceiptOcrStructuralReconstructionService {
 
             Row current = rows.get(index);
             if (current.isAmountOnly()) {
-                Optional<Integer> nextTitleIndex = findAttachableTarget(rows, consumed, index, true);
-                if (nextTitleIndex.isPresent()) {
-                    rebuilt.add(rows.get(nextTitleIndex.get()).mergeWith(current, true));
-                    consumed[index] = true;
-                    consumed[nextTitleIndex.get()] = true;
+                Optional<AttachmentMatch> nextTitle = findItemAttachment(rows, consumed, index, true);
+                if (nextTitle.isPresent()) {
+                    AttachmentMatch match = nextTitle.orElseThrow();
+                    rebuilt.add(mergeItemAttachment(rows, current, match, true));
+                    markConsumed(consumed, index, match);
                     continue;
                 }
 
                 Optional<Integer> nextSummaryIndex = findAdjacentSummary(rows, consumed, index);
                 if (nextSummaryIndex.isPresent()) {
-                    rebuilt.add(rows.get(nextSummaryIndex.get()).mergeWith(current, true));
+                    rebuilt.add(rows.get(nextSummaryIndex.get()).mergeWith(current, true, "paired_summary_amount"));
                     consumed[index] = true;
                     consumed[nextSummaryIndex.get()] = true;
                     continue;
@@ -212,7 +252,7 @@ public class ReceiptOcrStructuralReconstructionService {
             if (current.isSummaryLike()) {
                 Optional<Integer> nextAmountIndex = findAdjacentAmount(rows, consumed, index);
                 if (nextAmountIndex.isPresent()) {
-                    rebuilt.add(current.mergeWith(rows.get(nextAmountIndex.get()), false));
+                    rebuilt.add(current.mergeWith(rows.get(nextAmountIndex.get()), false, "paired_summary_amount"));
                     consumed[index] = true;
                     consumed[nextAmountIndex.get()] = true;
                     continue;
@@ -222,7 +262,7 @@ public class ReceiptOcrStructuralReconstructionService {
             if (current.isPaymentAmountDescriptor()) {
                 Optional<Integer> nextCardTailIndex = findAdjacentCardTail(rows, consumed, index);
                 if (nextCardTailIndex.isPresent()) {
-                    rebuilt.add(current.mergeWith(rows.get(nextCardTailIndex.get()), false));
+                    rebuilt.add(current.mergeWith(rows.get(nextCardTailIndex.get()), false, "paired_payment_card"));
                     consumed[index] = true;
                     consumed[nextCardTailIndex.get()] = true;
                     continue;
@@ -230,11 +270,11 @@ public class ReceiptOcrStructuralReconstructionService {
             }
 
             if (current.isTitleLike() && current.isLikelyItemLike()) {
-                Optional<Integer> nextAmountIndex = findAttachableTarget(rows, consumed, index, false);
-                if (nextAmountIndex.isPresent()) {
-                    rebuilt.add(current.mergeWith(rows.get(nextAmountIndex.get()), false));
-                    consumed[index] = true;
-                    consumed[nextAmountIndex.get()] = true;
+                Optional<AttachmentMatch> nextAmount = findItemAttachment(rows, consumed, index, false);
+                if (nextAmount.isPresent()) {
+                    AttachmentMatch match = nextAmount.orElseThrow();
+                    rebuilt.add(mergeItemAttachment(rows, current, match, false));
+                    markConsumed(consumed, index, match);
                     continue;
                 }
             }
@@ -266,6 +306,7 @@ public class ReceiptOcrStructuralReconstructionService {
             boolean hasAmountSegment = segments.stream().anyMatch(Row::isAmountOnly);
 
             if (hasAmountSegment) {
+                tagSegments(segments, "split_amount_segment");
                 expanded.addAll(segments);
                 continue;
             }
@@ -275,12 +316,22 @@ public class ReceiptOcrStructuralReconstructionService {
                 continue;
             }
 
+            tagSegments(segments, "split_service_segment");
             expanded.addAll(segments);
         }
 
         expanded.forEach(Row::finalizeGeometry);
         expanded.sort(Comparator.comparingDouble(Row::top).thenComparingDouble(Row::left).thenComparingInt(Row::minOrder));
         return expanded;
+    }
+
+    private void tagSegments(List<Row> segments, String action) {
+        for (Row segment : segments) {
+            segment.addAction(action);
+            if (segment.isServiceLike()) {
+                segment.addAction("isolated_service");
+            }
+        }
     }
 
     private List<Row> groupAdjacent(List<LineBox> fragments) {
@@ -344,44 +395,86 @@ public class ReceiptOcrStructuralReconstructionService {
             || (digitCount >= 10 && digitCount >= letterCount * 2);
     }
 
-    private Optional<Integer> findAttachableTarget(List<Row> rows, boolean[] consumed, int index, boolean amountBeforeTitle) {
+    private Row mergeItemAttachment(List<Row> rows, Row current, AttachmentMatch match, boolean amountBeforeTitle) {
+        Row merged = amountBeforeTitle ? rows.get(match.targetIndex()) : current;
+        for (int supportIndex : match.mergeSupportIndices()) {
+            merged = merged.mergeWith(rows.get(supportIndex), false, "merged_support_fragment");
+        }
+        return amountBeforeTitle
+            ? merged.mergeWith(current, true, "paired_amount_before_title")
+            : merged.mergeWith(rows.get(match.targetIndex()), false, "paired_title_amount");
+    }
+
+    private void markConsumed(boolean[] consumed, int index, AttachmentMatch match) {
+        consumed[index] = true;
+        consumed[match.targetIndex()] = true;
+        for (int supportIndex : match.mergeSupportIndices()) {
+            consumed[supportIndex] = true;
+        }
+    }
+
+    private Optional<AttachmentMatch> findItemAttachment(List<Row> rows, boolean[] consumed, int index, boolean amountBeforeTitle) {
         Row source = rows.get(index);
         int skippedServiceRows = 0;
+        int skippedSupportRows = 0;
+        int skippedNoiseRows = 0;
+        int lastBridgeIndex = index;
         Integer bestCandidateIndex = null;
+        List<Integer> bestSupportIndices = List.of();
+        List<Integer> mergeSupportIndices = new ArrayList<>();
         double bestScore = Double.NEGATIVE_INFINITY;
 
-        for (int candidateIndex = index + 1; candidateIndex < rows.size() && candidateIndex <= index + 3; candidateIndex++) {
+        for (int candidateIndex = index + 1; candidateIndex < rows.size() && candidateIndex <= index + 6; candidateIndex++) {
             if (consumed[candidateIndex]) {
                 continue;
             }
 
             Row candidate = rows.get(candidateIndex);
-            if (!source.isCloseTo(candidate)) {
+            Row bridge = rows.get(lastBridgeIndex);
+            if (!source.isCloseTo(candidate) && !bridge.isCloseTo(candidate)) {
                 break;
             }
 
             if (candidate.isServiceLike()) {
                 skippedServiceRows++;
-                if (skippedServiceRows > 1) {
+                if (skippedServiceRows > 2) {
                     break;
                 }
+                lastBridgeIndex = candidateIndex;
                 continue;
             }
 
-            if (amountBeforeTitle && candidate.isTitleLike() && candidate.isLikelyItemLike()) {
-                double score = source.attachmentScore(candidate);
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestCandidateIndex = candidateIndex;
+            if (candidate.isMeasureOnly()) {
+                skippedSupportRows++;
+                if (skippedSupportRows > 2) {
+                    break;
                 }
+                mergeSupportIndices.add(candidateIndex);
+                lastBridgeIndex = candidateIndex;
                 continue;
             }
 
-            if (!amountBeforeTitle && candidate.isAmountOnly()) {
-                double score = source.attachmentScore(candidate);
+            if (candidate.isWeakBodyNoiseLike()) {
+                skippedNoiseRows++;
+                if (skippedNoiseRows > 2) {
+                    break;
+                }
+                lastBridgeIndex = candidateIndex;
+                continue;
+            }
+
+            boolean matchesTarget = amountBeforeTitle
+                ? candidate.isTitleLike() && candidate.isLikelyItemLike()
+                : candidate.isAmountOnly();
+            if (matchesTarget) {
+                double score = source.attachmentScore(candidate)
+                    - (skippedServiceRows * 1.5d)
+                    - (skippedSupportRows * 0.75d)
+                    - (skippedNoiseRows * 0.75d);
                 if (score > bestScore) {
                     bestScore = score;
                     bestCandidateIndex = candidateIndex;
+                    bestSupportIndices = List.copyOf(mergeSupportIndices);
                 }
                 continue;
             }
@@ -389,7 +482,7 @@ public class ReceiptOcrStructuralReconstructionService {
             break;
         }
 
-        return Optional.ofNullable(bestCandidateIndex);
+        return bestCandidateIndex == null ? Optional.empty() : Optional.of(new AttachmentMatch(bestCandidateIndex, bestSupportIndices));
     }
 
     private Optional<Integer> findAdjacentSummary(List<Row> rows, boolean[] consumed, int index) {
@@ -465,10 +558,12 @@ public class ReceiptOcrStructuralReconstructionService {
 
     private final class Row {
         private final List<LineBox> members = new ArrayList<>();
+        private final LinkedHashSet<String> reconstructionActions = new LinkedHashSet<>();
         private double top;
         private double bottom;
         private double left;
         private double right;
+        private double centerX;
         private double centerY;
 
         private Row(LineBox first) {
@@ -478,6 +573,12 @@ public class ReceiptOcrStructuralReconstructionService {
 
         private void add(LineBox line) {
             members.add(line);
+        }
+
+        private void addAction(String action) {
+            if (StringUtils.hasText(action)) {
+                reconstructionActions.add(action);
+            }
         }
 
         private boolean accepts(LineBox line) {
@@ -493,12 +594,16 @@ public class ReceiptOcrStructuralReconstructionService {
                 }
             }
 
-            double lineHeight = Math.max(1d, line.bottom() - line.top());
+            double lineHeight = Math.max(1d, line.height());
+            double rowHeight = height();
             double overlap = Math.min(bottom, line.bottom()) - Math.max(top, line.top());
-            double minHeight = Math.min(height(), lineHeight);
-            double minRequiredOverlap = Math.max(4d, Math.min(minHeight * 0.35d, 14d));
-            double centerThreshold = Math.max(10d, Math.min(minHeight * 0.5d, 16d));
-            return overlap >= minRequiredOverlap || Math.abs(centerY - line.centerY()) <= centerThreshold;
+            double minHeight = Math.min(rowHeight, lineHeight);
+            double maxHeight = Math.max(rowHeight, lineHeight);
+            double overlapRatio = overlap <= 0d ? 0d : overlap / minHeight;
+            double centerDelta = Math.abs(centerY - line.centerY());
+            double centerThreshold = Math.max(8d, Math.min(maxHeight * 0.45d, 18d));
+            boolean heightCompatible = maxHeight / Math.max(1d, minHeight) <= 2.4d || overlapRatio >= 0.65d;
+            return heightCompatible && (overlapRatio >= 0.42d || centerDelta <= centerThreshold);
         }
 
         private void finalizeGeometry() {
@@ -507,6 +612,7 @@ public class ReceiptOcrStructuralReconstructionService {
             bottom = members.stream().mapToDouble(LineBox::bottom).max().orElse(top);
             left = members.stream().mapToDouble(LineBox::left).min().orElse(Double.MAX_VALUE);
             right = members.stream().mapToDouble(LineBox::right).max().orElse(left);
+            centerX = (left + right) / 2d;
             centerY = (top + bottom) / 2d;
         }
 
@@ -528,6 +634,10 @@ public class ReceiptOcrStructuralReconstructionService {
 
         private double height() {
             return Math.max(1d, bottom - top);
+        }
+
+        private double width() {
+            return Math.max(1d, right - left);
         }
 
         private int minOrder() {
@@ -552,7 +662,7 @@ public class ReceiptOcrStructuralReconstructionService {
         }
 
         private boolean isAmountOnly() {
-            String text = text();
+            String text = normalizeAmountTypography(text());
             return StringUtils.hasText(text)
                 && AMOUNT_ONLY_PATTERN.matcher(text).matches()
                 && !keywordLexicon.containsSummaryKeyword(text);
@@ -560,9 +670,10 @@ public class ReceiptOcrStructuralReconstructionService {
 
         private boolean isSummaryLike() {
             String text = text();
+            String normalized = keywordLexicon.normalizeForMatching(text);
             return keywordLexicon.containsSummaryKeyword(text)
                 || keywordLexicon.containsTaxKeyword(text)
-                || PERCENT_PATTERN.matcher(text).find();
+                || looksLikeTaxSummaryText(text, normalized);
         }
 
         private boolean isServiceLike() {
@@ -594,6 +705,29 @@ public class ReceiptOcrStructuralReconstructionService {
                 && !LONG_DIGITS_PATTERN.matcher(text).find()
                 && (letterCount >= 4)
                 && digitCount <= Math.max(6L, letterCount);
+        }
+
+        private boolean isMeasureOnly() {
+            String text = text();
+            return StringUtils.hasText(text)
+                && !isAmountOnly()
+                && !isSummaryLike()
+                && !isServiceLike()
+                && MEASURE_ONLY_PATTERN.matcher(text.trim()).matches();
+        }
+
+        private boolean isWeakBodyNoiseLike() {
+            String text = text();
+            if (!StringUtils.hasText(text) || isAmountOnly() || isMeasureOnly() || isLikelyItemLike() || isSummaryLike() || isServiceLike()) {
+                return false;
+            }
+
+            String normalized = keywordLexicon.normalizeForMatching(text);
+            long letterCount = text.codePoints().filter(Character::isLetter).count();
+            long digitCount = text.chars().filter(Character::isDigit).count();
+            return keywordLexicon.containsPromoKeyword(text)
+                || normalized.matches("(?iu)^[\\p{L}]{1,4}[\\p{Punct}]*$")
+                || (letterCount > 0 && letterCount <= 4 && digitCount <= 4 && !keywordLexicon.extractMerchantAlias(text).isPresent());
         }
 
         private boolean isCardTailLike() {
@@ -644,10 +778,18 @@ public class ReceiptOcrStructuralReconstructionService {
         }
 
         private Row mergeWith(Row other, boolean appendAmountAtEnd) {
+            return mergeWith(other, appendAmountAtEnd, "merged");
+        }
+
+        private Row mergeWith(Row other, boolean appendAmountAtEnd, String action) {
             List<LineBox> mergedMembers = new ArrayList<>();
             mergedMembers.addAll(members);
             mergedMembers.addAll(other.members);
             Row merged = rowFrom(mergedMembers);
+            merged.reconstructionActions.addAll(reconstructionActions);
+            merged.reconstructionActions.addAll(other.reconstructionActions);
+            merged.addAction("merged");
+            merged.addAction(action);
             if (appendAmountAtEnd) {
                 merged.members.sort(Comparator
                     .comparing((LineBox line) -> other.members.contains(line) ? 1 : 0)
@@ -675,16 +817,56 @@ public class ReceiptOcrStructuralReconstructionService {
             if (members.size() > 1) {
                 tags.add("merged");
             }
+            if (members.stream().anyMatch(line -> !line.hasGeometry())) {
+                tags.add("geometry_inferred");
+            }
+            if (members.stream()
+                .map(LineBox::confidence)
+                .filter(Objects::nonNull)
+                .anyMatch(confidence -> confidence < 0.7d)) {
+                tags.add("low_confidence");
+            }
+
+            LinkedHashSet<String> actions = new LinkedHashSet<>(reconstructionActions);
+            if (members.size() > 1) {
+                actions.add("merged");
+            }
+            if (members.stream().anyMatch(line -> !line.hasGeometry())) {
+                actions.add("geometry_inferred");
+            }
+            if (isReorderedByGeometry()) {
+                actions.add("reordered_by_geometry");
+            }
+            if (tags.contains("low_confidence")) {
+                actions.add("low_confidence_preserved");
+            }
 
             return new ReconstructedOcrLineResponse(
                 canonicalText(),
                 order,
                 members.stream().map(LineBox::confidence).filter(Objects::nonNull).mapToDouble(Double::doubleValue).average().orElse(0.0d),
                 combinedBbox(),
+                geometry(),
+                null,
+                List.of(),
                 members.stream().map(LineBox::order).filter(Objects::nonNull).toList(),
                 members.stream().map(LineBox::text).toList(),
-                List.copyOf(tags)
+                List.copyOf(tags),
+                List.copyOf(actions)
             );
+        }
+
+        private boolean isReorderedByGeometry() {
+            List<Integer> orderedSourceOrders = members.stream()
+                .map(LineBox::order)
+                .filter(Objects::nonNull)
+                .toList();
+            if (orderedSourceOrders.size() < 2) {
+                return false;
+            }
+
+            List<Integer> sortedSourceOrders = orderedSourceOrders.stream().sorted().toList();
+            return !orderedSourceOrders.equals(sortedSourceOrders);
         }
 
         private List<List<Double>> combinedBbox() {
@@ -696,6 +878,19 @@ public class ReceiptOcrStructuralReconstructionService {
                 List.of(right, top),
                 List.of(right, bottom),
                 List.of(left, bottom)
+            );
+        }
+
+        private OcrLineGeometryResponse geometry() {
+            return new OcrLineGeometryResponse(
+                left,
+                right,
+                top,
+                bottom,
+                centerX,
+                centerY,
+                width(),
+                height()
             );
         }
     }
@@ -725,7 +920,7 @@ public class ReceiptOcrStructuralReconstructionService {
             || normalized.contains("kasa")
             || (text.contains("#") && text.contains("[") && text.contains("]"))
             || normalized.startsWith("nh")
-            || normalized.startsWith("пн")
+            || normalized.startsWith("pn") || normalized.startsWith("nh")
             || digits.length() >= 8;
     }
 
@@ -734,116 +929,94 @@ public class ReceiptOcrStructuralReconstructionService {
             return text;
         }
 
-        String trimmed = stripTrailingCardTail(text.trim().replaceAll("\\s+", " "));
+        String trimmed = normalizeAmountTypography(stripTrailingCardTail(text.trim().replaceAll("\\s+", " ")));
         trimmed = trimmed.replaceAll("(\\d{2}\\.\\d{2}\\.\\d{4})(\\d{2}:\\d{2}(?::\\d{2})?)", "$1 $2");
         String normalized = keywordLexicon.normalizeForMatching(trimmed);
-        Optional<String> merchantAlias = keywordLexicon.extractMerchantAlias(trimmed);
 
-        if (looksLikeStoreHeaderMarker(normalized) && merchantAlias.isPresent()) {
-            return "МАГАЗИН " + merchantAlias.orElseThrow();
-        }
-
-        if (looksLikeDistrictHeaderLine(normalized)) {
-            return canonicalizeDistrictHeaderLine(normalized);
-        }
-
-        if (looksLikeStreetHeaderLine(normalized)) {
-            String streetBody = trimmed
-                .replaceFirst("(?iu)^(?:вул\\.?\\s*)+", "")
-                .replaceAll("[,;]+$", "");
-            return "ВУЛ. " + streetBody;
-        }
-
-        if (normalized.matches("^(?:[nfpп][hн]|n[hн]|f[hн]|п[нh])\\s*\\d{8,}$")) {
-            return "ПН " + extractLongDigits(trimmed).orElse(trimmed.replaceAll("\\D+", ""));
+        if (normalized.matches("^(?:[nfpР В Р’В Р РЋРІР‚вЂќ][hР В Р’В Р В РІР‚В¦]|n[hР В Р’В Р В РІР‚В¦]|f[hР В Р’В Р В РІР‚В¦]|Р В Р’В Р РЋРІР‚вЂќ[Р В Р’В Р В РІР‚В¦h])\\s*\\d{8,}$")) {
+            return CANONICAL_TAX_ID + " " + extractLongDigits(trimmed).orElse(trimmed.replaceAll("\\D+", ""));
         }
 
         if (normalized.contains("kco") || normalized.contains("kaca") || normalized.contains("kasa")) {
             String suffix = trimmed.replaceAll("(?iu)^.*?(\\d+)$", "$1");
-            return suffix.equals(trimmed) ? "КСО Каса" : "КСО Каса " + suffix;
+            return suffix.equals(trimmed) ? CANONICAL_CASH_DESK : CANONICAL_CASH_DESK + " " + suffix;
         }
 
         if (trimmed.contains("#") && trimmed.contains("[") && trimmed.contains("]")) {
             String bracket = trimmed.replaceAll("(?s)^.*?(\\[[^\\]]+\\]).*$", "$1");
-            return "Чек # " + bracket;
-        }
-
-        if (looksLikeLegalEntityHeader(normalized) && merchantAlias.isPresent()) {
-            return "ТОВ \"" + merchantAlias.orElseThrow() + " УКРАЇНА\"";
-        }
-
-        if (looksLikeOnlineStoreLine(normalized)) {
-            return canonicalizeOnlineStoreLine(trimmed, merchantAlias);
-        }
-
-        if (looksLikeBankMerchantLine(normalized) && merchantAlias.isPresent()) {
-            return "ПРИВАТБАНК " + merchantAlias.orElseThrow() + " УКРАЇНА";
+            return CANONICAL_CHECK_LABEL + " " + bracket;
         }
 
         if (normalized.contains("onnara")
             || normalized.contains("nnara")
             || normalized.contains("oplata")
-            || normalized.contains("оплат")
-            || trimmed.matches("(?iu).*[oо0]n+n[aа]r[aа].*")) {
-            return "Оплата";
+            || normalized.contains("Р В Р’В Р РЋРІР‚СћР В Р’В Р РЋРІР‚вЂќР В Р’В Р вЂ™Р’В»Р В Р’В Р вЂ™Р’В°Р В Р Р‹Р Р†Р вЂљРЎв„ў")
+            || trimmed.matches("(?iu).*[oР В Р’В Р РЋРІР‚Сћ0]n+n[aР В Р’В Р вЂ™Р’В°]r[aР В Р’В Р вЂ™Р’В°].*")) {
+            return CANONICAL_PAYMENT_LABEL;
         }
 
         if (looksLikeStandalonePaymentLabel(trimmed, normalized)) {
-            return "Оплата";
+            return CANONICAL_PAYMENT_LABEL;
         }
 
         if (extractMaskedCard(trimmed).isPresent()) {
-            return "ЕПЗ " + extractMaskedCard(trimmed).orElseThrow();
+            return CANONICAL_EPZ_LABEL + " " + extractMaskedCard(trimmed).orElseThrow();
         }
 
         if (normalized.contains("mastercard")) {
             String code = extractLongDigits(trimmed).orElse("");
             return code.isEmpty()
-                ? "ПЛАТІЖНА СИСТЕМА: MasterCard"
-                : "ПЛАТІЖНА СИСТЕМА: MasterCard КОД ТРАНЗ. " + code;
+                ? CANONICAL_PAYMENT_SYSTEM_PREFIX + "MasterCard"
+                : CANONICAL_PAYMENT_SYSTEM_PREFIX + "MasterCard " + CANONICAL_TRANSACTION_CODE_LABEL + " " + code;
+        }
+
+        if (normalized.contains("visa")) {
+            String code = extractLongDigits(trimmed).orElse("");
+            return code.isEmpty()
+                ? CANONICAL_PAYMENT_SYSTEM_PREFIX + "Visa"
+                : CANONICAL_PAYMENT_SYSTEM_PREFIX + "Visa " + CANONICAL_TRANSACTION_CODE_LABEL + " " + code;
         }
 
         if ((normalized.contains("tpah3") || normalized.contains("trah3") || normalized.contains("tranz"))
             && extractLongDigits(trimmed).isPresent()) {
-            return "КОД ТРАНЗ. " + extractLongDigits(trimmed).orElseThrow();
+            return CANONICAL_TRANSACTION_CODE_LABEL + " " + extractLongDigits(trimmed).orElseThrow();
         }
 
         if (extractLongDigits(trimmed).isPresent() && looksLikeBarcodeLine(normalized)) {
-            return "Штрих код " + extractLongDigits(trimmed).orElseThrow();
-        }
-
-        if (looksLikeBeverageProductLine(normalized)) {
-            return canonicalizeBeverageProductLine(trimmed);
+            return CANONICAL_BARCODE_LABEL + " " + extractLongDigits(trimmed).orElseThrow();
         }
 
         if (normalized.contains("a8t") || normalized.contains("abt")) {
             String code = extractAuthCode(trimmed).orElse("");
-            return code.isEmpty() ? "КОД АВТ." : "КОД АВТ. " + code;
+            return code.isEmpty() ? CANONICAL_AUTH_CODE_LABEL : CANONICAL_AUTH_CODE_LABEL + " " + code;
         }
 
         if (looksLikePaymentDescriptor(normalized, trimmed)
             && extractAmount(trimmed).isPresent()) {
-            return "БЕЗГОТІВКОВА КАРТКА " + extractAmount(trimmed).orElseThrow() + " грн";
+            return CANONICAL_NON_CASH_CARD_LABEL + " " + extractAmount(trimmed).orElseThrow() + " \u0433\u0440\u043D";
         }
 
         if (normalized.startsWith("cyma") || normalized.startsWith("suma")) {
-            return extractAmount(trimmed).map(amount -> "Сума " + amount).orElse("Сума");
+            return extractAmount(trimmed)
+                .map(amount -> CANONICAL_TOTAL_LABEL + " " + amount + canonicalCurrencySuffix(normalized))
+                .orElse(CANONICAL_TOTAL_LABEL);
         }
 
-        if (PERCENT_PATTERN.matcher(trimmed).find() && extractAmount(trimmed).isPresent()) {
+        if (looksLikeTaxSummaryText(trimmed, normalized) && extractAmount(trimmed).isPresent()) {
             String rate = extractVatRate(trimmed).orElse("20.00%");
-            return "ПДВ A = " + rate + " " + extractAmount(trimmed).orElseThrow();
+            return CANONICAL_TAX_LABEL + rate + " " + extractAmount(trimmed).orElseThrow();
         }
 
         if ((normalized.contains("yek") || normalized.contains("4ek") || normalized.contains("chek"))
             && extractLongDigits(trimmed).isPresent()) {
             String checkNo = trimmed.replaceAll("(?iu)^.*?(\\d{6,}\\s+\\d{4,}).*$", "$1");
-            return checkNo.equals(trimmed) ? "ЧЕК № " + extractLongDigits(trimmed).orElseThrow() : "ЧЕК № " + checkNo;
+            return checkNo.equals(trimmed)
+                ? CANONICAL_CHECK_NUMBER_LABEL + " " + extractLongDigits(trimmed).orElseThrow()
+                : CANONICAL_CHECK_NUMBER_LABEL + " " + checkNo;
         }
 
         return trimmed;
     }
-
     private boolean looksLikeBarcodeLine(String normalized) {
         return normalized.contains("wtphx")
             || normalized.contains("utphx")
@@ -853,13 +1026,41 @@ public class ReceiptOcrStructuralReconstructionService {
             || normalized.contains("barcode");
     }
 
+    private boolean looksLikeTaxSummaryText(String text, String normalized) {
+        if (!StringUtils.hasText(text) || extractAmount(text).isEmpty()) {
+            return false;
+        }
+
+        return keywordLexicon.containsTaxKeyword(text)
+            || normalized.startsWith("nab")
+            || normalized.startsWith("nav")
+            || normalized.startsWith("pab")
+            || normalized.contains("pdv")
+            || normalized.contains("Р В РЎвЂ”Р В РўвЂР В Р вЂ ");
+    }
+
+    private String normalizeAmountTypography(String text) {
+        if (!StringUtils.hasText(text)) {
+            return text;
+        }
+        return text.replaceAll("(?<=\\d)[:;](?=\\d{2}(?:\\D|$))", ".");
+    }
+
     private Optional<String> extractAmount(String text) {
-        var matcher = AMOUNT_CAPTURE_PATTERN.matcher(text);
+        var matcher = AMOUNT_CAPTURE_PATTERN.matcher(normalizeAmountTypography(text));
         Optional<String> last = Optional.empty();
         while (matcher.find()) {
-            last = Optional.of(matcher.group(1).replace(" ", "").replace("\u00A0", "").replace(',', '.'));
+            last = Optional.of(matcher.group(1).replace(" ", "").replace("\u00A0", "").replace(',', '.').replace(':', '.'));
         }
         return last;
+    }
+
+    private String canonicalCurrencySuffix(String normalized) {
+        return normalized.matches(".*(?:uah|rph|rpn|tph|toh|reh|teh).*")
+            || normalized.contains("\u0433\u0440\u043D")
+            || normalized.contains("\u20B4")
+            ? " \u0433\u0440\u043D"
+            : "";
     }
 
     private Optional<String> extractLongDigits(String text) {
@@ -913,15 +1114,29 @@ public class ReceiptOcrStructuralReconstructionService {
             || normalized.contains("btck");
     }
 
-    private ReconstructedOcrLineResponse copyLine(ReconstructedOcrLineResponse line, String text) {
+    private ReconstructedOcrLineResponse copyLine(ReconstructedOcrLineResponse line, String text, String... extraActions) {
+        LinkedHashSet<String> actions = new LinkedHashSet<>();
+        if (line.reconstructionActions() != null) {
+            actions.addAll(line.reconstructionActions());
+        }
+        for (String action : extraActions) {
+            if (StringUtils.hasText(action)) {
+                actions.add(action);
+            }
+        }
+
         return new ReconstructedOcrLineResponse(
             text,
             line.order(),
             line.confidence(),
             line.bbox(),
+            line.geometry(),
+            line.documentZone(),
+            line.documentZoneReasons(),
             line.sourceOrders(),
             line.sourceTexts(),
-            line.structuralTags()
+            line.structuralTags(),
+            List.copyOf(actions)
         );
     }
 
@@ -929,7 +1144,7 @@ public class ReceiptOcrStructuralReconstructionService {
         return normalized.contains("maga3")
             || normalized.contains("magaz")
             || normalized.contains("mara3")
-            || normalized.contains("магаз")
+            || normalized.contains("Р В Р’В Р РЋР’ВР В Р’В Р вЂ™Р’В°Р В Р’В Р РЋРІР‚вЂњР В Р’В Р вЂ™Р’В°Р В Р’В Р вЂ™Р’В·")
             || normalized.contains("store")
             || normalized.contains("market");
     }
@@ -937,57 +1152,12 @@ public class ReceiptOcrStructuralReconstructionService {
     private boolean looksLikeLegalEntityHeader(String normalized) {
         return (normalized.contains("tob")
             || normalized.contains("t0b")
-            || normalized.contains("тов")
+            || normalized.contains("Р В Р Р‹Р Р†Р вЂљРЎв„ўР В Р’В Р РЋРІР‚СћР В Р’В Р В РІР‚В ")
             || normalized.startsWith("\""))
             && (normalized.contains("ukrai")
             || normalized.contains("ykpaiha")
             || normalized.contains("ykpaiha")
-            || normalized.contains("украї"));
-    }
-
-    private boolean looksLikeOnlineStoreLine(String normalized) {
-        return normalized.contains("zakaz")
-            || normalized.contains("online")
-            || normalized.contains("onna")
-            || normalized.contains("kupy")
-            || normalized.contains("купу")
-            || normalized.contains("онла");
-    }
-
-    private String canonicalizeOnlineStoreLine(String text, Optional<String> merchantAlias) {
-        String normalized = keywordLexicon.normalizeForMatching(text);
-        String domain = text.replaceAll("(?iu)^.*?((?:[A-Z0-9-]+\\.)+[A-Z]{2,}).*$", "$1");
-        if (!domain.equals(text)) {
-            return "КУПУЙ ОНЛАЙН НА " + domain.toUpperCase();
-        }
-        if (merchantAlias.isPresent()) {
-            return "КУПУЙ ОНЛАЙН НА " + merchantAlias.orElseThrow();
-        }
-        return text;
-    }
-
-    private boolean looksLikeDistrictHeaderLine(String normalized) {
-        return normalized.contains("panoh")
-            || normalized.contains("rayon")
-            || normalized.contains("район");
-    }
-
-    private String canonicalizeDistrictHeaderLine(String normalized) {
-        if (normalized.contains("khb")
-            || normalized.contains("kuib")
-            || normalized.contains("kyib")
-            || normalized.contains("k0ib")
-            || normalized.contains("київ")) {
-            return "м. КИЇВ, РАЙОН,";
-        }
-        return "РАЙОН,";
-    }
-
-    private boolean looksLikeStreetHeaderLine(String normalized) {
-        return normalized.contains("cbka")
-            || normalized.contains("ська")
-            || normalized.endsWith("ska")
-            || normalized.endsWith("cka");
+            || normalized.contains("Р В Р Р‹Р РЋРІР‚СљР В Р’В Р РЋРІР‚СњР В Р Р‹Р В РІР‚С™Р В Р’В Р вЂ™Р’В°Р В Р Р‹Р Р†Р вЂљРІР‚Сњ"));
     }
 
     private boolean looksLikeBankMerchantLine(String normalized) {
@@ -996,32 +1166,12 @@ public class ReceiptOcrStructuralReconstructionService {
             || normalized.contains("pr1vat");
         boolean countryLike = normalized.contains("ukpaiha")
             || normalized.contains("ukraiha")
-            || normalized.contains("украї")
+            || normalized.contains("Р В Р Р‹Р РЋРІР‚СљР В Р’В Р РЋРІР‚СњР В Р Р‹Р В РІР‚С™Р В Р’В Р вЂ™Р’В°Р В Р Р‹Р Р†Р вЂљРІР‚Сњ")
             || normalized.contains("ukra");
         boolean bankLike = normalized.contains("bank")
             || normalized.contains("gahk")
-            || normalized.contains("банк");
+            || normalized.contains("Р В Р’В Р вЂ™Р’В±Р В Р’В Р вЂ™Р’В°Р В Р’В Р В РІР‚В¦Р В Р’В Р РЋРІР‚Сњ");
         return privatLike && (countryLike || bankLike);
-    }
-
-    private boolean looksLikeBeverageProductLine(String normalized) {
-        return normalized.contains("газ")
-            || normalized.contains("ga3")
-            || normalized.contains("газ.")
-            || normalized.contains("cola")
-            || normalized.contains("fanta")
-            || normalized.contains("co1a");
-    }
-
-    private String canonicalizeBeverageProductLine(String text) {
-        String canonical = text
-            .replaceAll("(?iu)^\\s*(?:hanin|napin|hапин|напин|naпin|haпin)\\s*r[aа]3\\.?\\s*", "Напій газ. ")
-            .replaceAll("(?iu)\\b1\\s*[,\\.]\\s*75\\s*[nлlіi]\\b", "1,75л")
-            .replaceAll("(?iu)\\b(?:nет|пet|pet|nET|ПET)\\b", "ПЕТ")
-            .replaceAll("(?iu)(?<=[A-Za-z])1(?=[A-Za-z])", "l")
-            .replaceAll("\\s+", " ")
-            .trim();
-        return canonical;
     }
 
     private Optional<String> extractVatRate(String text) {
@@ -1063,12 +1213,33 @@ public class ReceiptOcrStructuralReconstructionService {
         return split.isEmpty() ? Optional.empty() : Optional.of(List.copyOf(split));
     }
 
+    private Optional<List<String>> splitHeaderAmountLeak(String text, String normalized) {
+        if (!(looksLikeHeaderBlockText(text) || looksLikeLegalEntityHeader(normalized))) {
+            return Optional.empty();
+        }
+
+        var matcher = Pattern.compile(
+            "(?iu)^(.*?\\p{L}.*?)\\s+(\\d{1,5}(?:[ \\u00A0]\\d{3})*[\\.,:]\\d{2}(?:\\s*[a-z\\p{IsCyrillic}Р В Р’В Р В РІР‚В Р В Р вЂ Р В РІР‚С™Р РЋРІвЂћСћР В РЎС›Р Р†Р вЂљР’В$Р В Р’В Р В РІР‚В Р В Р вЂ Р В РІР‚С™Р РЋРІвЂћСћР В РІР‚в„ўР вЂ™Р’В¬]+)?)$"
+        ).matcher(text.trim());
+        if (!matcher.matches()) {
+            return Optional.empty();
+        }
+
+        String headerText = matcher.group(1).trim();
+        String amountText = matcher.group(2).trim();
+        if (!StringUtils.hasText(headerText) || !StringUtils.hasText(amountText) || headerText.length() < 6) {
+            return Optional.empty();
+        }
+
+        return Optional.of(List.of(headerText, amountText));
+    }
+
     private String canonicalizePaymentSystemLabel(String text, String normalized) {
         if (normalized.contains("mastercard")) {
-            return "ПЛАТІЖНА СИСТЕМА: MasterCard";
+            return CANONICAL_PAYMENT_SYSTEM_PREFIX + "MasterCard";
         }
         if (normalized.contains("visa")) {
-            return "ПЛАТІЖНА СИСТЕМА: Visa";
+            return CANONICAL_PAYMENT_SYSTEM_PREFIX + "Visa";
         }
         return text;
     }
@@ -1082,7 +1253,7 @@ public class ReceiptOcrStructuralReconstructionService {
             || normalized.contains("mastercard")
             || normalized.contains("visa"))
             && extractLongDigits(text).isPresent()) {
-            return Optional.of("КОД ТРАНЗ. " + extractLongDigits(text).orElseThrow());
+            return Optional.of(CANONICAL_TRANSACTION_CODE_LABEL + " " + extractLongDigits(text).orElseThrow());
         }
         return Optional.empty();
     }
@@ -1092,9 +1263,9 @@ public class ReceiptOcrStructuralReconstructionService {
             || normalized.contains("nnara")
             || normalized.contains("oplata")
             || normalized.contains("oplta")
-            || normalized.contains("оплат")
-            || text.matches("(?iu)^[oо0]n+n[aа]r[aа][\\p{Punct}\\s]*$")
-            || text.matches("(?iu)^op+l[aа]t[aа][\\p{Punct}\\s]*$");
+            || normalized.contains("Р В Р’В Р РЋРІР‚СћР В Р’В Р РЋРІР‚вЂќР В Р’В Р вЂ™Р’В»Р В Р’В Р вЂ™Р’В°Р В Р Р‹Р Р†Р вЂљРЎв„ў")
+            || text.matches("(?iu)^[oР В Р’В Р РЋРІР‚Сћ0]n+n[aР В Р’В Р вЂ™Р’В°]r[aР В Р’В Р вЂ™Р’В°][\\p{Punct}\\s]*$")
+            || text.matches("(?iu)^op+l[aР В Р’В Р вЂ™Р’В°]t[aР В Р’В Р вЂ™Р’В°][\\p{Punct}\\s]*$");
     }
 
     private boolean looksLikePaymentDescriptor(String normalized, String text) {
@@ -1102,53 +1273,112 @@ public class ReceiptOcrStructuralReconstructionService {
         return (normalized.contains("gotib")
             || normalized.contains("gotiv")
             || normalized.contains("bezgot")
-            || normalized.contains("безгот")
+            || normalized.contains("Р В Р’В Р вЂ™Р’В±Р В Р’В Р вЂ™Р’ВµР В Р’В Р вЂ™Р’В·Р В Р’В Р РЋРІР‚вЂњР В Р’В Р РЋРІР‚СћР В Р Р‹Р Р†Р вЂљРЎв„ў")
             || normalized.contains("kaptka")
             || normalized.contains("kart")
-            || normalized.contains("карт")
+            || normalized.contains("Р В Р’В Р РЋРІР‚СњР В Р’В Р вЂ™Р’В°Р В Р Р‹Р В РІР‚С™Р В Р Р‹Р Р†Р вЂљРЎв„ў")
             || normalized.contains("rph"))
             && letterCount >= 4;
     }
 
     private String stripTrailingCardTail(String text) {
-        return text.replaceAll("(?iu)\\s+(?:kaptka|kartka|kartk[ao]?|картк[а-яіїєґ]*)\\s*$", "");
+        return text.replaceAll("(?iu)\\s+(?:kaptka|kartka|kartk[ao]?|Р В Р’В Р РЋРІР‚СњР В Р’В Р вЂ™Р’В°Р В Р Р‹Р В РІР‚С™Р В Р Р‹Р Р†Р вЂљРЎв„ўР В Р’В Р РЋРІР‚Сњ[Р В Р’В Р вЂ™Р’В°-Р В Р Р‹Р В Р РЏР В Р Р‹Р Р†Р вЂљРІР‚СљР В Р Р‹Р Р†Р вЂљРІР‚СњР В Р Р‹Р Р†Р вЂљРЎСљР В РЎС›Р Р†Р вЂљР’В]*)\\s*$", "");
     }
 
     private record ServiceLeadSplit(String serviceText, String leadToken) { }
 
-    private record LineBox(String text, Double confidence, Integer order, List<List<Double>> bbox, double top, double bottom, double left, double right) {
+    private record AttachmentMatch(int targetIndex, List<Integer> mergeSupportIndices) { }
+
+    private record LineBox(
+        String text,
+        Double confidence,
+        Integer order,
+        List<List<Double>> bbox,
+        OcrLineGeometryResponse geometry,
+        boolean geometryInferred
+    ) {
 
         private static LineBox from(OcrExtractionLine line) {
             if (line.bbox() == null || line.bbox().isEmpty()) {
                 double fallback = line.order() == null ? 0d : line.order().doubleValue() * 20d;
-                return new LineBox(line.text(), line.confidence(), line.order(), null, fallback, fallback + 12d, 0d, 100d);
+                return new LineBox(
+                    line.text(),
+                    line.confidence(),
+                    line.order(),
+                    null,
+                    geometry(0d, 100d, fallback, fallback + 12d),
+                    true
+                );
             }
 
             double top = line.bbox().stream().mapToDouble(point -> point.size() > 1 ? point.get(1) : 0d).min().orElse(0d);
             double bottom = line.bbox().stream().mapToDouble(point -> point.size() > 1 ? point.get(1) : 0d).max().orElse(top);
             double left = line.bbox().stream().mapToDouble(point -> point.isEmpty() ? 0d : point.get(0)).min().orElse(0d);
             double right = line.bbox().stream().mapToDouble(point -> point.isEmpty() ? 0d : point.get(0)).max().orElse(left);
-            return new LineBox(line.text(), line.confidence(), line.order(), line.bbox(), top, bottom, left, right);
+            return new LineBox(line.text(), line.confidence(), line.order(), line.bbox(), geometry(left, right, top, bottom), false);
+        }
+
+        private static OcrLineGeometryResponse geometry(double left, double right, double top, double bottom) {
+            double width = Math.max(1d, right - left);
+            double height = Math.max(1d, bottom - top);
+            return new OcrLineGeometryResponse(
+                left,
+                right,
+                top,
+                bottom,
+                left + width / 2d,
+                top + height / 2d,
+                width,
+                height
+            );
         }
 
         private boolean hasGeometry() {
-            return bbox != null && !bbox.isEmpty();
+            return !geometryInferred && bbox != null && !bbox.isEmpty();
+        }
+
+        private double top() {
+            return geometry.minY();
+        }
+
+        private double bottom() {
+            return geometry.maxY();
+        }
+
+        private double left() {
+            return geometry.minX();
+        }
+
+        private double right() {
+            return geometry.maxX();
         }
 
         private double centerY() {
-            return (top + bottom) / 2d;
+            return geometry.centerY();
         }
 
         private double width() {
-            return Math.max(1d, right - left);
+            return geometry.width();
+        }
+
+        private double height() {
+            return geometry.height();
         }
 
         private double sortTop() {
-            return top;
+            return top();
         }
 
         private double sortLeft() {
-            return left;
+            return left();
         }
     }
 }
+
+
+
+
+
+
+
+

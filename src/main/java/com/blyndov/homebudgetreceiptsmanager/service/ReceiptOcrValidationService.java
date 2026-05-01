@@ -1,6 +1,7 @@
 package com.blyndov.homebudgetreceiptsmanager.service;
 
 import com.blyndov.homebudgetreceiptsmanager.dto.NormalizedOcrLineResponse;
+import com.blyndov.homebudgetreceiptsmanager.entity.ReceiptProcessingDecision;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -46,7 +47,12 @@ public class ReceiptOcrValidationService {
 
     public ParsedReceiptValidationResult validate(NormalizedOcrDocument document, ParsedReceiptDocument parsedDocument) {
         if (document == null || parsedDocument == null) {
-            return new ParsedReceiptValidationResult(List.of(), false);
+            return new ParsedReceiptValidationResult(
+                List.of(),
+                true,
+                ReceiptConfidence.unknown(),
+                ReceiptProcessingDecision.PARSING_FAILED
+            );
         }
 
         LinkedHashSet<ReceiptParseWarningCode> warnings = new LinkedHashSet<>();
@@ -64,7 +70,138 @@ public class ReceiptOcrValidationService {
                 && parsedDocument.totalAmount() == null
                 && parsedDocument.lineItems().isEmpty());
 
-        return new ParsedReceiptValidationResult(List.copyOf(warnings), weakParseQuality);
+        ReceiptConfidence confidence = calculateConfidence(document, parsedDocument, warnings);
+        ReceiptProcessingDecision processingDecision = chooseProcessingDecision(parsedDocument, warnings, weakParseQuality, confidence);
+
+        return new ParsedReceiptValidationResult(List.copyOf(warnings), weakParseQuality, confidence, processingDecision);
+    }
+
+    private ReceiptConfidence calculateConfidence(
+        NormalizedOcrDocument document,
+        ParsedReceiptDocument parsedDocument,
+        Set<ReceiptParseWarningCode> warnings
+    ) {
+        double ocrConfidence = calculateOcrConfidence(document);
+        double imageQualityConfidence = 1.0d;
+        double reconstructionConfidence = calculateReconstructionConfidence(document);
+        double fieldExtractionConfidence = calculateFieldExtractionConfidence(document, parsedDocument);
+        double businessConsistencyConfidence = calculateBusinessConsistencyConfidence(warnings);
+        double overall = (ocrConfidence * 0.20d)
+            + (imageQualityConfidence * 0.10d)
+            + (reconstructionConfidence * 0.15d)
+            + (fieldExtractionConfidence * 0.30d)
+            + (businessConsistencyConfidence * 0.25d);
+
+        if (ocrConfidence < 0.55d) {
+            overall = Math.min(overall, 0.79d);
+        }
+        if (fieldExtractionConfidence < 0.65d) {
+            overall = Math.min(overall, 0.69d);
+        }
+        if (businessConsistencyConfidence < 0.55d) {
+            overall = Math.min(overall, 0.59d);
+        }
+
+        return new ReceiptConfidence(
+            ocrConfidence,
+            imageQualityConfidence,
+            reconstructionConfidence,
+            fieldExtractionConfidence,
+            businessConsistencyConfidence,
+            overall
+        );
+    }
+
+    private ReceiptProcessingDecision chooseProcessingDecision(
+        ParsedReceiptDocument parsedDocument,
+        Set<ReceiptParseWarningCode> warnings,
+        boolean weakParseQuality,
+        ReceiptConfidence confidence
+    ) {
+        boolean noParsedFields = !StringUtils.hasText(parsedDocument.merchantName())
+            && parsedDocument.purchaseDate() == null
+            && parsedDocument.totalAmount() == null
+            && parsedDocument.lineItems().isEmpty();
+        if (noParsedFields) {
+            return ReceiptProcessingDecision.PARSING_FAILED;
+        }
+
+        boolean needsReview = weakParseQuality
+            || confidence.fieldExtractionConfidence() < 0.65d
+            || confidence.businessConsistencyConfidence() < 0.55d
+            || warnings.contains(ReceiptParseWarningCode.SUSPICIOUS_TOTAL)
+            || warnings.contains(ReceiptParseWarningCode.SUSPICIOUS_MERCHANT)
+            || warnings.contains(ReceiptParseWarningCode.SUSPICIOUS_LINE_ITEMS);
+        if (needsReview) {
+            return ReceiptProcessingDecision.NEEDS_REVIEW;
+        }
+
+        if (confidence.overallReceiptConfidence() < 0.80d || !warnings.isEmpty()) {
+            return ReceiptProcessingDecision.PARSED_LOW_CONFIDENCE;
+        }
+
+        return ReceiptProcessingDecision.PARSED_OK;
+    }
+
+    private double calculateOcrConfidence(NormalizedOcrDocument document) {
+        List<Double> confidences = document.normalizedLines().stream()
+            .filter(line -> !line.ignored())
+            .map(NormalizedOcrLineResponse::confidence)
+            .filter(value -> value != null && value >= 0.0d)
+            .map(value -> Math.min(1.0d, value))
+            .toList();
+        if (confidences.isEmpty()) {
+            return 0.90d;
+        }
+
+        return confidences.stream().mapToDouble(Double::doubleValue).average().orElse(0.90d);
+    }
+
+    private double calculateReconstructionConfidence(NormalizedOcrDocument document) {
+        int normalizedCount = document.normalizedLines().size();
+        if (normalizedCount == 0) {
+            return StringUtils.hasText(document.parserReadyText()) ? 0.60d : 0.40d;
+        }
+
+        long ignoredCount = document.normalizedLines().stream().filter(NormalizedOcrLineResponse::ignored).count();
+        double ignoredPenalty = Math.min(0.40d, (ignoredCount / (double) normalizedCount) * 0.40d);
+        double emptyParserPenalty = document.parserReadyLines().isEmpty() ? 0.30d : 0.0d;
+        return Math.max(0.35d, 1.0d - ignoredPenalty - emptyParserPenalty);
+    }
+
+    private double calculateFieldExtractionConfidence(NormalizedOcrDocument document, ParsedReceiptDocument parsedDocument) {
+        double score = 0.0d;
+        if (StringUtils.hasText(parsedDocument.merchantName())) {
+            score += 0.25d;
+        }
+        if (parsedDocument.purchaseDate() != null) {
+            score += 0.20d;
+        }
+        if (parsedDocument.totalAmount() != null) {
+            score += 0.30d;
+        }
+        if (parsedDocument.currency() != null) {
+            score += 0.10d;
+        }
+        if (!parsedDocument.lineItems().isEmpty() || looksLikeBankDocument(document)) {
+            score += 0.15d;
+        } else if (parsedDocument.totalAmount() != null) {
+            score += 0.05d;
+        }
+        return score;
+    }
+
+    private double calculateBusinessConsistencyConfidence(Set<ReceiptParseWarningCode> warnings) {
+        double penalty = 0.0d;
+        for (ReceiptParseWarningCode warning : warnings) {
+            penalty += switch (warning) {
+                case SUSPICIOUS_MERCHANT, SUSPICIOUS_TOTAL, SUSPICIOUS_LINE_ITEMS -> 0.25d;
+                case ITEM_TOTAL_MISMATCH, PAYMENT_CONTENT_IN_ITEMS -> 0.20d;
+                case SUSPICIOUS_DATE, INCONSISTENT_ITEM_MATH -> 0.15d;
+                case NOISY_ITEM_TITLES -> 0.10d;
+            };
+        }
+        return Math.max(0.0d, 1.0d - penalty);
     }
 
     private Optional<ReceiptParseWarningCode> validateMerchant(

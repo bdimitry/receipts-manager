@@ -10,6 +10,9 @@ import com.blyndov.homebudgetreceiptsmanager.client.OcrClient;
 import com.blyndov.homebudgetreceiptsmanager.config.AwsProperties;
 import com.blyndov.homebudgetreceiptsmanager.dto.AuthResponse;
 import com.blyndov.homebudgetreceiptsmanager.dto.LoginRequest;
+import com.blyndov.homebudgetreceiptsmanager.dto.OcrDocumentZoneType;
+import com.blyndov.homebudgetreceiptsmanager.dto.ReceiptCorrectionRequest;
+import com.blyndov.homebudgetreceiptsmanager.dto.ReceiptCorrectionResponse;
 import com.blyndov.homebudgetreceiptsmanager.dto.ReceiptOcrResponse;
 import com.blyndov.homebudgetreceiptsmanager.dto.ReceiptResponse;
 import com.blyndov.homebudgetreceiptsmanager.dto.RegisterRequest;
@@ -18,6 +21,8 @@ import com.blyndov.homebudgetreceiptsmanager.entity.OcrLanguageDetectionSource;
 import com.blyndov.homebudgetreceiptsmanager.entity.Receipt;
 import com.blyndov.homebudgetreceiptsmanager.entity.ReceiptCountryHint;
 import com.blyndov.homebudgetreceiptsmanager.entity.ReceiptOcrStatus;
+import com.blyndov.homebudgetreceiptsmanager.entity.ReceiptProcessingDecision;
+import com.blyndov.homebudgetreceiptsmanager.entity.ReceiptReviewStatus;
 import com.blyndov.homebudgetreceiptsmanager.repository.ReceiptRepository;
 import com.blyndov.homebudgetreceiptsmanager.repository.UserRepository;
 import com.blyndov.homebudgetreceiptsmanager.support.AbstractPostgresIntegrationTest;
@@ -114,6 +119,7 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         assertThat(uploadResponse.getBody().currency()).isEqualTo(CurrencyCode.UAH);
 
         Receipt processedReceipt = awaitReceiptStatus(uploadResponse.getBody().id(), ReceiptOcrStatus.DONE);
+        assertThat(processedReceipt.getRawOcrArtifactJson()).isNotBlank();
         assertThat(processedReceipt.getReconstructedOcrLinesJson()).isNotBlank();
         assertThat(processedReceipt.getNormalizedOcrLinesJson()).isNotBlank();
         assertThat(processedReceipt.getParserReadyText()).isNotBlank();
@@ -123,6 +129,9 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         assertThat(processedReceipt.getOcrProfileUsed()).isEqualTo("cyrillic");
         assertThat(processedReceipt.getParseWarningsJson()).isEqualTo("[]");
         assertThat(processedReceipt.isWeakParseQuality()).isFalse();
+        assertThat(processedReceipt.getOcrConfidenceJson()).isNotBlank();
+        assertThat(processedReceipt.getOcrProcessingDecision()).isEqualTo(ReceiptProcessingDecision.PARSED_OK);
+        assertThat(processedReceipt.getReviewStatus()).isEqualTo(ReceiptReviewStatus.UNREVIEWED);
         assertThat(processedReceipt.getLineItems()).hasSizeGreaterThan(1);
         assertThat(processedReceipt.getLineItems())
             .extracting(item -> item.getTitle())
@@ -138,6 +147,10 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         assertThat(ocrResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(ocrResponse.getBody()).isNotNull();
         assertThat(ocrResponse.getBody().currency()).isEqualTo(CurrencyCode.UAH);
+        assertThat(ocrResponse.getBody().rawOcrArtifact()).isNotNull();
+        assertThat(ocrResponse.getBody().rawOcrArtifact().rawText()).isEqualTo(processedReceipt.getRawOcrText());
+        assertThat(ocrResponse.getBody().rawOcrArtifact().lines()).isNotEmpty();
+        assertThat(ocrResponse.getBody().rawOcrArtifact().lines().getFirst().confidence()).isEqualTo(0.98d);
         assertThat(ocrResponse.getBody().reconstructedLines()).isNotEmpty();
         assertThat(ocrResponse.getBody().normalizedLines()).isNotEmpty();
         assertThat(ocrResponse.getBody().receiptCountryHint()).isNull();
@@ -153,6 +166,10 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         assertThat(ocrResponse.getBody().parsedCurrency()).isEqualTo(processedReceipt.getParsedCurrency());
         assertThat(ocrResponse.getBody().parseWarnings()).isEmpty();
         assertThat(ocrResponse.getBody().weakParseQuality()).isFalse();
+        assertThat(ocrResponse.getBody().ocrConfidence()).isNotNull();
+        assertThat(ocrResponse.getBody().ocrConfidence().overallReceiptConfidence()).isGreaterThan(0.80d);
+        assertThat(ocrResponse.getBody().ocrProcessingDecision()).isEqualTo(ReceiptProcessingDecision.PARSED_OK);
+        assertThat(ocrResponse.getBody().reviewStatus()).isEqualTo(ReceiptReviewStatus.UNREVIEWED);
     }
 
     @Test
@@ -179,6 +196,7 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         );
 
         Receipt processedReceipt = awaitReceiptStatus(uploadResponse.getBody().id(), ReceiptOcrStatus.DONE);
+        assertThat(processedReceipt.getRawOcrArtifactJson()).isNotBlank();
         assertThat(processedReceipt.getReconstructedOcrLinesJson()).isNotBlank();
         assertThat(processedReceipt.getNormalizedOcrLinesJson()).contains("FRESH MARKET");
         assertThat(processedReceipt.getParserReadyText()).contains("FRESH MARKET");
@@ -187,6 +205,9 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         assertThat(processedReceipt.getOcrProfileUsed()).isEqualTo("en");
         assertThat(processedReceipt.getParseWarningsJson()).isEqualTo("[]");
         assertThat(processedReceipt.isWeakParseQuality()).isFalse();
+        assertThat(processedReceipt.getOcrConfidenceJson()).isNotBlank();
+        assertThat(processedReceipt.getOcrProcessingDecision()).isEqualTo(ReceiptProcessingDecision.NEEDS_REVIEW);
+        assertThat(processedReceipt.getReviewStatus()).isEqualTo(ReceiptReviewStatus.NEEDS_REVIEW);
         assertThat(processedReceipt.getParsedStoreName()).isEqualTo("FRESH MARKET");
         assertThat(processedReceipt.getParsedTotalAmount()).isEqualByComparingTo("210.40");
 
@@ -198,9 +219,18 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         );
 
         assertThat(ocrResponse.getBody()).isNotNull();
+        assertThat(ocrResponse.getBody().rawOcrArtifact()).isNotNull();
+        assertThat(ocrResponse.getBody().rawOcrArtifact().rawText()).contains("FRESH.MARKET");
+        assertThat(ocrResponse.getBody().rawOcrArtifact().engineName()).isNull();
+        assertThat(ocrResponse.getBody().rawOcrArtifact().lines()).hasSize(4);
         assertThat(ocrResponse.getBody().reconstructedLines()).isNotEmpty();
+        assertThat(ocrResponse.getBody().reconstructedLines().getFirst().geometry()).isNotNull();
+        assertThat(ocrResponse.getBody().reconstructedLines().getFirst().documentZone()).isEqualTo(OcrDocumentZoneType.MERCHANT_BLOCK);
+        assertThat(ocrResponse.getBody().reconstructedLines().getFirst().documentZoneReasons()).contains("top_position");
+        assertThat(ocrResponse.getBody().reconstructedLines().getFirst().reconstructionActions()).contains("geometry_inferred");
         assertThat(ocrResponse.getBody().normalizedLines()).extracting(line -> line.normalizedText())
             .contains("FRESH MARKET", "TOTAL. 210.40", "THANK YOU");
+        assertThat(ocrResponse.getBody().normalizedLines().getFirst().tags()).contains("zone_merchant_block");
         assertThat(ocrResponse.getBody().languageDetectionSource()).isEqualTo(OcrLanguageDetectionSource.DEFAULT_FALLBACK);
         assertThat(ocrResponse.getBody().ocrProfileStrategy()).isEqualTo("en");
         assertThat(ocrResponse.getBody().ocrProfileUsed()).isEqualTo("en");
@@ -209,6 +239,8 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         assertThat(ocrResponse.getBody().parsedTotalAmount()).isEqualByComparingTo("210.40");
         assertThat(ocrResponse.getBody().parseWarnings()).isEmpty();
         assertThat(ocrResponse.getBody().weakParseQuality()).isFalse();
+        assertThat(ocrResponse.getBody().ocrProcessingDecision()).isEqualTo(ReceiptProcessingDecision.NEEDS_REVIEW);
+        assertThat(ocrResponse.getBody().reviewStatus()).isEqualTo(ReceiptReviewStatus.NEEDS_REVIEW);
     }
 
     @Test
@@ -227,6 +259,9 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         Receipt processedReceipt = awaitReceiptStatus(uploadResponse.getBody().id(), ReceiptOcrStatus.DONE);
         assertThat(processedReceipt.getParseWarningsJson()).contains("SUSPICIOUS_TOTAL");
         assertThat(processedReceipt.isWeakParseQuality()).isTrue();
+        assertThat(processedReceipt.getOcrConfidenceJson()).isNotBlank();
+        assertThat(processedReceipt.getOcrProcessingDecision()).isEqualTo(ReceiptProcessingDecision.NEEDS_REVIEW);
+        assertThat(processedReceipt.getReviewStatus()).isEqualTo(ReceiptReviewStatus.NEEDS_REVIEW);
 
         ResponseEntity<ReceiptOcrResponse> ocrResponse = restTemplate.exchange(
             "/api/receipts/" + processedReceipt.getId() + "/ocr",
@@ -239,6 +274,63 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         assertThat(ocrResponse.getBody().parseWarnings())
             .contains("SUSPICIOUS_TOTAL", "SUSPICIOUS_LINE_ITEMS");
         assertThat(ocrResponse.getBody().weakParseQuality()).isTrue();
+        assertThat(ocrResponse.getBody().ocrProcessingDecision()).isEqualTo(ReceiptProcessingDecision.NEEDS_REVIEW);
+        assertThat(ocrResponse.getBody().reviewStatus()).isEqualTo(ReceiptReviewStatus.NEEDS_REVIEW);
+    }
+
+    @Test
+    void correctionEndpointPersistsDiffWithoutOverwritingParsedFields() {
+        when(ocrClient.extractResult(any(), any(), any(), any())).thenReturn(
+            mapResult("FRESH MARKET\nDATE 2026-04-10\nTOTAL 210.40")
+        );
+        String accessToken = registerAndLogin(uniqueEmail("ocr-correction"), "P@ssword123");
+
+        ResponseEntity<ReceiptResponse> uploadResponse = restTemplate.exchange(
+            "/api/receipts/upload",
+            HttpMethod.POST,
+            multipartEntity("correction.png", MediaType.IMAGE_PNG, "png".getBytes(StandardCharsets.UTF_8), CurrencyCode.UAH, accessToken),
+            ReceiptResponse.class
+        );
+
+        Receipt processedReceipt = awaitReceiptStatus(uploadResponse.getBody().id(), ReceiptOcrStatus.DONE);
+        assertThat(processedReceipt.getParsedTotalAmount()).isEqualByComparingTo("210.40");
+
+        ReceiptCorrectionRequest correctionRequest = new ReceiptCorrectionRequest(
+            "FRESH MARKET",
+            java.time.LocalDate.of(2026, 4, 10),
+            new java.math.BigDecimal("211.40"),
+            CurrencyCode.UAH,
+            null,
+            false
+        );
+
+        ResponseEntity<ReceiptCorrectionResponse> correctionResponse = restTemplate.exchange(
+            "/api/receipts/" + processedReceipt.getId() + "/correction",
+            HttpMethod.POST,
+            authorizedJsonEntity(accessToken, correctionRequest),
+            ReceiptCorrectionResponse.class
+        );
+
+        assertThat(correctionResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(correctionResponse.getBody()).isNotNull();
+        assertThat(correctionResponse.getBody().reviewStatus()).isEqualTo(ReceiptReviewStatus.CORRECTED);
+        assertThat(correctionResponse.getBody().diffs()).extracting(diff -> diff.field()).contains("totalAmount");
+
+        Receipt correctedReceipt = receiptRepository.findDetailedById(processedReceipt.getId()).orElseThrow();
+        assertThat(correctedReceipt.getParsedTotalAmount()).isEqualByComparingTo("210.40");
+        assertThat(correctedReceipt.getReviewStatus()).isEqualTo(ReceiptReviewStatus.CORRECTED);
+
+        ResponseEntity<ReceiptOcrResponse> ocrResponse = restTemplate.exchange(
+            "/api/receipts/" + processedReceipt.getId() + "/ocr",
+            HttpMethod.GET,
+            authorizedEntity(accessToken),
+            ReceiptOcrResponse.class
+        );
+
+        assertThat(ocrResponse.getBody()).isNotNull();
+        assertThat(ocrResponse.getBody().parsedTotalAmount()).isEqualByComparingTo("210.40");
+        assertThat(ocrResponse.getBody().latestCorrection()).isNotNull();
+        assertThat(ocrResponse.getBody().latestCorrection().correctedSnapshot().totalAmount()).isEqualByComparingTo("211.40");
     }
 
     @Test
@@ -368,6 +460,13 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(accessToken);
         return new HttpEntity<>(headers);
+    }
+
+    private HttpEntity<Object> authorizedJsonEntity(String accessToken, Object body) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(accessToken);
+        return new HttpEntity<>(body, headers);
     }
 
     private void clearBucket() {

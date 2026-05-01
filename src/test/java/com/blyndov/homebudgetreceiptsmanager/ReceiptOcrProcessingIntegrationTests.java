@@ -121,6 +121,7 @@ class ReceiptOcrProcessingIntegrationTests extends AbstractPostgresIntegrationTe
         Receipt processedReceipt = awaitReceiptStatus(uploadResponse.getBody().id(), ReceiptOcrStatus.DONE);
         assertThat(processedReceipt.getRawOcrText()).isNotBlank();
         assertThat(processedReceipt.getRawOcrText().toUpperCase()).contains("FRESH");
+        assertThat(processedReceipt.getRawOcrArtifactJson()).isNotBlank();
         assertThat(processedReceipt.getReconstructedOcrLinesJson()).isNotBlank();
         assertThat(processedReceipt.getNormalizedOcrLinesJson()).isNotBlank();
         assertThat(processedReceipt.getParserReadyText()).contains("FRESH MARKET");
@@ -160,6 +161,12 @@ class ReceiptOcrProcessingIntegrationTests extends AbstractPostgresIntegrationTe
         assertThat(ocrResponse.getBody().currency()).isEqualTo(CurrencyCode.UAH);
         assertThat(ocrResponse.getBody().ocrStatus()).isEqualTo(ReceiptOcrStatus.DONE);
         assertThat(ocrResponse.getBody().rawOcrText()).containsIgnoringCase("FRESH");
+        assertThat(ocrResponse.getBody().rawOcrArtifact()).isNotNull();
+        assertThat(ocrResponse.getBody().rawOcrArtifact().engineName()).isEqualTo("PaddleOCR");
+        assertThat(ocrResponse.getBody().rawOcrArtifact().rawText()).containsIgnoringCase("FRESH");
+        assertThat(ocrResponse.getBody().rawOcrArtifact().lines()).isNotEmpty();
+        assertThat(ocrResponse.getBody().rawOcrArtifact().pages()).isNotEmpty();
+        assertThat(ocrResponse.getBody().rawOcrArtifact().preprocessingSteps()).isNotNull();
         assertThat(ocrResponse.getBody().reconstructedLines()).isNotEmpty();
         assertThat(ocrResponse.getBody().normalizedLines()).isNotEmpty();
         assertThat(ocrResponse.getBody().receiptCountryHint()).isNull();

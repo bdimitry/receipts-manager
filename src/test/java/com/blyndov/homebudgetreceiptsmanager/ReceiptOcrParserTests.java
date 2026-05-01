@@ -7,8 +7,10 @@ import com.blyndov.homebudgetreceiptsmanager.entity.CurrencyCode;
 import com.blyndov.homebudgetreceiptsmanager.service.NormalizedOcrDocument;
 import com.blyndov.homebudgetreceiptsmanager.service.ParsedReceiptDocument;
 import com.blyndov.homebudgetreceiptsmanager.service.ParsedReceiptLineItem;
+import com.blyndov.homebudgetreceiptsmanager.service.ReceiptOcrFieldCandidate;
 import com.blyndov.homebudgetreceiptsmanager.service.ReceiptOcrKeywordLexicon;
 import com.blyndov.homebudgetreceiptsmanager.service.ReceiptOcrLineNormalizationService;
+import com.blyndov.homebudgetreceiptsmanager.service.ReceiptOcrCandidateSet;
 import com.blyndov.homebudgetreceiptsmanager.service.ReceiptOcrParser;
 import com.blyndov.homebudgetreceiptsmanager.service.ReceiptOcrStructuralReconstructionService;
 import java.io.IOException;
@@ -174,13 +176,33 @@ class ReceiptOcrParserTests {
             normalizationService.normalizeRawTextDocument(fixture("fixtures/ocr/real-receipt-5-lines.txt"))
         );
 
-        assertThat(parsed.merchantName()).isNull();
+        assertThat(parsed.merchantName()).isEqualTo("CASH RECEIPT");
         assertThat(parsed.totalAmount()).isEqualByComparingTo("84.80");
         assertThat(parsed.purchaseDate()).isEqualTo(LocalDate.of(2018, 1, 1));
         assertThat(parsed.lineItems()).hasSize(7);
         assertThat(parsed.lineItems()).extracting(ParsedReceiptLineItem::title)
             .contains("Ipsum")
             .doesNotContain("CASH RECEIPT", "Adress1234Lorem Lpsum Dolor", "THANK YOU");
+    }
+
+    @Test
+    void parserRanksFinalTotalAboveSubtotalAndTaxLines() {
+        List<NormalizedOcrLineResponse> normalizedLines = List.of(
+            normalizedLine("CASH RECEIPT", 0, List.of("header_like", "zone_merchant_block"), false),
+            normalizedLine("Date 01-01-2018", 1, List.of("header_like", "zone_metadata"), false),
+            normalizedLine("Lorem 6.50", 2, List.of("content_like", "price_like", "zone_items"), false),
+            normalizedLine("Total 84.80", 3, List.of("price_like", "service_like", "zone_totals"), false),
+            normalizedLine("Sub-total 76.80", 4, List.of("price_like", "service_like", "zone_totals"), false),
+            normalizedLine("Sales Tax 8.00", 5, List.of("price_like", "service_like", "zone_totals"), false),
+            normalizedLine("Balance 84.80", 6, List.of("price_like", "service_like", "zone_totals"), false)
+        );
+
+        ParsedReceiptDocument parsed = parser.parse(
+            new NormalizedOcrDocument("RAW", List.of(), normalizedLines, normalizedLines, "")
+        );
+
+        assertThat(parsed.merchantName()).isEqualTo("CASH RECEIPT");
+        assertThat(parsed.totalAmount()).isEqualByComparingTo("84.80");
     }
 
     @Test
@@ -192,6 +214,31 @@ class ReceiptOcrParserTests {
         assertThat(parsed.merchantName()).isEqualTo("UkrsibBank");
         assertThat(parsed.totalAmount()).isEqualByComparingTo("5480.00");
         assertThat(parsed.purchaseDate()).isEqualTo(LocalDate.of(2026, 4, 2));
+        assertThat(parsed.lineItems()).isEmpty();
+    }
+
+    @Test
+    void parserKeepsBankLikeCompactDateThroughReconstructionPipeline() throws IOException {
+        String rawText = fixture("fixtures/ocr/real-receipt-6-lines.txt");
+        var extractionResult = new com.blyndov.homebudgetreceiptsmanager.client.OcrExtractionResult(
+            rawText,
+            rawText.lines()
+                .map(String::trim)
+                .filter(line -> !line.isBlank())
+                .map(line -> new com.blyndov.homebudgetreceiptsmanager.client.OcrExtractionLine(line, 0.98d, null, null))
+                .toList()
+        );
+        NormalizedOcrDocument document = normalizationService.normalizeDocument(
+            reconstructionService.reconstruct(extractionResult)
+        );
+
+        ParsedReceiptDocument parsed = parser.parse(document);
+
+        assertThat(parsed.merchantName()).isEqualTo("UkrsibBank");
+        assertThat(parsed.totalAmount()).isEqualByComparingTo("5480.00");
+        assertThat(parsed.purchaseDate())
+            .as("parser-ready text:%n%s", document.parserReadyText())
+            .isEqualTo(LocalDate.of(2026, 4, 2));
         assertThat(parsed.lineItems()).isEmpty();
     }
 
@@ -219,6 +266,101 @@ class ReceiptOcrParserTests {
         assertThat(parsed.totalAmount()).isEqualByComparingTo("39.90");
         assertThat(parsed.currency()).isEqualTo(CurrencyCode.UAH);
         assertThat(parsed.lineItems()).extracting(ParsedReceiptLineItem::title).containsExactly("Bread");
+    }
+
+    @Test
+    void parserCollectsExplainableCandidatesFromZonesAndNormalizedLines() {
+        List<NormalizedOcrLineResponse> normalizedLines = List.of(
+            normalizedLine("FRESH MARKET", 0, List.of("header_like", "zone_merchant_block"), false),
+            normalizedLine("Date 2026-03-14", 1, List.of("header_like", "zone_metadata"), false),
+            normalizedLine("Bread 39.90", 2, List.of("price_like", "content_like", "zone_items"), false),
+            normalizedLine("TOTAL UAH 39.90", 3, List.of("price_like", "service_like", "zone_totals"), false),
+            normalizedLine("VISA 39.90 UAH", 4, List.of("price_like", "service_like", "zone_payment"), false),
+            normalizedLine("4820000000000", 5, List.of("barcode_like", "zone_service"), true)
+        );
+
+        NormalizedOcrDocument document = new NormalizedOcrDocument("RAW", List.of(), normalizedLines, normalizedLines, "");
+        ReceiptOcrCandidateSet candidates = parser.collectCandidates(document);
+        ParsedReceiptDocument parsed = parser.parse(document);
+
+        assertThat(candidates.merchantCandidates().getFirst().normalizedValue()).isEqualTo("FRESH MARKET");
+        assertThat(candidates.merchantCandidates().getFirst().sourceZone()).isEqualTo("MERCHANT_BLOCK");
+        assertThat(candidates.merchantCandidates().getFirst().scoringReasons()).contains("merchant_zone");
+        assertThat(candidates.dateCandidates()).extracting(candidate -> candidate.normalizedValue()).contains("2026-03-14");
+        assertThat(candidates.totalAmountCandidates().getFirst().normalizedValue()).isEqualTo("39.90");
+        assertThat(candidates.totalAmountCandidates().getFirst().scoringReasons()).contains("summary_label", "totals_zone");
+        assertThat(candidates.paymentAmountCandidates()).extracting(candidate -> candidate.sourceZone()).contains("PAYMENT");
+        assertThat(candidates.itemRowCandidates()).extracting(candidate -> candidate.normalizedValue()).containsExactly("Bread");
+        assertThat(parsed.candidates().totalAmountCandidates().getFirst().scoringReasons()).contains("totals_zone");
+    }
+
+    @Test
+    void parserRanksStrongTotalCandidateAbovePlainAmountOnlyLine() {
+        List<NormalizedOcrLineResponse> normalizedLines = List.of(
+            normalizedLine("FRESH MARKET", 0, List.of("header_like", "zone_merchant_block"), false),
+            normalizedLine("12.04", 1, List.of("price_like", "content_like", "zone_items"), false),
+            normalizedLine("Bread 39.90", 2, List.of("price_like", "content_like", "zone_items"), false),
+            normalizedLine("TOTAL UAH 39.90", 3, List.of("price_like", "service_like", "zone_totals"), false)
+        );
+
+        NormalizedOcrDocument document = new NormalizedOcrDocument("RAW", List.of(), normalizedLines, normalizedLines, "");
+
+        assertThat(parser.collectCandidates(document).totalAmountCandidates().getFirst().normalizedValue()).isEqualTo("39.90");
+        assertThat(parser.parse(document).totalAmount()).isEqualByComparingTo("39.90");
+    }
+
+    @Test
+    void parserUsesPaymentAmountCandidateAsSupportWhenSummaryLabelIsWeak() {
+        List<NormalizedOcrLineResponse> normalizedLines = List.of(
+            normalizedLine("UKRSIBBANK", 0, List.of("header_like", "zone_merchant_block"), false),
+            normalizedLine("02.04.202619:03", 1, List.of("zone_metadata"), false),
+            normalizedLine("VISA 5 480,00 UAH", 2, List.of("price_like", "service_like", "zone_payment"), false)
+        );
+
+        ParsedReceiptDocument parsed = parser.parse(
+            new NormalizedOcrDocument("RAW", List.of(), normalizedLines, normalizedLines, "")
+        );
+
+        assertThat(parsed.merchantName()).isEqualTo("UkrsibBank");
+        assertThat(parsed.purchaseDate()).isEqualTo(LocalDate.of(2026, 4, 2));
+        assertThat(parsed.totalAmount()).isEqualByComparingTo("5480.00");
+        assertThat(parsed.currency()).isEqualTo(CurrencyCode.UAH);
+    }
+
+    @Test
+    void parserNormalizesOcrDigitConfusionsOnlyInsideNumericCandidates() {
+        List<NormalizedOcrLineResponse> normalizedLines = List.of(
+            normalizedLine("FOOD ROOM", 0, List.of("header_like", "zone_merchant_block"), false),
+            normalizedLine("Date O2.O4.2O26", 1, List.of("header_like", "zone_metadata"), false),
+            normalizedLine("Organic OIL 3.20", 2, List.of("content_like", "price_like", "zone_items"), false),
+            normalizedLine("TOTAL 1O.5O rpn", 3, List.of("price_like", "service_like", "zone_totals"), false)
+        );
+        NormalizedOcrDocument document = new NormalizedOcrDocument("RAW", List.of(), normalizedLines, normalizedLines, "");
+
+        ReceiptOcrCandidateSet candidates = parser.collectCandidates(document);
+        ParsedReceiptDocument parsed = parser.parse(document);
+
+        assertThat(parsed.totalAmount()).isEqualByComparingTo("10.50");
+        assertThat(parsed.purchaseDate()).isEqualTo(LocalDate.of(2026, 4, 2));
+        assertThat(parsed.currency()).isEqualTo(CurrencyCode.UAH);
+        assertThat(parsed.lineItems()).extracting(ParsedReceiptLineItem::title).contains("Organic OIL");
+
+        ReceiptOcrFieldCandidate totalCandidate = candidates.totalAmountCandidates().getFirst();
+        assertThat(totalCandidate.rawText()).contains("1O.5O");
+        assertThat(totalCandidate.normalizedValue()).isEqualTo("10.50");
+        assertThat(totalCandidate.normalizationActions()).contains("amount_ocr_digit_correction");
+
+        ReceiptOcrFieldCandidate dateCandidate = candidates.dateCandidates().getFirst();
+        assertThat(dateCandidate.rawText()).contains("O2.O4.2O26");
+        assertThat(dateCandidate.normalizedValue()).isEqualTo("2026-04-02");
+        assertThat(dateCandidate.normalizationActions()).contains("date_ocr_digit_correction");
+
+        assertThat(candidates.merchantCandidates().getFirst().normalizedValue()).isEqualTo("FOOD ROOM");
+        assertThat(candidates.merchantCandidates().getFirst().normalizationActions())
+            .doesNotContain("amount_ocr_digit_correction", "date_ocr_digit_correction");
+        assertThat(candidates.itemRowCandidates().getFirst().normalizedValue()).isEqualTo("Organic OIL");
+        assertThat(candidates.itemRowCandidates().getFirst().normalizationActions())
+            .doesNotContain("amount_ocr_digit_correction", "date_ocr_digit_correction");
     }
 
     @Test

@@ -1,0 +1,4 @@
+interface:
+  display_name: "OCR Global Strategy"
+  short_description: "Guide OCR-first direction and prevent overfit"
+  default_prompt: "Use $receipt-ocr-global-strategy to choose the next OCR-first direction for Home Budget & Receipts Manager without sample-specific hacks."

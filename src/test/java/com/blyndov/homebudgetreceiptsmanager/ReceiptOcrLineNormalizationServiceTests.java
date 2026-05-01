@@ -3,9 +3,12 @@ package com.blyndov.homebudgetreceiptsmanager;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.blyndov.homebudgetreceiptsmanager.client.OcrExtractionLine;
+import com.blyndov.homebudgetreceiptsmanager.client.OcrExtractionResult;
 import com.blyndov.homebudgetreceiptsmanager.dto.NormalizedOcrLineResponse;
+import com.blyndov.homebudgetreceiptsmanager.service.ReceiptOcrDocumentZoneClassifier;
 import com.blyndov.homebudgetreceiptsmanager.service.ReceiptOcrKeywordLexicon;
 import com.blyndov.homebudgetreceiptsmanager.service.ReceiptOcrLineNormalizationService;
+import com.blyndov.homebudgetreceiptsmanager.service.ReceiptOcrStructuralReconstructionService;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -77,7 +80,7 @@ class ReceiptOcrLineNormalizationServiceTests {
     @Test
     void normalizationBuildsParserReadyStreamFromNonIgnoredNormalizedLines() {
         var document = normalizationService.normalizeDocument(
-            new com.blyndov.homebudgetreceiptsmanager.client.OcrExtractionResult(
+            new OcrExtractionResult(
                 "RECEIPT\n1234567890123\nTOTAL.. 210.40,\nTHANK.YOU",
                 List.of(
                     rawLine("RECEIPT", 0),
@@ -94,7 +97,46 @@ class ReceiptOcrLineNormalizationServiceTests {
         assertThat(document.parserReadyText()).isEqualTo("RECEIPT\nTOTAL. 210.40\nTHANK YOU");
     }
 
+    @Test
+    void normalizationCarriesDocumentZoneTagsFromReconstructedLines() {
+        ReceiptOcrKeywordLexicon keywordLexicon = new ReceiptOcrKeywordLexicon();
+        ReceiptOcrStructuralReconstructionService reconstructionService = new ReceiptOcrStructuralReconstructionService(
+            keywordLexicon,
+            new ReceiptOcrDocumentZoneClassifier(keywordLexicon)
+        );
+
+        var reconstructed = reconstructionService.reconstruct(
+            new OcrExtractionResult(
+                "MArA3NH NOVUS\nBread 39.90\nTOTAL 39.90",
+                List.of(
+                    rawLine("MArA3NH NOVUS", 0, bbox(40, 20, 320, 44)),
+                    rawLine("Bread 39.90", 1, bbox(40, 420, 360, 444)),
+                    rawLine("TOTAL 39.90", 2, bbox(40, 760, 320, 784))
+                )
+            )
+        );
+
+        var normalized = normalizationService.normalizeDocument(reconstructed);
+
+        assertThat(normalized.normalizedLines().get(0).tags()).contains("zone_merchant_block");
+        assertThat(normalized.normalizedLines().get(1).tags()).contains("zone_items");
+        assertThat(normalized.normalizedLines().get(2).tags()).contains("zone_totals");
+    }
+
     private OcrExtractionLine rawLine(String text, int order) {
         return new OcrExtractionLine(text, 0.98d, order, null);
+    }
+
+    private OcrExtractionLine rawLine(String text, int order, List<List<Double>> bbox) {
+        return new OcrExtractionLine(text, 0.98d, order, bbox);
+    }
+
+    private List<List<Double>> bbox(double left, double top, double right, double bottom) {
+        return List.of(
+            List.of(left, top),
+            List.of(right, top),
+            List.of(right, bottom),
+            List.of(left, bottom)
+        );
     }
 }

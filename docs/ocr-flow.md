@@ -36,10 +36,11 @@ Flow:
 9. the configured OCR client sends the file to the selected OCR helper container with routing options
 10. the raw OCR text is stored
 11. `ReceiptOcrStructuralReconstructionService` rebuilds a cleaner geometry-aware line stream before normalization
-12. `ReceiptOcrLineNormalizationService` builds Java `normalizedLines[]` and parser-ready text from reconstructed lines
-13. `ReceiptOcrParser` performs best-effort baseline parsing for summary fields, parsed currency, and line items
-14. `ReceiptOcrValidationService` runs sanity checks on the parsed result
-15. the receipt persists those OCR artifacts, routing metadata, and validation warnings and is marked `DONE` or `FAILED`
+12. `ReceiptOcrDocumentZoneClassifier` labels reconstructed rows with Java-owned document zones
+13. `ReceiptOcrLineNormalizationService` builds Java `normalizedLines[]` and parser-ready text from reconstructed lines
+14. `ReceiptOcrParser` collects and ranks field candidates, then returns best-effort summary fields, parsed currency, and line items
+15. `ReceiptOcrValidationService` runs sanity checks on the parsed result
+16. the receipt persists those OCR artifacts, routing metadata, and validation warnings and is marked `DONE` or `FAILED`
 
 ## OCR Backend Options
 
@@ -56,11 +57,27 @@ It runs as a separate helper container and exposes:
 Response contract:
 
 - `rawText`
+- `engine`
+  - `name`
+  - `version`
+  - `model`
+  - `language`
+  - `profile`
+- `preprocessing`
+  - `applied`
+  - `profile`
+  - `steps`
+  - `warnings`
 - `lines`
   - `text`
   - `confidence`
   - `order`
   - `bbox` when coordinates are available
+- `pages[]`
+  - page index
+  - image dimensions before and after preprocessing
+  - preprocessing strategy and steps
+  - optional low-level image diagnostics
 
 The Spring Boot application uses it by default through:
 
@@ -231,13 +248,14 @@ Current responsibilities:
 
 - cluster OCR fragments into visual rows using bbox overlap and line center proximity
 - preserve reading order top-to-bottom and left-to-right
-- rescue a weak first-page header block from a focused top-zone OCR crop before the parser sees it
+- rescue a weak first-page header block from a focused top-zone OCR module before the parser sees it
 - separate service or barcode fragments from content fragments when they share the same OCR row
 - reconnect detached amount rows with nearby item-title rows
 - reconnect title rows with following standalone amount rows
 - preserve summary lines such as `TOTAL` or `Cyma` without flattening them into item rows
 - split visually stacked numeric fragments apart when OCR geometry accidentally collapses tax and total amounts into one row
 - let summary or percent-like tax rows pair with their own nearby amount instead of blending into one ambiguous summary block
+- label reconstructed rows with explicit Java document zones so later parser/candidate stages can distinguish header, merchant, item, totals, payment, footer, and service context
 
 Current debug artifact:
 
@@ -246,16 +264,31 @@ Current debug artifact:
   - `order`
   - `confidence`
   - `bbox`
+  - `geometry`
+    - `minX`
+    - `maxX`
+    - `minY`
+    - `maxY`
+    - `centerX`
+    - `centerY`
+    - `width`
+    - `height`
+  - `documentZone`
+  - `documentZoneReasons[]`
   - `sourceOrders[]`
   - `sourceTexts[]`
   - `structuralTags[]`
+  - `reconstructionActions[]`
 
 This layer is intentionally conservative:
 
 - it never invents text that is not present in OCR output
 - it keeps the original raw `lines[]` intact for diagnostics
 - when rows are merged or reordered, that evidence remains visible in `sourceOrders[]` and `sourceTexts[]`
+- merge, split, pairing, geometry-inferred, low-confidence, and geometry-reorder decisions are now visible in `reconstructionActions[]`
+- zone assignment is heuristic and visible through `documentZone` plus `documentZoneReasons[]`; normalized line tags mirror it as `zone_<name>`
 - the header rescue pass only replaces the weak pre-anchor top prefix and then maps those rows back into parser-facing order above the first anchor line
+- the helper now scores multiple generic top-zone candidates rather than relying on one fixed receipt-style rescue path
 
 The Java normalization layer is intentionally conservative. It does not try to infer store names, totals, dates, or items.
 
@@ -301,9 +334,9 @@ Current downstream artifact:
   - `parserReadyText`
 - this is the bridge into the baseline parser layer
 
-## Java Baseline Parser Layer
+## Java Candidate Parser Layer
 
-Sprint 3 adds a dedicated Java parser layer on top of `NormalizedOcrDocument`.
+The Java parser layer sits on top of `NormalizedOcrDocument` and now uses candidate collection and ranking for key fields instead of relying primarily on first-match extraction.
 
 Responsibility split now becomes:
 
@@ -326,6 +359,38 @@ Current parser characteristics:
 - no document-type routing
 - no hard-fail validation gate; suspicious results are flagged instead
 
+Candidate types currently collected:
+
+- `MERCHANT`
+- `DATE`
+- `TOTAL_AMOUNT`
+- `PAYMENT_AMOUNT`
+- `CURRENCY`
+- `ITEM_ROW`
+
+Each candidate keeps practical evidence:
+
+- source line order
+- source document zone when available from `zone_<name>` tags
+- raw source text
+- normalized candidate value
+- field-context normalization actions
+- OCR confidence when available
+- parser score
+- scoring reasons
+
+Field-context normalization now happens at the candidate layer, not as a global rewrite of OCR text.
+
+Current candidate normalizers:
+
+- `ReceiptOcrAmountNormalizer` fixes high-confidence numeric OCR confusions such as `1O.5O -> 10.50` only for amount candidates
+- `ReceiptOcrDateTimeNormalizer` fixes numeric OCR confusions inside date candidates and emits ISO dates
+- `ReceiptOcrCurrencyNormalizer` maps explicit currency variants such as `UAH`, `rpn`, `грн`, `$`, `EUR`, and `RUB` to `CurrencyCode`
+- `ReceiptOcrMerchantNormalizer` only trims/normalizes safe text whitespace and punctuation
+- `ReceiptOcrItemTextNormalizer` only trims/normalizes safe item-title whitespace
+
+This keeps merchant and item text from being corrupted by numeric cleanup. For example, `FOOD OIL` and `Organic OIL` remain text, while `TOTAL 1O.5O` can become an amount candidate with normalized value `10.50` and action `amount_ocr_digit_correction`.
+
 Current parser output model in Spring:
 
 - `ParsedReceiptDocument`
@@ -334,6 +399,7 @@ Current parser output model in Spring:
   - `totalAmount`
   - `currency`
   - `lineItems[]`
+  - `candidates`
 - `ParsedReceiptLineItem`
   - `title`
   - `lineTotal`
@@ -345,13 +411,15 @@ Current parser output model in Spring:
 
 Current parser rules focus on:
 
-- extracting merchant/store from early header-like lines
-- extracting dates from line-level date matches
-- extracting totals from total-like lines near the bottom of the document
-- extracting explicit currency markers such as `UAH`, `грн`, `USD`, `EUR`, `RUB`
+- collecting merchant/store candidates from early header-like and merchant-zone lines
+- collecting date candidates from line-level date matches, including compact date/time OCR joins
+- collecting total candidates from total-like, payment-like, and zone-aware summary lines
+- collecting explicit currency markers such as `UAH`, `грн`, `USD`, `EUR`, `RUB`
 - building item-like lines from `content_like` / `price_like` lines
 - pairing title lines with following amount-only lines
 - ignoring barcode/service/noise lines as item candidates
+- scoring totals using labels, `TOTALS`/`PAYMENT` zones, bottom position, OCR confidence, payment-total agreement, and item-sum agreement
+- downranking totals from tax, promo, item, barcode/service, account, and date/time contexts
 - rejecting weak short merchant fragments before they can become parsed store names
 - rejecting address- and contact-like header lines before they can become parsed store names
 - preferring explicit merchant aliases like `NOVUS` and `UkrsibBank` when OCR noise breaks header candidates
@@ -362,12 +430,18 @@ Current parser rules focus on:
 
 The parser uses `normalizedLines[]` as its primary input. Raw OCR text remains stored for diagnostics and compatibility, but it is no longer the main parsing artifact.
 The parser also no longer needs to compensate for every OCR row-order defect itself. The new structural reconstruction layer is now the primary place where detached amount rows, split title or amount rows, and interleaved barcode/service rows are cleaned up before parsing.
+Recent OCR-only body-zone hardening also keeps more noisy retail body rows usable before normalization:
+
+- amount detection now tolerates OCR punctuation like `59:99` and normalizes it into a price-shaped value before row attachment
+- item rows may now absorb short measure fragments such as `350r`, `1 kr`, or `40r` while still skipping barcode/service rows that sit between title and amount
+- item lines that contain `%` are no longer treated as VAT summaries unless the surrounding text actually looks tax-like, which keeps lines like `2.6% ... 128.97` in the body zone instead of rewriting them into summary labels
 
 ## Persisted OCR Artifacts
 
 When OCR processing succeeds, the receipt now stores the same downstream OCR artifacts that the product later uses during retrieval:
 
 - `rawOcrText`
+- `rawOcrArtifactJson`
 - `reconstructedOcrLinesJson`
 - `normalizedOcrLinesJson`
 - `parserReadyText`
@@ -379,9 +453,14 @@ When OCR processing succeeds, the receipt now stores the same downstream OCR art
 - `languageDetectionSource`
 - `ocrProfileStrategy`
 - `ocrProfileUsed`
+- `ocrConfidenceJson`
+- `ocrProcessingDecision`
+- `reviewStatus`
 - persisted `ReceiptLineItem` rows
+- persisted `ReceiptCorrection` rows when a user confirms or corrects the parse
 
 This means receipt detail and `GET /api/receipts/{id}/ocr` now prefer the product-integrated OCR result instead of rebuilding most of it from raw OCR text on every read.
+`rawOcrArtifactJson` is a Java-owned snapshot of the helper evidence received during processing. It preserves engine metadata, preprocessing metadata, page metadata, image diagnostics where available, and raw OCR lines with confidence and bbox so later reconstruction, confidence, and review work can inspect the original evidence without rerunning OCR.
 
 ## Java Validation Layer
 
@@ -417,6 +496,47 @@ Current persisted validation artifacts:
 
 - `parseWarningsJson`
 - `weakParseQuality`
+- `ocrConfidenceJson`
+- `ocrProcessingDecision`
+
+`ocrConfidenceJson` stores the current Java confidence envelope:
+
+- `ocrConfidence`
+- `imageQualityConfidence`
+- `reconstructionConfidence`
+- `fieldExtractionConfidence`
+- `businessConsistencyConfidence`
+- `overallReceiptConfidence`
+
+`ocrProcessingDecision` is the product-facing processing decision:
+
+- `PARSED_OK`
+- `PARSED_LOW_CONFIDENCE`
+- `NEEDS_REVIEW`
+- `PARSING_FAILED`
+
+The confidence model is intentionally small and explainable. It combines OCR line confidence, reconstruction completeness, required field extraction, validation warnings, and business-consistency checks. It does not replace validation warnings and it does not hard-fail suspicious OCR by itself.
+
+## Java Review And Correction Layer
+
+Human review/correction data is now stored separately from raw OCR and parsed OCR fields.
+
+Current behavior:
+
+- `POST /api/receipts/{id}/correction` records a confirmation or corrected structured receipt snapshot
+- parsed OCR fields such as `parsedStoreName`, `parsedTotalAmount`, and `parsedPurchaseDate` are not overwritten by corrections
+- each correction stores a parsed snapshot, corrected snapshot, and field-level diff JSON
+- the parent receipt stores `reviewStatus`, `reviewedAt`, and `reviewedByUser`
+- `GET /api/receipts/{id}/ocr` returns `reviewStatus` and the latest correction for diagnostics
+
+Review statuses:
+
+- `UNREVIEWED`
+- `NEEDS_REVIEW`
+- `CONFIRMED`
+- `CORRECTED`
+
+This keeps OCR evidence auditable while giving later reporting or purchase-prefill work a trusted user-confirmed data path.
 
 Retrieval behavior:
 
@@ -498,6 +618,7 @@ Stored directly on `Receipt`:
 - `currency`
 - `ocrStatus`
 - `rawOcrText`
+- `rawOcrArtifactJson`
 - `normalizedOcrLinesJson`
 - `parserReadyText`
 - `parsedStoreName`
@@ -600,6 +721,7 @@ Use:
 `ReceiptOcrResponse` now includes:
 
 - `currency`
+- `rawOcrArtifact`
 - `reconstructedLines`
 - `normalizedLines`
 - `parsedStoreName`
@@ -617,6 +739,8 @@ Use:
 - `ocrStatus`
 - `ocrErrorMessage`
 - `ocrProcessedAt`
+
+`rawOcrArtifact` is intended for diagnostics and future confidence/review layers. Compatibility fields such as `rawOcrText`, `reconstructedLines`, `normalizedLines`, and `parserReadyText` remain the primary stable product artifacts.
 
 Ownership is enforced the same way as for the rest of the receipt API:
 
@@ -698,6 +822,7 @@ Invoke-RestMethod -Method Get `
 5. verify that the response contains:
 
 - `currency`
+- `rawOcrArtifact`
 - `normalizedLines`
 - `parsedTotalAmount`
 - `parsedCurrency`

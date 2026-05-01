@@ -21,8 +21,12 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import lombok.Getter;
+import lombok.Setter;
 
 @Entity
+@Getter
+@Setter
 @Table(name = "receipts")
 public class Receipt {
 
@@ -68,6 +72,9 @@ public class Receipt {
     @Column(name = "raw_ocr_text", columnDefinition = "TEXT")
     private String rawOcrText;
 
+    @Column(name = "raw_ocr_artifact_json", columnDefinition = "TEXT")
+    private String rawOcrArtifactJson;
+
     @Column(name = "parsed_store_name", length = 255)
     private String parsedStoreName;
 
@@ -106,6 +113,24 @@ public class Receipt {
     @Column(name = "weak_parse_quality", nullable = false)
     private boolean weakParseQuality;
 
+    @Column(name = "ocr_confidence_json", columnDefinition = "TEXT")
+    private String ocrConfidenceJson;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ocr_processing_decision", length = 30)
+    private ReceiptProcessingDecision ocrProcessingDecision;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "review_status", nullable = false, length = 30)
+    private ReceiptReviewStatus reviewStatus;
+
+    @Column(name = "reviewed_at")
+    private Instant reviewedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reviewed_by_user_id")
+    private User reviewedByUser;
+
     @Column(name = "ocr_error_message", columnDefinition = "TEXT")
     private String ocrErrorMessage;
 
@@ -115,218 +140,6 @@ public class Receipt {
     @OneToMany(mappedBy = "receipt", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("lineIndex ASC, id ASC")
     private List<ReceiptLineItem> lineItems = new ArrayList<>();
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public User getUser() {
-        return user;
-    }
-
-    public void setUser(User user) {
-        this.user = user;
-    }
-
-    public Purchase getPurchase() {
-        return purchase;
-    }
-
-    public void setPurchase(Purchase purchase) {
-        this.purchase = purchase;
-    }
-
-    public String getOriginalFileName() {
-        return originalFileName;
-    }
-
-    public void setOriginalFileName(String originalFileName) {
-        this.originalFileName = originalFileName;
-    }
-
-    public String getContentType() {
-        return contentType;
-    }
-
-    public void setContentType(String contentType) {
-        this.contentType = contentType;
-    }
-
-    public Long getFileSize() {
-        return fileSize;
-    }
-
-    public void setFileSize(Long fileSize) {
-        this.fileSize = fileSize;
-    }
-
-    public CurrencyCode getCurrency() {
-        return currency;
-    }
-
-    public void setCurrency(CurrencyCode currency) {
-        this.currency = currency;
-    }
-
-    public ReceiptCountryHint getReceiptCountryHint() {
-        return receiptCountryHint;
-    }
-
-    public void setReceiptCountryHint(ReceiptCountryHint receiptCountryHint) {
-        this.receiptCountryHint = receiptCountryHint;
-    }
-
-    public String getS3Key() {
-        return s3Key;
-    }
-
-    public void setS3Key(String s3Key) {
-        this.s3Key = s3Key;
-    }
-
-    public Instant getUploadedAt() {
-        return uploadedAt;
-    }
-
-    public void setUploadedAt(Instant uploadedAt) {
-        this.uploadedAt = uploadedAt;
-    }
-
-    public ReceiptOcrStatus getOcrStatus() {
-        return ocrStatus;
-    }
-
-    public void setOcrStatus(ReceiptOcrStatus ocrStatus) {
-        this.ocrStatus = ocrStatus;
-    }
-
-    public String getRawOcrText() {
-        return rawOcrText;
-    }
-
-    public void setRawOcrText(String rawOcrText) {
-        this.rawOcrText = rawOcrText;
-    }
-
-    public String getParsedStoreName() {
-        return parsedStoreName;
-    }
-
-    public void setParsedStoreName(String parsedStoreName) {
-        this.parsedStoreName = parsedStoreName;
-    }
-
-    public BigDecimal getParsedTotalAmount() {
-        return parsedTotalAmount;
-    }
-
-    public void setParsedTotalAmount(BigDecimal parsedTotalAmount) {
-        this.parsedTotalAmount = parsedTotalAmount;
-    }
-
-    public CurrencyCode getParsedCurrency() {
-        return parsedCurrency;
-    }
-
-    public void setParsedCurrency(CurrencyCode parsedCurrency) {
-        this.parsedCurrency = parsedCurrency;
-    }
-
-    public LocalDate getParsedPurchaseDate() {
-        return parsedPurchaseDate;
-    }
-
-    public void setParsedPurchaseDate(LocalDate parsedPurchaseDate) {
-        this.parsedPurchaseDate = parsedPurchaseDate;
-    }
-
-    public String getNormalizedOcrLinesJson() {
-        return normalizedOcrLinesJson;
-    }
-
-    public void setNormalizedOcrLinesJson(String normalizedOcrLinesJson) {
-        this.normalizedOcrLinesJson = normalizedOcrLinesJson;
-    }
-
-    public String getReconstructedOcrLinesJson() {
-        return reconstructedOcrLinesJson;
-    }
-
-    public void setReconstructedOcrLinesJson(String reconstructedOcrLinesJson) {
-        this.reconstructedOcrLinesJson = reconstructedOcrLinesJson;
-    }
-
-    public String getParserReadyText() {
-        return parserReadyText;
-    }
-
-    public void setParserReadyText(String parserReadyText) {
-        this.parserReadyText = parserReadyText;
-    }
-
-    public OcrLanguageDetectionSource getLanguageDetectionSource() {
-        return languageDetectionSource;
-    }
-
-    public void setLanguageDetectionSource(OcrLanguageDetectionSource languageDetectionSource) {
-        this.languageDetectionSource = languageDetectionSource;
-    }
-
-    public String getOcrProfileStrategy() {
-        return ocrProfileStrategy;
-    }
-
-    public void setOcrProfileStrategy(String ocrProfileStrategy) {
-        this.ocrProfileStrategy = ocrProfileStrategy;
-    }
-
-    public String getOcrProfileUsed() {
-        return ocrProfileUsed;
-    }
-
-    public void setOcrProfileUsed(String ocrProfileUsed) {
-        this.ocrProfileUsed = ocrProfileUsed;
-    }
-
-    public String getParseWarningsJson() {
-        return parseWarningsJson;
-    }
-
-    public void setParseWarningsJson(String parseWarningsJson) {
-        this.parseWarningsJson = parseWarningsJson;
-    }
-
-    public boolean isWeakParseQuality() {
-        return weakParseQuality;
-    }
-
-    public void setWeakParseQuality(boolean weakParseQuality) {
-        this.weakParseQuality = weakParseQuality;
-    }
-
-    public String getOcrErrorMessage() {
-        return ocrErrorMessage;
-    }
-
-    public void setOcrErrorMessage(String ocrErrorMessage) {
-        this.ocrErrorMessage = ocrErrorMessage;
-    }
-
-    public Instant getOcrProcessedAt() {
-        return ocrProcessedAt;
-    }
-
-    public void setOcrProcessedAt(Instant ocrProcessedAt) {
-        this.ocrProcessedAt = ocrProcessedAt;
-    }
-
-    public List<ReceiptLineItem> getLineItems() {
-        return lineItems;
-    }
 
     public void setLineItems(List<ReceiptLineItem> lineItems) {
         this.lineItems.clear();
@@ -354,12 +167,18 @@ public class Receipt {
         if (ocrStatus == null) {
             ocrStatus = ReceiptOcrStatus.NEW;
         }
+        if (reviewStatus == null) {
+            reviewStatus = ReceiptReviewStatus.UNREVIEWED;
+        }
     }
 
     @PreUpdate
     void preUpdate() {
         if (ocrStatus == null) {
             ocrStatus = ReceiptOcrStatus.NEW;
+        }
+        if (reviewStatus == null) {
+            reviewStatus = ReceiptReviewStatus.UNREVIEWED;
         }
     }
 }

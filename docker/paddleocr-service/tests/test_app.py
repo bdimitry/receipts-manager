@@ -62,6 +62,13 @@ class PaddleOcrAppTests(unittest.TestCase):
         self.assertEqual(body["rawText"], "STORE\nMILK 42.50\nTOTAL 132.60")
         self.assertEqual(body["profile"], "en")
         self.assertNotIn("normalizedLines", body)
+        self.assertEqual(body["engine"]["name"], "PaddleOCR")
+        self.assertEqual(body["engine"]["version"], "PP-OCRv4")
+        self.assertIn("en_PP-OCRv4_rec_infer", body["engine"]["model"])
+        self.assertEqual(body["engine"]["language"], "en")
+        self.assertEqual(body["engine"]["profile"], "en")
+        self.assertTrue(body["preprocessing"]["applied"])
+        self.assertIn("contrast", body["preprocessing"]["steps"])
         self.assertTrue(body["preprocessingApplied"])
         self.assertFalse(body["headerRescueApplied"])
         self.assertEqual(len(body["lines"]), 3)
@@ -73,6 +80,8 @@ class PaddleOcrAppTests(unittest.TestCase):
         self.assertEqual(body["lines"][0]["bbox"], [[10.0, 20.0], [220.0, 20.0], [220.0, 60.0], [10.0, 60.0]])
         self.assertIn(body["pages"][0]["strategy"], {"soft", "strong"})
         self.assertGreater(len(body["pages"][0]["stepsApplied"]), 0)
+        self.assertIn("imageDiagnosticsBefore", body["pages"][0])
+        self.assertIn("imageDiagnosticsAfter", body["pages"][0])
         self.assertGreater(engine.calls, 0)
 
     def test_ocr_debug_mode_exposes_raw_engine_output_and_lang_override(self):
@@ -143,8 +152,11 @@ class PaddleOcrAppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         body = response.get_json()
         self.assertFalse(body["preprocessingApplied"])
+        self.assertFalse(body["preprocessing"]["applied"])
         self.assertEqual(body["pages"][0]["stepsApplied"], [])
         self.assertEqual(body["pages"][0]["strategy"], "disabled")
+        self.assertIn("imageDiagnosticsBefore", body["pages"][0])
+        self.assertIn("imageDiagnosticsAfter", body["pages"][0])
 
 
 class FakeEngine:

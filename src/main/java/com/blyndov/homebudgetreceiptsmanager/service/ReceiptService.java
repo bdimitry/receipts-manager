@@ -1,6 +1,8 @@
 package com.blyndov.homebudgetreceiptsmanager.service;
 
 import com.blyndov.homebudgetreceiptsmanager.dto.ReceiptOcrResponse;
+import com.blyndov.homebudgetreceiptsmanager.dto.ReceiptCorrectionRequest;
+import com.blyndov.homebudgetreceiptsmanager.dto.ReceiptCorrectionResponse;
 import com.blyndov.homebudgetreceiptsmanager.dto.ReceiptResponse;
 import com.blyndov.homebudgetreceiptsmanager.entity.CurrencyCode;
 import com.blyndov.homebudgetreceiptsmanager.entity.Purchase;
@@ -38,6 +40,7 @@ public class ReceiptService {
     private final PurchaseService purchaseService;
     private final S3StorageService s3StorageService;
     private final ReceiptOcrService receiptOcrService;
+    private final ReceiptCorrectionService receiptCorrectionService;
     private final ApplicationEventPublisher applicationEventPublisher;
 
     public ReceiptService(
@@ -46,6 +49,7 @@ public class ReceiptService {
         PurchaseService purchaseService,
         S3StorageService s3StorageService,
         ReceiptOcrService receiptOcrService,
+        ReceiptCorrectionService receiptCorrectionService,
         ApplicationEventPublisher applicationEventPublisher
     ) {
         this.receiptRepository = receiptRepository;
@@ -53,6 +57,7 @@ public class ReceiptService {
         this.purchaseService = purchaseService;
         this.s3StorageService = s3StorageService;
         this.receiptOcrService = receiptOcrService;
+        this.receiptCorrectionService = receiptCorrectionService;
         this.applicationEventPublisher = applicationEventPublisher;
     }
 
@@ -123,6 +128,15 @@ public class ReceiptService {
 
     public ReceiptOcrResponse getReceiptOcr(Long id) {
         return receiptOcrService.mapToOcrResponse(getOwnedReceiptEntity(id));
+    }
+
+    @Transactional
+    public ReceiptCorrectionResponse submitReceiptCorrection(Long id, ReceiptCorrectionRequest request) {
+        User currentUser = authService.getCurrentAuthenticatedUser();
+        Receipt receipt = receiptRepository.findDetailedById(id)
+            .filter(candidate -> candidate.getUser().getId().equals(currentUser.getId()))
+            .orElseThrow(() -> new ResourceNotFoundException("Receipt not found"));
+        return receiptCorrectionService.submitCorrection(receipt, currentUser, request);
     }
 
     @Transactional(readOnly = true)

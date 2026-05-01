@@ -120,6 +120,7 @@ class ReceiptOcrFailureIntegrationTests extends AbstractPostgresIntegrationTest 
             ).isEqualTo(ReceiptOcrStatus.FAILED));
 
         assertThat(receiptRepository.findById(uploadResponse.getBody().id()).orElseThrow().getParsedCurrency()).isNull();
+        assertThat(receiptRepository.findById(uploadResponse.getBody().id()).orElseThrow().getRawOcrArtifactJson()).isNull();
         assertThat(receiptRepository.findById(uploadResponse.getBody().id()).orElseThrow().getReconstructedOcrLinesJson()).isNull();
         assertThat(receiptRepository.findById(uploadResponse.getBody().id()).orElseThrow().getNormalizedOcrLinesJson()).isNull();
         assertThat(receiptRepository.findById(uploadResponse.getBody().id()).orElseThrow().getParserReadyText()).isNull();
@@ -141,6 +142,7 @@ class ReceiptOcrFailureIntegrationTests extends AbstractPostgresIntegrationTest 
         assertThat(ocrResponse.getBody().currency()).isEqualTo(CurrencyCode.UAH);
         assertThat(ocrResponse.getBody().ocrStatus()).isEqualTo(ReceiptOcrStatus.FAILED);
         assertThat(ocrResponse.getBody().rawOcrText()).isNull();
+        assertThat(ocrResponse.getBody().rawOcrArtifact()).isNull();
         assertThat(ocrResponse.getBody().reconstructedLines()).isEmpty();
         assertThat(ocrResponse.getBody().normalizedLines()).isEmpty();
         assertThat(ocrResponse.getBody().parsedCurrency()).isNull();

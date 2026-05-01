@@ -3,11 +3,13 @@ package com.blyndov.homebudgetreceiptsmanager.service;
 import com.blyndov.homebudgetreceiptsmanager.client.OcrExtractionLine;
 import com.blyndov.homebudgetreceiptsmanager.client.OcrExtractionResult;
 import com.blyndov.homebudgetreceiptsmanager.dto.NormalizedOcrLineResponse;
+import com.blyndov.homebudgetreceiptsmanager.dto.OcrDocumentZoneType;
 import com.blyndov.homebudgetreceiptsmanager.dto.ReconstructedOcrLineResponse;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
@@ -124,7 +126,7 @@ public class ReceiptOcrLineNormalizationService {
         for (int index = 0; index < orderedLines.size(); index++) {
             ReconstructedOcrLineResponse line = orderedLines.get(index);
             String normalizedText = normalizeText(line.text());
-            List<String> tags = mergeTags(classify(normalizedText, index, totalLines), line.structuralTags());
+            List<String> tags = mergeTags(classify(normalizedText, index, totalLines), line.structuralTags(), line.documentZone());
             boolean ignored = tags.contains("noise") || tags.contains("barcode_like");
             normalized.add(
                 new NormalizedOcrLineResponse(
@@ -173,10 +175,17 @@ public class ReceiptOcrLineNormalizationService {
         );
     }
 
-    private List<String> mergeTags(List<String> normalizedTags, List<String> structuralTags) {
+    private List<String> mergeTags(
+        List<String> normalizedTags,
+        List<String> structuralTags,
+        OcrDocumentZoneType documentZone
+    ) {
         LinkedHashSet<String> merged = new LinkedHashSet<>(normalizedTags);
         if (structuralTags != null) {
             merged.addAll(structuralTags);
+        }
+        if (documentZone != null) {
+            merged.add("zone_" + documentZone.name().toLowerCase(Locale.ROOT));
         }
         return List.copyOf(merged);
     }

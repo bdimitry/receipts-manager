@@ -11,7 +11,6 @@ Full-stack demo project for personal budget tracking, receipt OCR, async report 
 - [Skills catalog](docs/skills-catalog.md)
 - [Agent roster](docs/agent-roster.md)
 - [Sub-agent playbook](docs/subagent-playbook.md)
-- [MCP stack](docs/mcp-stack.md)
 - [Development workflow](docs/development-workflow.md)
 - [Report generation flow](docs/report-generation-flow.md)
 - [Reporting system](docs/reporting-system.md)
@@ -21,15 +20,15 @@ Full-stack demo project for personal budget tracking, receipt OCR, async report 
 - [Demo guide](docs/demo-guide.md)
 - [Runbook](docs/runbook.md)
 
-## Developer Operating System
+## Developer Operating Model
 
-The project now also has a lightweight AI-assisted development operating model:
+The project now uses a smaller local Codex operating model focused on OCR quality first:
 
-- local project-specific Codex skills
-- a stable sub-agent role roster
-- a practical MCP adoption plan
-- a home-local Codex plugin shell for project tooling
-- workflow conventions tuned for OCR-first delivery
+- a minimal project-local skill set under [`.codex/skills`](.codex/skills)
+- a three-role OCR roster for strategy, reconstruction, and evaluation
+- corpus-first decision making over the mandatory receipt set
+- percentage-based reporting for OCR, product-visible parse quality, and corpus average
+- an explicit rule against sample-specific OCR hacks and transcript memorization
 
 ## What The Project Includes
 
@@ -212,11 +211,14 @@ When you run the stack through `docker compose`, `.env` values are injected into
 The PaddleOCR helper currently returns:
 
 - `rawText`
+- `engine` metadata
+- `preprocessing` metadata
 - `lines[]`
   - `text`
   - `confidence`
   - `order`
   - `bbox` as an optional four-point polygon when Paddle exposes coordinates
+- `pages[]` metadata with image dimensions, preprocessing steps, and low-level image diagnostics where available
 
 The Paddle helper now also applies automatic preprocessing before OCR. The preprocessing layer is now adaptive and safe-by-default:
 
@@ -273,8 +275,9 @@ In the live OCR processing path, Spring now treats the Java-normalized stream as
 
 - raw helper `lines[]` are normalized in `ReceiptOcrLineNormalizationService`
 - before normalization, `ReceiptOcrStructuralReconstructionService` rebuilds a safer line stream from OCR geometry and line metadata
+- `ReceiptOcrDocumentZoneClassifier` attaches transparent document zones such as header, merchant block, items, totals, payment, footer, and service
 - a parser-ready line stream is built from non-ignored normalized lines
-- the baseline Java parser now consumes that normalized downstream stream instead of the raw OCR blob
+- the Java parser now collects and ranks field candidates from that normalized downstream stream instead of selecting the first matching regex result
 - the receipt persistence layer now stores the same downstream OCR artifacts that power retrieval and receipt detail
 - the validation layer now marks suspicious parse results instead of silently treating them as fully trustworthy
 - the structured parser result now includes:
@@ -287,6 +290,7 @@ In the live OCR processing path, Spring now treats the Java-normalized stream as
 Persisted receipt OCR artifacts now include:
 
 - raw OCR text
+- raw OCR artifact JSON with helper evidence, line bbox/confidence, engine metadata, preprocessing metadata, and page diagnostics
 - reconstructed OCR lines as JSON
 - Java `normalizedLines[]` as JSON
 - Java parser-ready text
@@ -296,6 +300,9 @@ Persisted receipt OCR artifacts now include:
 - parsed purchase date
 - persisted parse warnings
 - weak parse quality flag
+- persisted OCR confidence JSON
+- OCR processing decision (`PARSED_OK`, `PARSED_LOW_CONFIDENCE`, `NEEDS_REVIEW`, or `PARSING_FAILED`)
+- receipt review status (`UNREVIEWED`, `NEEDS_REVIEW`, `CONFIRMED`, or `CORRECTED`)
 - persisted parsed line items
 - selected `receiptCountryHint`
 - `languageDetectionSource`
@@ -308,10 +315,16 @@ The same OCR response now also exposes validation output:
 
 - `parseWarnings[]`
 - `weakParseQuality`
+- `ocrConfidence`
+- `ocrProcessingDecision`
+- `reviewStatus`
+- latest user correction when available
 - `receiptCountryHint`
 - `languageDetectionSource`
 - `ocrProfileStrategy`
 - `ocrProfileUsed`
+
+User corrections are stored separately from OCR parse output through `POST /api/receipts/{id}/correction`. A correction records the parsed snapshot, corrected snapshot, and field-level diff without overwriting `rawOcrText`, reconstructed lines, normalized lines, or parsed OCR fields. This keeps the OCR pipeline auditable while giving future purchase-prefill and reporting work a trusted review path.
 
 `GET /api/receipts/{id}/ocr` now includes `normalizedLines[]` with:
 
@@ -329,9 +342,15 @@ The same OCR response now also includes `reconstructedLines[]` for structural de
 - `order`
 - `confidence`
 - `bbox`
+- `geometry`
+- `documentZone`
+- `documentZoneReasons`
 - `sourceOrders`
 - `sourceTexts`
 - `structuralTags`
+- `reconstructionActions`
+
+The Java reconstruction layer now normalizes row geometry into `minX`, `maxX`, `minY`, `maxY`, `centerX`, `centerY`, `width`, and `height`, records merge, split, pair, service-isolation, low-confidence, inferred-geometry, and geometry-reordering actions for diagnostics, and labels each reconstructed row with a heuristic document zone. Normalized line tags also carry the zone as `zone_<name>` for future parser/candidate scoring.
 
 The OCR response also exposes `parsedCurrency` so the baseline parser result is easier to inspect without any UI work.
 
@@ -342,8 +361,12 @@ Current Java normalization stays intentionally conservative:
 - applies safe OCR confusion cleanup in narrow contexts such as multiplication separators
 - tags lines as `noise`, `barcode_like`, `service_like`, `price_like`, `header_like`, or `content_like`
 
-Current Java baseline parser hardening on noisy receipts additionally:
+Current Java candidate-based parser hardening on noisy receipts additionally:
 
+- independently collects merchant, date, total amount, payment amount, currency, and item row candidates
+- keeps in-memory candidate evidence on `ParsedReceiptDocument` for diagnostics, including source line order, source zone, raw text, normalized value, field-context normalization actions, OCR confidence, parser score, and scoring reasons
+- normalizes amount, date/time, currency, merchant, and item-text candidates separately so numeric OCR corrections such as `O -> 0` only happen inside amount/date candidates
+- ranks candidates using labels, document zones, OCR confidence, bottom-of-document position, payment-total agreement, item-sum agreement, and generic merchant aliases
 - rejects weak short merchant candidates such as broken header fragments
 - rejects address- or contact-like header lines from becoming parsed merchants on clean receipts
 - prefers explicit merchant aliases like `NOVUS` and `UkrsibBank` over noisier header fallbacks

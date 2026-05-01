@@ -1,13 +1,19 @@
 package com.blyndov.homebudgetreceiptsmanager.service;
 
+import com.blyndov.homebudgetreceiptsmanager.client.OcrExtractionResult;
 import com.blyndov.homebudgetreceiptsmanager.dto.NormalizedOcrLineResponse;
+import com.blyndov.homebudgetreceiptsmanager.dto.RawOcrArtifactResponse;
+import com.blyndov.homebudgetreceiptsmanager.dto.RawOcrLineResponse;
 import com.blyndov.homebudgetreceiptsmanager.dto.ReconstructedOcrLineResponse;
+import com.blyndov.homebudgetreceiptsmanager.dto.ReceiptConfidenceResponse;
 import com.blyndov.homebudgetreceiptsmanager.dto.ReceiptLineItemResponse;
 import com.blyndov.homebudgetreceiptsmanager.dto.ReceiptOcrResponse;
 import com.blyndov.homebudgetreceiptsmanager.entity.CurrencyCode;
 import com.blyndov.homebudgetreceiptsmanager.entity.Receipt;
 import com.blyndov.homebudgetreceiptsmanager.entity.ReceiptLineItem;
 import com.blyndov.homebudgetreceiptsmanager.entity.ReceiptOcrStatus;
+import com.blyndov.homebudgetreceiptsmanager.entity.ReceiptProcessingDecision;
+import com.blyndov.homebudgetreceiptsmanager.entity.ReceiptReviewStatus;
 import com.blyndov.homebudgetreceiptsmanager.exception.ResourceNotFoundException;
 import com.blyndov.homebudgetreceiptsmanager.repository.ReceiptRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -31,7 +37,11 @@ public class ReceiptOcrService {
     };
     private static final TypeReference<List<ReconstructedOcrLineResponse>> RECONSTRUCTED_LINES_TYPE = new TypeReference<>() {
     };
+    private static final TypeReference<RawOcrArtifactResponse> RAW_OCR_ARTIFACT_TYPE = new TypeReference<>() {
+    };
     private static final TypeReference<List<String>> WARNING_CODES_TYPE = new TypeReference<>() {
+    };
+    private static final TypeReference<ReceiptConfidence> RECEIPT_CONFIDENCE_TYPE = new TypeReference<>() {
     };
 
     private final ReceiptRepository receiptRepository;
@@ -41,6 +51,7 @@ public class ReceiptOcrService {
     private final ReceiptOcrStructuralReconstructionService structuralReconstructionService;
     private final ReceiptOcrLineNormalizationService lineNormalizationService;
     private final ReceiptOcrValidationService receiptOcrValidationService;
+    private final ReceiptCorrectionService receiptCorrectionService;
     private final ObjectMapper objectMapper;
 
     public ReceiptOcrService(
@@ -51,6 +62,7 @@ public class ReceiptOcrService {
         ReceiptOcrStructuralReconstructionService structuralReconstructionService,
         ReceiptOcrLineNormalizationService lineNormalizationService,
         ReceiptOcrValidationService receiptOcrValidationService,
+        ReceiptCorrectionService receiptCorrectionService,
         ObjectMapper objectMapper
     ) {
         this.receiptRepository = receiptRepository;
@@ -60,6 +72,7 @@ public class ReceiptOcrService {
         this.structuralReconstructionService = structuralReconstructionService;
         this.lineNormalizationService = lineNormalizationService;
         this.receiptOcrValidationService = receiptOcrValidationService;
+        this.receiptCorrectionService = receiptCorrectionService;
         this.objectMapper = objectMapper;
     }
 
@@ -68,6 +81,7 @@ public class ReceiptOcrService {
         Receipt receipt = getReceiptEntity(receiptId);
         receipt.setOcrStatus(ReceiptOcrStatus.PROCESSING);
         receipt.setRawOcrText(null);
+        receipt.setRawOcrArtifactJson(null);
         receipt.setParsedStoreName(null);
         receipt.setParsedTotalAmount(null);
         receipt.setParsedCurrency(null);
@@ -80,6 +94,11 @@ public class ReceiptOcrService {
         receipt.setOcrProfileUsed(null);
         receipt.setParseWarningsJson(null);
         receipt.setWeakParseQuality(false);
+        receipt.setOcrConfidenceJson(null);
+        receipt.setOcrProcessingDecision(null);
+        receipt.setReviewStatus(ReceiptReviewStatus.UNREVIEWED);
+        receipt.setReviewedAt(null);
+        receipt.setReviewedByUser(null);
         receipt.clearLineItems();
         receipt.setOcrErrorMessage(null);
         receipt.setOcrProcessedAt(null);
@@ -104,6 +123,7 @@ public class ReceiptOcrService {
         ParsedReceiptValidationResult validationResult = receiptOcrValidationService.validate(normalizedDocument, parsedData);
 
         receipt.setRawOcrText(rawText);
+        receipt.setRawOcrArtifactJson(serializeRawOcrArtifact(rawArtifactForPersistence(extractionResult)));
         receipt.setReconstructedOcrLinesJson(serializeReconstructedLines(reconstructedDocument.reconstructedLines()));
         receipt.setNormalizedOcrLinesJson(serializeNormalizedLines(normalizedDocument.normalizedLines()));
         receipt.setParserReadyText(normalizedDocument.parserReadyText());
@@ -112,6 +132,13 @@ public class ReceiptOcrService {
         receipt.setOcrProfileUsed(routingDecision.ocrProfileUsed());
         receipt.setParseWarningsJson(serializeWarningCodes(validationResult.warnings()));
         receipt.setWeakParseQuality(validationResult.weakParseQuality());
+        receipt.setOcrConfidenceJson(serializeConfidence(validationResult.confidence()));
+        receipt.setOcrProcessingDecision(validationResult.processingDecision());
+        receipt.setReviewStatus(validationResult.processingDecision() == ReceiptProcessingDecision.NEEDS_REVIEW
+            ? ReceiptReviewStatus.NEEDS_REVIEW
+            : ReceiptReviewStatus.UNREVIEWED);
+        receipt.setReviewedAt(null);
+        receipt.setReviewedByUser(null);
         receipt.setParsedStoreName(parsedData.merchantName());
         receipt.setParsedTotalAmount(parsedData.totalAmount());
         receipt.setParsedCurrency(parsedData.currency());
@@ -146,6 +173,7 @@ public class ReceiptOcrService {
         Receipt receipt = getReceiptEntity(receiptId);
         receipt.setOcrStatus(ReceiptOcrStatus.FAILED);
         receipt.setRawOcrText(null);
+        receipt.setRawOcrArtifactJson(null);
         receipt.setParsedStoreName(null);
         receipt.setParsedTotalAmount(null);
         receipt.setParsedCurrency(null);
@@ -158,6 +186,11 @@ public class ReceiptOcrService {
         receipt.setOcrProfileUsed(null);
         receipt.setParseWarningsJson(null);
         receipt.setWeakParseQuality(false);
+        receipt.setOcrConfidenceJson(null);
+        receipt.setOcrProcessingDecision(ReceiptProcessingDecision.PARSING_FAILED);
+        receipt.setReviewStatus(ReceiptReviewStatus.NEEDS_REVIEW);
+        receipt.setReviewedAt(null);
+        receipt.setReviewedByUser(null);
         receipt.clearLineItems();
         receipt.setOcrErrorMessage(errorMessage);
         receipt.setOcrProcessedAt(Instant.now());
@@ -169,6 +202,7 @@ public class ReceiptOcrService {
         Receipt receipt = getReceiptEntity(receiptId);
         receipt.setOcrStatus(ReceiptOcrStatus.FAILED);
         receipt.setRawOcrText(null);
+        receipt.setRawOcrArtifactJson(null);
         receipt.setParsedStoreName(null);
         receipt.setParsedTotalAmount(null);
         receipt.setParsedCurrency(null);
@@ -181,6 +215,11 @@ public class ReceiptOcrService {
         receipt.setOcrProfileUsed(null);
         receipt.setParseWarningsJson(null);
         receipt.setWeakParseQuality(false);
+        receipt.setOcrConfidenceJson(null);
+        receipt.setOcrProcessingDecision(ReceiptProcessingDecision.PARSING_FAILED);
+        receipt.setReviewStatus(ReceiptReviewStatus.NEEDS_REVIEW);
+        receipt.setReviewedAt(null);
+        receipt.setReviewedByUser(null);
         receipt.clearLineItems();
         receipt.setOcrErrorMessage(errorMessage);
         receipt.setOcrProcessedAt(Instant.now());
@@ -215,6 +254,7 @@ public class ReceiptOcrService {
             receipt.getCurrency(),
             receipt.getOcrStatus(),
             receipt.getRawOcrText(),
+            restoreRawOcrArtifact(receipt),
             normalizedDocument.reconstructedLines(),
             normalizedDocument.normalizedLines(),
             receipt.getReceiptCountryHint(),
@@ -228,6 +268,12 @@ public class ReceiptOcrService {
             receipt.getLineItems().stream().map(this::mapLineItemResponse).toList(),
             validationResult.warnings().stream().map(Enum::name).toList(),
             validationResult.weakParseQuality(),
+            toConfidenceResponse(validationResult.confidence()),
+            receipt.getOcrProcessingDecision() == null
+                ? validationResult.processingDecision()
+                : receipt.getOcrProcessingDecision(),
+            receipt.getReviewStatus(),
+            receiptCorrectionService.findLatestCorrection(receipt.getId()).orElse(null),
             receipt.getOcrErrorMessage(),
             receipt.getOcrProcessedAt()
         );
@@ -275,11 +321,57 @@ public class ReceiptOcrService {
         }
     }
 
+    private String serializeRawOcrArtifact(RawOcrArtifactResponse rawOcrArtifact) {
+        if (rawOcrArtifact == null) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(rawOcrArtifact);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Failed to persist raw OCR artifact", exception);
+        }
+    }
+
+    private RawOcrArtifactResponse rawArtifactForPersistence(OcrExtractionResult extractionResult) {
+        if (extractionResult.rawArtifact() != null) {
+            return extractionResult.rawArtifact();
+        }
+
+        return new RawOcrArtifactResponse(
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            List.of(),
+            List.of(),
+            null,
+            List.of(),
+            extractionResult.lines() == null
+                ? List.of()
+                : extractionResult.lines().stream()
+                    .map(line -> new RawOcrLineResponse(line.text(), line.confidence(), line.order(), line.bbox()))
+                    .toList(),
+            extractionResult.rawText(),
+            null
+        );
+    }
+
     private String serializeWarningCodes(List<ReceiptParseWarningCode> warnings) {
         try {
             return objectMapper.writeValueAsString(warnings.stream().map(Enum::name).toList());
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Failed to persist OCR parse warnings", exception);
+        }
+    }
+
+    private String serializeConfidence(ReceiptConfidence confidence) {
+        try {
+            return objectMapper.writeValueAsString(confidence);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Failed to persist OCR confidence", exception);
         }
     }
 
@@ -327,6 +419,19 @@ public class ReceiptOcrService {
         }
     }
 
+    private RawOcrArtifactResponse restoreRawOcrArtifact(Receipt receipt) {
+        if (!StringUtils.hasText(receipt.getRawOcrArtifactJson())) {
+            return null;
+        }
+
+        try {
+            return objectMapper.readValue(receipt.getRawOcrArtifactJson(), RAW_OCR_ARTIFACT_TYPE);
+        } catch (JsonProcessingException exception) {
+            log.warn("Failed to deserialize persisted raw OCR artifact for receiptId={}", receipt.getId(), exception);
+            return null;
+        }
+    }
+
     private ParsedReceiptValidationResult restoreValidationResult(
         Receipt receipt,
         NormalizedOcrDocument normalizedDocument,
@@ -336,18 +441,37 @@ public class ReceiptOcrService {
             return new ParsedReceiptValidationResult(List.of(), false);
         }
 
-        if (StringUtils.hasText(receipt.getParseWarningsJson())) {
+        if (StringUtils.hasText(receipt.getParseWarningsJson())
+            && StringUtils.hasText(receipt.getOcrConfidenceJson())
+            && receipt.getOcrProcessingDecision() != null) {
             try {
                 List<ReceiptParseWarningCode> warnings = objectMapper.readValue(receipt.getParseWarningsJson(), WARNING_CODES_TYPE).stream()
                     .map(ReceiptParseWarningCode::valueOf)
                     .toList();
-                return new ParsedReceiptValidationResult(warnings, receipt.isWeakParseQuality());
+                ReceiptConfidence confidence = objectMapper.readValue(receipt.getOcrConfidenceJson(), RECEIPT_CONFIDENCE_TYPE);
+                return new ParsedReceiptValidationResult(
+                    warnings,
+                    receipt.isWeakParseQuality(),
+                    confidence,
+                    receipt.getOcrProcessingDecision()
+                );
             } catch (JsonProcessingException | IllegalArgumentException exception) {
-                log.warn("Failed to deserialize persisted OCR parse warnings for receiptId={}, recomputing validation", receipt.getId(), exception);
+                log.warn("Failed to deserialize persisted OCR validation state for receiptId={}, recomputing validation", receipt.getId(), exception);
             }
         }
 
         return receiptOcrValidationService.validate(normalizedDocument, parsedDocument);
+    }
+
+    private ReceiptConfidenceResponse toConfidenceResponse(ReceiptConfidence confidence) {
+        return new ReceiptConfidenceResponse(
+            confidence.ocrConfidence(),
+            confidence.imageQualityConfidence(),
+            confidence.reconstructionConfidence(),
+            confidence.fieldExtractionConfidence(),
+            confidence.businessConsistencyConfidence(),
+            confidence.overallReceiptConfidence()
+        );
     }
 
     private ParsedReceiptDocument restoreParsedDocument(Receipt receipt) {

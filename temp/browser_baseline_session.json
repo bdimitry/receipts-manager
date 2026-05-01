@@ -1,0 +1,18 @@
+﻿{
+    "email":  "ocr-browser-20260424161108@example.com",
+    "password":  "BrowserPass123!",
+    "receipts":  [
+                     {
+                         "sample":  "2.jpg",
+                         "receiptId":  282
+                     },
+                     {
+                         "sample":  "5.jpg",
+                         "receiptId":  283
+                     },
+                     {
+                         "sample":  "6.pdf",
+                         "receiptId":  284
+                     }
+                 ]
+}
