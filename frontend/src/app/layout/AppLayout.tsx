@@ -9,11 +9,11 @@ import { LoadingState } from "../../shared/ui/LoadingState";
 import { ThemeToggle } from "../../shared/ui/ThemeToggle";
 
 const navItems = [
-  { to: "/", key: "overview" as const },
-  { to: "/purchases", key: "purchases" as const },
-  { to: "/receipts", key: "receipts" as const },
-  { to: "/reports", key: "reports" as const },
-  { to: "/profile", key: "profile" as const },
+  { to: "/", key: "overview" as const, icon: "H" },
+  { to: "/purchases", key: "purchases" as const, icon: "$" },
+  { to: "/receipts", key: "receipts" as const, icon: "#" },
+  { to: "/reports", key: "reports" as const, icon: "R" },
+  { to: "/profile", key: "profile" as const, icon: "U" },
 ];
 
 export function AppLayout() {
@@ -31,6 +31,7 @@ export function AppLayout() {
     "/receipts": t("receipts"),
     "/reports": t("reports"),
     "/profile": t("profile"),
+    "/admin": t("admin"),
   };
   const currentTitle = Object.entries(routeTitleMap).find(([path]) =>
     path === "/"
@@ -55,9 +56,21 @@ export function AppLayout() {
               end={item.to === "/"}
               to={item.to}
             >
-              {t(item.key)}
+              <span aria-hidden="true" className="sidebar__nav-icon">{item.icon}</span>
+              <span>{t(item.key)}</span>
             </NavLink>
           ))}
+          {currentUser?.admin ? (
+            <NavLink
+              className={({ isActive }) =>
+                `sidebar__nav-link ${isActive ? "sidebar__nav-link--active" : ""}`.trim()
+              }
+              to="/admin"
+            >
+              <span aria-hidden="true" className="sidebar__nav-icon">A</span>
+              <span>{t("admin")}</span>
+            </NavLink>
+          ) : null}
         </nav>
         <div className="sidebar__footer">
           {isLoading ? (

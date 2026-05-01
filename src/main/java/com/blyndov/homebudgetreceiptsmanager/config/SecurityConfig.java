@@ -15,7 +15,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties(JwtProperties.class)
+@EnableConfigurationProperties({JwtProperties.class, AuthProperties.class})
 public class SecurityConfig {
 
     @Bean
@@ -31,6 +31,9 @@ public class SecurityConfig {
             .exceptionHandling(exception -> exception.authenticationEntryPoint(
                 (request, response, authException) ->
                     response.sendError(HttpServletResponse.SC_UNAUTHORIZED)
+            ).accessDeniedHandler(
+                (request, response, accessDeniedException) ->
+                    response.sendError(HttpServletResponse.SC_FORBIDDEN)
             ))
             .authorizeHttpRequests(authorize -> authorize
                 .requestMatchers(
@@ -39,7 +42,8 @@ public class SecurityConfig {
                     "/swagger-ui.html",
                     "/v3/api-docs/**",
                     "/api/auth/register",
-                    "/api/auth/login"
+                    "/api/auth/login",
+                    "/api/auth/google"
                 ).permitAll()
                 .anyRequest().authenticated()
             )

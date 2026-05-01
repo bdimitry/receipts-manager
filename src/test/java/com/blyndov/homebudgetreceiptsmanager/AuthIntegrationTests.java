@@ -26,7 +26,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     properties = {
         "app.report-jobs.consumer.enabled=false",
-        "app.receipts.ocr.consumer.enabled=false"
+        "app.receipts.ocr.consumer.enabled=false",
+        "app.auth.admin-emails=admin@example.com"
     }
 )
 class AuthIntegrationTests extends AbstractPostgresIntegrationTest {
@@ -56,11 +57,23 @@ class AuthIntegrationTests extends AbstractPostgresIntegrationTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().id()).isNotNull();
         assertThat(response.getBody().email()).isEqualTo(TEST_EMAIL);
+        assertThat(response.getBody().role()).isEqualTo("USER");
+        assertThat(response.getBody().admin()).isFalse();
         assertThat(response.getBody().createdAt()).isNotNull();
 
         User savedUser = userRepository.findByEmail(TEST_EMAIL).orElseThrow();
         assertThat(savedUser.getPasswordHash()).isNotEqualTo(TEST_PASSWORD);
         assertThat(passwordEncoder.matches(TEST_PASSWORD, savedUser.getPasswordHash())).isTrue();
+    }
+
+    @Test
+    void registerPromotesConfiguredAdminEmail() {
+        ResponseEntity<CurrentUserResponse> response = register("admin@example.com", TEST_PASSWORD);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().role()).isEqualTo("ADMIN");
+        assertThat(response.getBody().admin()).isTrue();
     }
 
     @Test
@@ -136,8 +149,28 @@ class AuthIntegrationTests extends AbstractPostgresIntegrationTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().email()).isEqualTo(TEST_EMAIL);
+        assertThat(response.getBody().role()).isEqualTo("USER");
+        assertThat(response.getBody().admin()).isFalse();
         assertThat(response.getBody().id()).isNotNull();
         assertThat(response.getBody().createdAt()).isNotNull();
+    }
+
+    @Test
+    void adminEndpointDoesNotAllowRegularUsers() {
+        register(TEST_EMAIL, TEST_PASSWORD);
+        String accessToken = login(TEST_EMAIL, TEST_PASSWORD).getBody().accessToken();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+
+        ResponseEntity<String> response =
+            restTemplate.exchange(
+                "/api/admin/overview",
+                HttpMethod.GET,
+                new HttpEntity<>(null, headers),
+                String.class
+            );
+
+        assertThat(response.getStatusCode()).isIn(HttpStatus.FORBIDDEN, HttpStatus.UNAUTHORIZED);
     }
 
     private ResponseEntity<CurrentUserResponse> register(String email, String password) {

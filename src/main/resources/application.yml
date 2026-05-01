@@ -55,6 +55,11 @@ springdoc:
     path: /swagger-ui.html
 
 app:
+  auth:
+    admin-emails: ${ADMIN_EMAILS:}
+    google:
+      client-id: ${GOOGLE_CLIENT_ID:}
+      token-info-url: ${GOOGLE_TOKEN_INFO_URL:https://oauth2.googleapis.com/tokeninfo}
   ocr:
     service:
       base-url: ${OCR_SERVICE_BASE_URL:http://localhost:8081}

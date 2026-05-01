@@ -147,10 +147,27 @@ textarea {
 }
 
 .sidebar__nav-link {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   padding: 0.9rem 1rem;
   border-radius: 1rem;
   color: #e8ddd1;
   transition: 0.2s ease;
+}
+
+.sidebar__nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 0.55rem;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 0.78rem;
+  font-weight: 800;
+  flex: 0 0 auto;
 }
 
 .sidebar__nav-link:hover,
@@ -519,6 +536,10 @@ textarea {
   border-radius: 1.1rem;
   background: rgba(255, 255, 255, 0.44);
   border: 1px solid rgba(255, 255, 255, 0.32);
+}
+
+.metric-pill--quiet {
+  background: var(--surface-muted);
 }
 
 .metric-pill span,
@@ -1116,6 +1137,36 @@ textarea {
   font-weight: 700;
 }
 
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1rem 0;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  height: 1px;
+  background: var(--border);
+  flex: 1;
+}
+
+.google-auth {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.admin-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
 @keyframes pulse {
   from {
     opacity: 0.45;
@@ -1141,6 +1192,7 @@ textarea {
 
   .detail-grid,
   .filter-grid,
+  .admin-metrics,
   .purchase-item-grid {
     grid-template-columns: 1fr;
   }

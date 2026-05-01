@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import { LoginPage } from "../features/auth/pages/LoginPage";
 import { RegisterPage } from "../features/auth/pages/RegisterPage";
+import { AdminPage } from "../features/admin/pages/AdminPage";
 import { DashboardPage } from "../features/dashboard/pages/DashboardPage";
 import { ProfilePage } from "../features/profile/pages/ProfilePage";
 import { PurchasesPage } from "../features/purchases/pages/PurchasesPage";
@@ -49,6 +50,10 @@ export const router = createBrowserRouter([
           {
             path: "profile",
             element: <ProfilePage />,
+          },
+          {
+            path: "admin",
+            element: <AdminPage />,
           },
           {
             path: "*",

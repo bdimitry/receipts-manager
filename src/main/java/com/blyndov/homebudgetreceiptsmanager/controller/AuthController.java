@@ -2,6 +2,7 @@ package com.blyndov.homebudgetreceiptsmanager.controller;
 
 import com.blyndov.homebudgetreceiptsmanager.dto.AuthResponse;
 import com.blyndov.homebudgetreceiptsmanager.dto.CurrentUserResponse;
+import com.blyndov.homebudgetreceiptsmanager.dto.GoogleAuthRequest;
 import com.blyndov.homebudgetreceiptsmanager.dto.LoginRequest;
 import com.blyndov.homebudgetreceiptsmanager.dto.RegisterRequest;
 import com.blyndov.homebudgetreceiptsmanager.service.AuthService;
@@ -31,5 +32,10 @@ public class AuthController {
     @PostMapping("/login")
     public AuthResponse login(@Valid @RequestBody LoginRequest request) {
         return authService.login(request);
+    }
+
+    @PostMapping("/google")
+    public AuthResponse google(@Valid @RequestBody GoogleAuthRequest request) {
+        return authService.loginWithGoogle(request);
     }
 }
