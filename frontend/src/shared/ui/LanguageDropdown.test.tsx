@@ -14,7 +14,7 @@ describe("language dropdown", () => {
 
     await user.click(screen.getByTestId("language-dropdown-trigger"));
     expect(screen.getByRole("button", { name: "RU" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "UK" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "UA" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "EN" })).toBeInTheDocument();
     expect(screen.getByTestId("language-flag-ru")).toBeInTheDocument();
     expect(screen.getByTestId("language-flag-uk")).toBeInTheDocument();

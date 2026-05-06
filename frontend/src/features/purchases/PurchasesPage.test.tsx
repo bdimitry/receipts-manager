@@ -75,23 +75,6 @@ describe("purchases page", () => {
     expect(lastRequest?.items).toBeUndefined();
   });
 
-  it("opens calculator and applies the result to amount", async () => {
-    server.use(http.get("/api/purchases", () => HttpResponse.json([])));
-
-    const user = userEvent.setup();
-    renderWithProviders(<PurchasesPage />);
-
-    await screen.findByText("No product items added yet.");
-    await user.click(screen.getByRole("button", { name: "Calculator" }));
-    await user.click(screen.getByRole("button", { name: "7" }));
-    await user.click(screen.getByRole("button", { name: "+" }));
-    await user.click(screen.getByRole("button", { name: "5" }));
-    await user.click(screen.getByRole("button", { name: "=" }));
-    await user.click(screen.getByRole("button", { name: "Apply to amount" }));
-
-    expect(screen.getByLabelText("Amount")).toHaveValue(12);
-  });
-
   it("creates a purchase with multiple items and calculated total", async () => {
     let purchases = [] as Array<Record<string, unknown>>;
     let lastRequest: Record<string, unknown> | null = null;

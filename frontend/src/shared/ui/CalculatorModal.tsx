@@ -135,7 +135,7 @@ export function CalculatorModal({
         <strong>{result !== null ? result : "--"}</strong>
       </div>
       {error ? <p className="form-error">{error}</p> : null}
-  <div className="calculator-grid">
+      <div className="calculator-grid">
         {keypad.map((token) => (
           <button
             key={token}
