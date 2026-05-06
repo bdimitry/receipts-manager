@@ -19,7 +19,11 @@ import com.blyndov.homebudgetreceiptsmanager.repository.PurchaseRepository;
 import com.blyndov.homebudgetreceiptsmanager.repository.ReportJobRepository;
 import com.blyndov.homebudgetreceiptsmanager.repository.UserRepository;
 import com.blyndov.homebudgetreceiptsmanager.support.AbstractPostgresIntegrationTest;
+import jakarta.mail.BodyPart;
+import jakarta.mail.Multipart;
+import jakarta.mail.Part;
 import jakarta.mail.internet.MimeMessage;
+import java.nio.charset.StandardCharsets;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -97,7 +101,13 @@ class NotificationChannelDispatchIntegrationTests extends AbstractPostgresIntegr
 
         assertThat(notification.getAllRecipients()[0].toString()).isEqualTo(email);
         assertThat(notification.getSubject()).contains("ready");
-        assertThat(notification.getContent().toString()).contains("CSV");
+        assertThat(readTextPart(notification)).contains("CSV");
+        BodyPart attachment = findAttachment(notification);
+        assertThat(attachment.getFileName()).endsWith(".csv");
+        assertThat(attachment.getContentType()).contains("text/csv");
+        assertThat(new String(attachment.getInputStream().readAllBytes(), StandardCharsets.UTF_8))
+            .contains("Monthly Spending Report")
+            .contains("Groceries");
         assertThat(receivedTelegramMessages()).isEmpty();
         assertThat(completedJob.status()).isEqualTo(ReportJobStatus.DONE);
     }
@@ -115,11 +125,68 @@ class NotificationChannelDispatchIntegrationTests extends AbstractPostgresIntegr
         AbstractPostgresIntegrationTest.TelegramMockMessage message = receivedTelegramMessages().getFirst();
 
         assertThat(message.chat_id()).isEqualTo("555000111");
-        assertThat(message.text()).contains("Your report is ready");
-        assertThat(message.text()).contains("PDF");
-        assertThat(message.text()).contains("/api/reports/" + completedJob.id() + "/download");
+        assertThat(message.caption()).contains("Your report is ready");
+        assertThat(message.caption()).contains("PDF");
+        assertThat(message.caption()).contains("/api/reports/" + completedJob.id() + "/download");
+        assertThat(message.document_file_name()).endsWith(".pdf");
+        assertThat(message.document_content_type()).contains("application/pdf");
+        assertThat(message.document_size()).isPositive();
         assertThat(receivedEmails()).isEmpty();
         assertThat(completedJob.status()).isEqualTo(ReportJobStatus.DONE);
+    }
+
+    private BodyPart findAttachment(MimeMessage notification) throws Exception {
+        assertThat(notification.getContent()).isInstanceOf(Multipart.class);
+        BodyPart attachment = findAttachment((Multipart) notification.getContent());
+        if (attachment == null) {
+            throw new AssertionError("Expected report attachment in email notification");
+        }
+        return attachment;
+    }
+
+    private BodyPart findAttachment(Multipart multipart) throws Exception {
+
+        for (int index = 0; index < multipart.getCount(); index++) {
+            BodyPart bodyPart = multipart.getBodyPart(index);
+            if (Part.ATTACHMENT.equalsIgnoreCase(bodyPart.getDisposition())) {
+                return bodyPart;
+            }
+            Object content = bodyPart.getContent();
+            if (content instanceof Multipart nestedMultipart) {
+                BodyPart attachment = findAttachment(nestedMultipart);
+                if (attachment != null) {
+                    return attachment;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private String readTextPart(MimeMessage notification) throws Exception {
+        String text = readTextPart((Part) notification);
+        if (text == null) {
+            throw new AssertionError("Expected text body in email notification");
+        }
+        return text;
+    }
+
+    private String readTextPart(Part part) throws Exception {
+        Object content = part.getContent();
+        if (part.isMimeType("text/*") && content instanceof String text) {
+            return text;
+        }
+        if (!(content instanceof Multipart multipart)) {
+            return null;
+        }
+        for (int index = 0; index < multipart.getCount(); index++) {
+            BodyPart bodyPart = multipart.getBodyPart(index);
+            String text = readTextPart(bodyPart);
+            if (text != null) {
+                return text;
+            }
+        }
+        return null;
     }
 
     private void updateNotificationSettings(

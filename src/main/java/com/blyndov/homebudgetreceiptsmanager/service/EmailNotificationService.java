@@ -4,10 +4,13 @@ import com.blyndov.homebudgetreceiptsmanager.config.NotificationEmailProperties;
 import com.blyndov.homebudgetreceiptsmanager.entity.NotificationChannel;
 import com.blyndov.homebudgetreceiptsmanager.entity.ReportJob;
 import com.blyndov.homebudgetreceiptsmanager.entity.User;
+import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.mail.SimpleMailMessage;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -47,11 +50,21 @@ public class EmailNotificationService implements NotificationChannelSender {
         );
 
         try {
-            SimpleMailMessage mailMessage = new SimpleMailMessage();
-            mailMessage.setFrom(notificationEmailProperties.getFrom());
-            mailMessage.setTo(recipient);
-            mailMessage.setSubject(message.subject());
-            mailMessage.setText(message.body());
+            MimeMessage mailMessage = javaMailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mailMessage, message.attachment() != null, "UTF-8");
+            helper.setFrom(notificationEmailProperties.getFrom());
+            helper.setTo(recipient);
+            helper.setSubject(message.subject());
+            helper.setText(message.body());
+
+            NotificationAttachment attachment = message.attachment();
+            if (attachment != null) {
+                helper.addAttachment(
+                    attachment.fileName(),
+                    new ByteArrayResource(attachment.content()),
+                    attachment.contentType()
+                );
+            }
 
             javaMailSender.send(mailMessage);
 
@@ -61,6 +74,8 @@ public class EmailNotificationService implements NotificationChannelSender {
                 reportJob.getUser().getId(),
                 recipient
             );
+        } catch (MessagingException exception) {
+            throw new IllegalStateException("Failed to build email notification", exception);
         } catch (RuntimeException exception) {
             log.error(
                 "Email notification failed for jobId={}, userId={}, recipient={}: {}",

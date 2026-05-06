@@ -246,7 +246,15 @@ public abstract class AbstractPostgresIntegrationTest {
         }
     }
 
-    protected record TelegramMockMessage(String token, String chat_id, String text) {
+    protected record TelegramMockMessage(
+        String token,
+        String chat_id,
+        String text,
+        String caption,
+        String document_file_name,
+        String document_content_type,
+        Long document_size
+    ) {
     }
 
     private static void initializeAwsResources() {

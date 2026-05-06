@@ -19,6 +19,9 @@ import com.blyndov.homebudgetreceiptsmanager.repository.PurchaseRepository;
 import com.blyndov.homebudgetreceiptsmanager.repository.ReportJobRepository;
 import com.blyndov.homebudgetreceiptsmanager.repository.UserRepository;
 import com.blyndov.homebudgetreceiptsmanager.support.AbstractPostgresIntegrationTest;
+import jakarta.mail.BodyPart;
+import jakarta.mail.Multipart;
+import jakarta.mail.Part;
 import jakarta.mail.internet.MimeMessage;
 import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
@@ -162,6 +165,12 @@ class ReportJobGenerationIntegrationTests extends AbstractPostgresIntegrationTes
         MimeMessage notification = awaitEmailForRecipient(ownerEmail);
         assertThat(notification.getAllRecipients()[0].toString()).isEqualTo(ownerEmail);
         assertThat(notification.getSubject()).contains("ready");
+        BodyPart attachment = findAttachment(notification);
+        assertThat(attachment.getFileName()).endsWith(".csv");
+        assertThat(attachment.getContentType()).contains("text/csv");
+        assertThat(new String(attachment.getInputStream().readAllBytes(), StandardCharsets.UTF_8))
+            .contains("Monthly Spending Report")
+            .contains("Period,2026-03");
         assertThat(receivedTelegramMessages()).isEmpty();
     }
 
@@ -204,7 +213,7 @@ class ReportJobGenerationIntegrationTests extends AbstractPostgresIntegrationTes
         assertThat(downloadResponse.getBody().contentType()).isEqualTo("application/pdf");
 
         MimeMessage notification = awaitEmailForRecipient(ownerEmail);
-        assertThat(notification.getContent().toString()).contains("PDF");
+        assertThat(readTextPart(notification)).contains("PDF");
         assertThat(receivedTelegramMessages()).isEmpty();
     }
 
@@ -454,6 +463,60 @@ class ReportJobGenerationIntegrationTests extends AbstractPostgresIntegrationTes
         }
 
         return values;
+    }
+
+    private BodyPart findAttachment(MimeMessage notification) throws Exception {
+        assertThat(notification.getContent()).isInstanceOf(Multipart.class);
+        BodyPart attachment = findAttachment((Multipart) notification.getContent());
+        if (attachment == null) {
+            throw new AssertionError("Expected report attachment in email notification");
+        }
+        return attachment;
+    }
+
+    private BodyPart findAttachment(Multipart multipart) throws Exception {
+
+        for (int index = 0; index < multipart.getCount(); index++) {
+            BodyPart bodyPart = multipart.getBodyPart(index);
+            if (Part.ATTACHMENT.equalsIgnoreCase(bodyPart.getDisposition())) {
+                return bodyPart;
+            }
+            Object content = bodyPart.getContent();
+            if (content instanceof Multipart nestedMultipart) {
+                BodyPart attachment = findAttachment(nestedMultipart);
+                if (attachment != null) {
+                    return attachment;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private String readTextPart(MimeMessage notification) throws Exception {
+        String text = readTextPart((Part) notification);
+        if (text == null) {
+            throw new AssertionError("Expected text body in email notification");
+        }
+        return text;
+    }
+
+    private String readTextPart(Part part) throws Exception {
+        Object content = part.getContent();
+        if (part.isMimeType("text/*") && content instanceof String text) {
+            return text;
+        }
+        if (!(content instanceof Multipart multipart)) {
+            return null;
+        }
+        for (int index = 0; index < multipart.getCount(); index++) {
+            BodyPart bodyPart = multipart.getBodyPart(index);
+            String text = readTextPart(bodyPart);
+            if (text != null) {
+                return text;
+            }
+        }
+        return null;
     }
 
     private String registerAndLogin(String email, String password) {

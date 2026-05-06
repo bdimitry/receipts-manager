@@ -79,6 +79,7 @@ Success notification includes:
 - reporting period
 - report job id
 - the API path to get the download contract
+- the generated report file itself, as an email attachment or Telegram document
 
 Failure notification includes:
 
@@ -171,12 +172,12 @@ Use the existing report endpoints and wait until the job becomes `DONE` or `FAIL
 
 For email:
 
-- open MailHog and verify the recipient, subject, and body
+- open MailHog and verify the recipient, subject, body, and report attachment
 
 For Telegram:
 
 - open [http://localhost:8082/messages](http://localhost:8082/messages)
-- confirm `chat_id` and `text`
+- confirm `chat_id`, `caption`, `document_file_name`, `document_content_type`, and positive `document_size`
 
 ### 5. Verify The Report Still Works
 
@@ -204,6 +205,7 @@ These tests verify:
 
 - successful email delivery
 - successful Telegram delivery
+- report file attachment delivery
 - preferred-channel selection
 - owner-only targeting
 - fallback from Telegram to email

@@ -21,6 +21,23 @@ def send_message(token):
     return jsonify({"ok": True, "result": message})
 
 
+@app.post("/bot<token>/sendDocument")
+def send_document(token):
+    document = request.files.get("document")
+    content = document.read() if document else b""
+    message = {
+        "token": token,
+        "chat_id": str(request.form.get("chat_id", "")),
+        "text": "",
+        "caption": str(request.form.get("caption", "")),
+        "document_file_name": document.filename if document else "",
+        "document_content_type": document.content_type if document else "",
+        "document_size": len(content),
+    }
+    messages.append(message)
+    return jsonify({"ok": True, "result": message})
+
+
 @app.get("/messages")
 def list_messages():
     return jsonify(messages)

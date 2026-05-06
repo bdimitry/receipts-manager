@@ -21,7 +21,7 @@ It is written for:
 - upload of the generated file to S3
 - persistence of `s3Key` on `ReportJob`
 - presigned download-link contract for finished reports
-- email notification after `DONE` or `FAILED`
+- email or Telegram notification after `DONE` or `FAILED`
 - failure handling with persisted diagnostic message
 
 ## Queue Message Contract
@@ -110,7 +110,7 @@ On success:
 - `ReportJob.s3Key` is stored
 - `ReportJob.errorMessage = null`
 - `updatedAt` is refreshed
-- success email is sent to the owner
+- success notification is sent to the owner with the generated file attached
 
 On failure:
 
@@ -118,7 +118,7 @@ On failure:
 - `ReportJob.s3Key = null`
 - `ReportJob.errorMessage` stores a diagnostic message
 - `updatedAt` is refreshed
-- failure email is sent to the owner
+- failure notification is sent to the owner without an attachment
 
 ## Status Model
 
@@ -176,9 +176,9 @@ Current behavior:
 - only three report types are implemented
 - report layouts are intentionally simple and backend-oriented
 - generated reports are uploaded to S3, but there is no retention management yet
-- email delivery errors are logged but not persisted as separate domain records
+- notification delivery errors are logged but not persisted as separate domain records
 - no retry or dead-letter queue orchestration yet
-- only one notification channel exists: email
+- notification channels currently support email and Telegram
 - no download history is stored
 
 ## How To Verify Locally

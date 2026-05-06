@@ -11,8 +11,9 @@ import java.util.Locale;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 @Service
 public class NotificationDispatcher implements NotificationService {
@@ -20,9 +21,14 @@ public class NotificationDispatcher implements NotificationService {
     private static final Logger log = LoggerFactory.getLogger(NotificationDispatcher.class);
 
     private final Map<NotificationChannel, NotificationChannelSender> channelSenders;
+    private final S3StorageService s3StorageService;
 
-    public NotificationDispatcher(List<NotificationChannelSender> channelSenders) {
+    public NotificationDispatcher(
+        List<NotificationChannelSender> channelSenders,
+        S3StorageService s3StorageService
+    ) {
         this.channelSenders = new EnumMap<>(NotificationChannel.class);
+        this.s3StorageService = s3StorageService;
         List<NotificationChannelSender> orderedSenders = new ArrayList<>(channelSenders);
         AnnotationAwareOrderComparator.sort(orderedSenders);
         orderedSenders.forEach(channelSender ->
@@ -46,7 +52,8 @@ public class NotificationDispatcher implements NotificationService {
                     period(reportJob),
                     reportJob.getId(),
                     reportJob.getId()
-                ).strip()
+                ).strip(),
+                buildAttachment(reportJob)
             )
         );
     }
@@ -166,5 +173,27 @@ public class NotificationDispatcher implements NotificationService {
 
     private String reportType(ReportJob reportJob) {
         return reportJob.getReportType().name().toLowerCase(Locale.ROOT).replace('_', ' ');
+    }
+
+    private NotificationAttachment buildAttachment(ReportJob reportJob) {
+        if (!StringUtils.hasText(reportJob.getS3Key())) {
+            return null;
+        }
+
+        byte[] content = s3StorageService.download(reportJob.getS3Key());
+        return new NotificationAttachment(
+            buildFileName(reportJob),
+            reportJob.getReportFormat().getContentType(),
+            content
+        );
+    }
+
+    private String buildFileName(ReportJob reportJob) {
+        return "%s-%d-%02d.%s".formatted(
+            reportJob.getReportType().name().toLowerCase(Locale.ROOT).replace('_', '-'),
+            reportJob.getYear(),
+            reportJob.getMonth(),
+            reportJob.getReportFormat().getFileExtension()
+        );
     }
 }
