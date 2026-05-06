@@ -2,7 +2,7 @@ import type { LanguageCode } from "../api/types";
 
 export const languages: Array<{ code: LanguageCode; label: string }> = [
   { code: "ru", label: "RU" },
-  { code: "uk", label: "UK" },
+  { code: "uk", label: "UA" },
   { code: "en", label: "EN" },
 ];
 
@@ -485,6 +485,20 @@ export const translationDictionary = {
     adminUsersHint: "Account provider and role summary for support checks.",
     googleUnavailable: "Google sign-in needs a client ID",
     or: "or",
+    receiptReviewTabs: "Receipt review",
+    receiptSummaryTab: "Summary",
+    receiptCompleteTab: "Complete receipt",
+    receiptCompleteTitle: "Complete scanned receipt",
+    receiptCompleteHint: "Fix missing products, totals, dates, or categories before the receipt feeds spending summaries.",
+    receiptCompleteItemsHint: "Keep recognized products, add missed ones, and correct totals where OCR was unsure.",
+    receiptCorrectionSaved: "Receipt correction saved and reflected in spending.",
+    receiptCorrected: "Corrected",
+    autoReportTitle: "Auto report",
+    autoReportHint: "Queue a monthly report from a chosen date. Leave the format empty to send CSV, PDF, and XLSX.",
+    autoReportDate: "Report date",
+    allFormats: "All formats",
+    enableAutoReport: "Enable auto report",
+    autoReportQueuedSuccess: "Auto report queued for the selected date.",
   },
 } satisfies Record<LanguageCode, Record<string, string>>;
 

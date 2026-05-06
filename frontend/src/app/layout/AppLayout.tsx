@@ -1,9 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { getCurrentUser } from "../../features/user/api";
 import { useAuth } from "../../shared/auth/AuthContext";
 import { useI18n } from "../../shared/i18n/I18nContext";
 import { Button } from "../../shared/ui/Button";
+import { CalculatorModal } from "../../shared/ui/CalculatorModal";
 import { LanguageDropdown } from "../../shared/ui/LanguageDropdown";
 import { LoadingState } from "../../shared/ui/LoadingState";
 import { ThemeToggle } from "../../shared/ui/ThemeToggle";
@@ -20,6 +22,7 @@ export function AppLayout() {
   const { t } = useI18n();
   const { logout } = useAuth();
   const location = useLocation();
+  const [calculatorOpen, setCalculatorOpen] = useState(false);
   const { data: currentUser, isLoading } = useQuery({
     queryKey: ["current-user"],
     queryFn: getCurrentUser,
@@ -60,6 +63,10 @@ export function AppLayout() {
               <span>{t(item.key)}</span>
             </NavLink>
           ))}
+          <button className="sidebar__nav-link sidebar__nav-button" type="button" onClick={() => setCalculatorOpen(true)}>
+            <span aria-hidden="true" className="sidebar__nav-icon">=</span>
+            <span>{t("calculator")}</span>
+          </button>
           {currentUser?.admin ? (
             <NavLink
               className={({ isActive }) =>
@@ -102,6 +109,16 @@ export function AppLayout() {
         <main className="content" data-testid="content-area">
           <Outlet />
         </main>
+        <CalculatorModal
+          title={t("calculator")}
+          closeLabel={t("close")}
+          clearLabel={t("clear")}
+          applyLabel={t("close")}
+          expressionLabel={t("expression")}
+          resultLabel={t("lineTotal")}
+          open={calculatorOpen}
+          onClose={() => setCalculatorOpen(false)}
+        />
       </div>
     </div>
   );

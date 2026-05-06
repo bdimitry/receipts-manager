@@ -119,6 +119,15 @@ describe("receipts flow", () => {
 
   it("opens receipt detail and shows OCR result", async () => {
     server.use(
+      http.get("/api/users/me", () =>
+        HttpResponse.json({
+          id: 1,
+          email: "demo@example.com",
+          createdAt: "2026-03-31T09:00:00Z",
+          role: "USER",
+          admin: false,
+        }),
+      ),
       http.get("/api/receipts/11", () =>
         HttpResponse.json({
           id: 11,
@@ -191,13 +200,13 @@ describe("receipts flow", () => {
     expect(await screen.findByText("Fresh Market")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "OCR routing" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Parsed line items" })).toBeInTheDocument();
-    expect(screen.getByText(/TOTAL 42.75/i)).toBeInTheDocument();
-    expect(screen.getByText(/Raw OCR text/i)).toBeInTheDocument();
+    expect(screen.queryByText(/TOTAL 42.75/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Raw OCR text/i)).not.toBeInTheDocument();
     expect(screen.getByText(/Manual country selection/i)).toBeInTheDocument();
     expect(screen.getByText("en+cyrillic")).toBeInTheDocument();
     expect(screen.getByText("Milk")).toBeInTheDocument();
     expect(screen.getByText("Bread")).toBeInTheDocument();
-    expect(screen.getByText("Milk 2 x 10.50 21.00")).toBeInTheDocument();
+    expect(screen.queryByText("Milk 2 x 10.50 21.00")).not.toBeInTheDocument();
     expect(screen.getByText("UAH")).toBeInTheDocument();
   });
 });

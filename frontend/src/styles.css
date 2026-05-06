@@ -157,6 +157,15 @@ textarea {
   transition: 0.2s ease;
 }
 
+.sidebar__nav-button {
+  border: 0;
+  background: transparent;
+  color: #e8ddd1;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
 .sidebar__nav-icon {
   display: inline-flex;
   align-items: center;
@@ -464,10 +473,54 @@ textarea {
   margin-bottom: 1rem;
 }
 
+.month-picker {
+  display: inline-grid;
+  gap: 0.35rem;
+  min-width: 11rem;
+}
+
+.month-picker span {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.month-picker input {
+  border: 1px solid var(--border);
+  border-radius: 0.95rem;
+  background: var(--surface-muted);
+  color: var(--text);
+  padding: 0.7rem 0.8rem;
+}
+
 .section-card__header p,
 .hero-card p,
 .auth-panel p {
   margin: 0.45rem 0 0;
+}
+
+.tab-list {
+  display: flex;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.tab-button {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  min-height: 2.8rem;
+  padding: 0.65rem 1rem;
+}
+
+.tab-button--active {
+  background: var(--surface-strong);
+  border-color: var(--surface-strong);
+  color: #fff7ea;
 }
 
 .hero-card {
@@ -1161,6 +1214,10 @@ textarea {
   gap: 0.65rem;
 }
 
+.google-auth > div:first-child {
+  min-height: 44px;
+}
+
 .admin-metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1245,9 +1302,14 @@ textarea {
 
   .page-intro,
   .hero-card,
-  .list-row {
+  .list-row,
+  .section-card__header {
     flex-direction: column;
     align-items: start;
+  }
+
+  .month-picker {
+    width: 100%;
   }
 
   .list-row__meta {

@@ -52,6 +52,7 @@ public class ReceiptOcrService {
     private final ReceiptOcrLineNormalizationService lineNormalizationService;
     private final ReceiptOcrValidationService receiptOcrValidationService;
     private final ReceiptCorrectionService receiptCorrectionService;
+    private final PurchaseService purchaseService;
     private final ObjectMapper objectMapper;
 
     public ReceiptOcrService(
@@ -63,6 +64,7 @@ public class ReceiptOcrService {
         ReceiptOcrLineNormalizationService lineNormalizationService,
         ReceiptOcrValidationService receiptOcrValidationService,
         ReceiptCorrectionService receiptCorrectionService,
+        PurchaseService purchaseService,
         ObjectMapper objectMapper
     ) {
         this.receiptRepository = receiptRepository;
@@ -73,6 +75,7 @@ public class ReceiptOcrService {
         this.lineNormalizationService = lineNormalizationService;
         this.receiptOcrValidationService = receiptOcrValidationService;
         this.receiptCorrectionService = receiptCorrectionService;
+        this.purchaseService = purchaseService;
         this.objectMapper = objectMapper;
     }
 
@@ -141,13 +144,14 @@ public class ReceiptOcrService {
         receipt.setReviewedByUser(null);
         receipt.setParsedStoreName(parsedData.merchantName());
         receipt.setParsedTotalAmount(parsedData.totalAmount());
-        receipt.setParsedCurrency(parsedData.currency());
+        receipt.setParsedCurrency(parsedData.currency() == null ? receipt.getCurrency() : parsedData.currency());
         receipt.setParsedPurchaseDate(parsedData.purchaseDate());
         receipt.setLineItems(parsedData.lineItems().stream().map(item -> mapLineItem(receipt, item)).toList());
         receipt.setOcrStatus(ReceiptOcrStatus.DONE);
         receipt.setOcrErrorMessage(null);
         receipt.setOcrProcessedAt(Instant.now());
         receiptRepository.save(receipt);
+        purchaseService.upsertFromCompletedReceipt(receipt);
 
         log.info(
             "Receipt OCR completed successfully for receiptId={}, userId={}, strategy={}, profileUsed={}, detectionSource={}, parsedStoreName={}, parsedTotalAmount={}, parsedPurchaseDate={}, parsedCurrency={}, lineItemCount={}, reconstructedLineCount={}, normalizedLineCount={}, parserReadyLineCount={}, warnings={}",

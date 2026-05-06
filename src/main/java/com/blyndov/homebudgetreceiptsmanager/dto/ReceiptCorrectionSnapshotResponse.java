@@ -7,6 +7,7 @@ import java.util.List;
 
 public record ReceiptCorrectionSnapshotResponse(
     String storeName,
+    String category,
     LocalDate purchaseDate,
     BigDecimal totalAmount,
     CurrencyCode currency,

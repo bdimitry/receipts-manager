@@ -30,8 +30,13 @@ function getCurrentPeriod() {
   };
 }
 
+function toMonthInputValue(year: number, month: number) {
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
 export function DashboardPage() {
-  const { year, month } = getCurrentPeriod();
+  const [period, setPeriod] = useState(getCurrentPeriod);
+  const { year, month } = period;
   const { t, language } = useI18n();
   const purchasesQuery = useQuery({
     queryKey: ["dashboard-purchases", year, month],
@@ -189,6 +194,20 @@ export function DashboardPage() {
                 : t("thisMonth")}
             </p>
           </div>
+          <label className="month-picker">
+            <span>{t("month")}</span>
+            <input
+              aria-label={t("month")}
+              type="month"
+              value={toMonthInputValue(year, month)}
+              onChange={(event) => {
+                const [nextYear, nextMonth] = event.target.value.split("-").map(Number);
+                if (nextYear && nextMonth) {
+                  setPeriod({ year: nextYear, month: nextMonth });
+                }
+              }}
+            />
+          </label>
         </div>
         {chartData.length ? (
           <SpendingDonutChart data={chartData} total={selectedTotal} currency={activeCurrency ?? "UAH"} />

@@ -6,9 +6,12 @@ import com.blyndov.homebudgetreceiptsmanager.dto.PurchaseItemResponse;
 import com.blyndov.homebudgetreceiptsmanager.dto.PurchaseResponse;
 import com.blyndov.homebudgetreceiptsmanager.entity.PurchaseItem;
 import com.blyndov.homebudgetreceiptsmanager.entity.Purchase;
+import com.blyndov.homebudgetreceiptsmanager.entity.Receipt;
 import com.blyndov.homebudgetreceiptsmanager.entity.User;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import com.blyndov.homebudgetreceiptsmanager.exception.ResourceNotFoundException;
 import com.blyndov.homebudgetreceiptsmanager.repository.PurchaseRepository;
@@ -55,6 +58,59 @@ public class PurchaseService {
         buildItems(request.items(), purchase).forEach(purchase::addItem);
 
         return mapToResponse(purchaseRepository.save(purchase));
+    }
+
+    @Transactional
+    public PurchaseResponse upsertFromCompletedReceipt(Receipt receipt) {
+        if (receipt.getPurchase() != null || receipt.getParsedTotalAmount() == null) {
+            return receipt.getPurchase() == null ? null : mapToResponse(receipt.getPurchase());
+        }
+
+        ReceiptCorrectionSnapshot snapshot = new ReceiptCorrectionSnapshot(
+            receipt.getParsedStoreName(),
+            "OTHER",
+            receipt.getParsedPurchaseDate(),
+            receipt.getParsedTotalAmount(),
+            receipt.getParsedCurrency() == null ? receipt.getCurrency() : receipt.getParsedCurrency(),
+            receipt.getLineItems().stream()
+                .map(item -> new ReceiptCorrectionLineItemSnapshot(
+                    item.getTitle(),
+                    item.getQuantity(),
+                    item.getUnit(),
+                    item.getUnitPrice(),
+                    item.getLineTotal()
+                ))
+                .toList()
+        );
+        return upsertFromReceiptCorrection(receipt, snapshot);
+    }
+
+    @Transactional
+    public PurchaseResponse upsertFromReceiptCorrection(Receipt receipt, ReceiptCorrectionSnapshot snapshot) {
+        BigDecimal amount = resolveSnapshotAmount(snapshot);
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return receipt.getPurchase() == null ? null : mapToResponse(receipt.getPurchase());
+        }
+
+        Purchase purchase = receipt.getPurchase() == null ? new Purchase() : receipt.getPurchase();
+        if (purchase.getId() == null) {
+            purchase.setUser(receipt.getUser());
+        }
+
+        String storeName = normalizeOptionalText(snapshot.storeName());
+        purchase.setTitle(StringUtils.hasText(storeName) ? storeName : receipt.getOriginalFileName());
+        purchase.setCategory(StringUtils.hasText(snapshot.category()) ? normalizeCategory(snapshot.category()) : "OTHER");
+        purchase.setAmount(normalizeMoney(amount));
+        purchase.setCurrency(snapshot.currency() == null ? receipt.getCurrency() : snapshot.currency());
+        purchase.setPurchaseDate(snapshot.purchaseDate() == null ? fallbackPurchaseDate(receipt) : snapshot.purchaseDate());
+        purchase.setStoreName(storeName);
+        purchase.setComment("Created from scanned receipt #" + receipt.getId());
+        purchase.clearItems();
+        buildItemsFromSnapshot(snapshot.items(), purchase).forEach(purchase::addItem);
+
+        Purchase savedPurchase = purchaseRepository.save(purchase);
+        receipt.setPurchase(savedPurchase);
+        return mapToResponse(savedPurchase);
     }
 
     public List<PurchaseResponse> getPurchases(Integer year, Integer month, String category) {
@@ -141,6 +197,31 @@ public class PurchaseService {
         return items;
     }
 
+    private List<PurchaseItem> buildItemsFromSnapshot(List<ReceiptCorrectionLineItemSnapshot> itemSnapshots, Purchase purchase) {
+        if (itemSnapshots == null || itemSnapshots.isEmpty()) {
+            return List.of();
+        }
+
+        List<PurchaseItem> items = new ArrayList<>();
+        for (int index = 0; index < itemSnapshots.size(); index++) {
+            ReceiptCorrectionLineItemSnapshot snapshot = itemSnapshots.get(index);
+            if (!StringUtils.hasText(snapshot.title())) {
+                continue;
+            }
+            PurchaseItem item = new PurchaseItem();
+            item.setPurchase(purchase);
+            item.setLineIndex(items.size());
+            item.setTitle(normalizeRequiredText(snapshot.title()));
+            item.setQuantity(snapshot.quantity());
+            item.setUnit(normalizeOptionalText(snapshot.unit()));
+            item.setUnitPrice(normalizeMoney(snapshot.unitPrice()));
+            item.setLineTotal(resolveSnapshotLineTotal(snapshot));
+            items.add(item);
+        }
+
+        return items;
+    }
+
     private BigDecimal resolvePurchaseAmount(CreatePurchaseRequest request) {
         if (request.items() == null || request.items().isEmpty()) {
             return normalizeMoney(request.amount());
@@ -170,6 +251,30 @@ public class PurchaseService {
         return null;
     }
 
+    private BigDecimal resolveSnapshotAmount(ReceiptCorrectionSnapshot snapshot) {
+        if (snapshot.totalAmount() != null) {
+            return normalizeMoney(snapshot.totalAmount());
+        }
+
+        BigDecimal computedTotal = snapshot.items().stream()
+            .map(this::resolveSnapshotLineTotal)
+            .filter(Objects::nonNull)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return computedTotal.compareTo(BigDecimal.ZERO) > 0 ? normalizeMoney(computedTotal) : null;
+    }
+
+    private BigDecimal resolveSnapshotLineTotal(ReceiptCorrectionLineItemSnapshot snapshot) {
+        if (snapshot.lineTotal() != null) {
+            return normalizeMoney(snapshot.lineTotal());
+        }
+
+        if (snapshot.quantity() != null && snapshot.unitPrice() != null) {
+            return normalizeMoney(snapshot.quantity().multiply(snapshot.unitPrice()));
+        }
+
+        return null;
+    }
+
     private BigDecimal normalizeMoney(BigDecimal amount) {
         if (amount == null) {
             return null;
@@ -194,5 +299,12 @@ public class PurchaseService {
 
     private String normalizeCategory(String category) {
         return category.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private LocalDate fallbackPurchaseDate(Receipt receipt) {
+        if (receipt.getUploadedAt() == null) {
+            return LocalDate.now(ZoneOffset.UTC);
+        }
+        return LocalDate.ofInstant(receipt.getUploadedAt(), ZoneOffset.UTC);
     }
 }

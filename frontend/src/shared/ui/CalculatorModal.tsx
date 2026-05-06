@@ -135,7 +135,7 @@ export function CalculatorModal({
         <strong>{result !== null ? result : "--"}</strong>
       </div>
       {error ? <p className="form-error">{error}</p> : null}
-      <div className="calculator-grid">
+  <div className="calculator-grid">
         {keypad.map((token) => (
           <button
             key={token}
@@ -147,14 +147,13 @@ export function CalculatorModal({
           </button>
         ))}
       </div>
-      <div className="calculator-window__actions">
-        <Button variant="ghost" onClick={() => appendToken("C")}>
-          {clearLabel}
-        </Button>
-        <Button disabled={result === null} onClick={() => result !== null && onApply?.(result)}>
-          {applyLabel}
-        </Button>
-      </div>
+      {onApply ? (
+        <div className="calculator-window__actions">
+          <Button disabled={result === null} onClick={() => result !== null && onApply(result)}>
+            {applyLabel}
+          </Button>
+        </div>
+      ) : null}
     </aside>
   );
 }

@@ -7,6 +7,7 @@ import java.util.List;
 
 public record ReceiptCorrectionRequest(
     String correctedStoreName,
+    String correctedCategory,
     LocalDate correctedPurchaseDate,
     BigDecimal correctedTotalAmount,
     CurrencyCode correctedCurrency,

@@ -297,6 +297,7 @@ class ReceiptOcrPersistenceIntegrationTests extends AbstractPostgresIntegrationT
 
         ReceiptCorrectionRequest correctionRequest = new ReceiptCorrectionRequest(
             "FRESH MARKET",
+            "FOOD",
             java.time.LocalDate.of(2026, 4, 10),
             new java.math.BigDecimal("211.40"),
             CurrencyCode.UAH,

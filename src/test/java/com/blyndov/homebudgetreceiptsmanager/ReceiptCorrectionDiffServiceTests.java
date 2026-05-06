@@ -21,6 +21,7 @@ class ReceiptCorrectionDiffServiceTests {
     void correctionSnapshotKeepsParsedValuesAndBuildsCorrectedValuesSeparately() {
         ReceiptCorrectionSnapshot parsedSnapshot = new ReceiptCorrectionSnapshot(
             "OCR STORE",
+            "OTHER",
             LocalDate.of(2026, 4, 12),
             new BigDecimal("12.04"),
             CurrencyCode.UAH,
@@ -29,6 +30,7 @@ class ReceiptCorrectionDiffServiceTests {
 
         ReceiptCorrectionRequest request = new ReceiptCorrectionRequest(
             "NOVUS",
+            "FOOD",
             LocalDate.of(2026, 4, 12),
             new BigDecimal("103.98"),
             CurrencyCode.UAH,
@@ -49,6 +51,7 @@ class ReceiptCorrectionDiffServiceTests {
     void diffListsOnlyChangedFields() {
         ReceiptCorrectionSnapshot parsedSnapshot = new ReceiptCorrectionSnapshot(
             "NOVUS",
+            "FOOD",
             LocalDate.of(2026, 4, 12),
             new BigDecimal("12.04"),
             CurrencyCode.UAH,
@@ -56,6 +59,7 @@ class ReceiptCorrectionDiffServiceTests {
         );
         ReceiptCorrectionSnapshot correctedSnapshot = new ReceiptCorrectionSnapshot(
             "NOVUS",
+            "FOOD",
             LocalDate.of(2026, 4, 12),
             new BigDecimal("103.98"),
             CurrencyCode.UAH,

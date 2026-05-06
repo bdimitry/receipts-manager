@@ -31,6 +31,7 @@ public class ReceiptCorrectionService {
 
     private final ReceiptCorrectionRepository receiptCorrectionRepository;
     private final ReceiptCorrectionDiffService receiptCorrectionDiffService;
+    private final PurchaseService purchaseService;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -54,6 +55,7 @@ public class ReceiptCorrectionService {
         receipt.setReviewStatus(reviewStatus);
         receipt.setReviewedAt(Instant.now());
         receipt.setReviewedByUser(user);
+        purchaseService.upsertFromReceiptCorrection(receipt, correctedSnapshot);
 
         return toResponse(savedCorrection, parsedSnapshot, correctedSnapshot, diffs);
     }
@@ -98,6 +100,7 @@ public class ReceiptCorrectionService {
     private ReceiptCorrectionSnapshotResponse toSnapshotResponse(ReceiptCorrectionSnapshot snapshot) {
         return new ReceiptCorrectionSnapshotResponse(
             snapshot.storeName(),
+            snapshot.category(),
             snapshot.purchaseDate(),
             snapshot.totalAmount(),
             snapshot.currency(),

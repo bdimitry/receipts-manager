@@ -16,6 +16,7 @@ public class ReceiptCorrectionDiffService {
     public ReceiptCorrectionSnapshot parsedSnapshot(Receipt receipt) {
         return new ReceiptCorrectionSnapshot(
             receipt.getParsedStoreName(),
+            receipt.getPurchase() == null ? null : receipt.getPurchase().getCategory(),
             receipt.getParsedPurchaseDate(),
             receipt.getParsedTotalAmount(),
             receipt.getParsedCurrency(),
@@ -43,6 +44,7 @@ public class ReceiptCorrectionDiffService {
 
         return new ReceiptCorrectionSnapshot(
             StringUtils.hasText(request.correctedStoreName()) ? request.correctedStoreName().trim() : parsedSnapshot.storeName(),
+            StringUtils.hasText(request.correctedCategory()) ? request.correctedCategory().trim() : parsedSnapshot.category(),
             request.correctedPurchaseDate() == null ? parsedSnapshot.purchaseDate() : request.correctedPurchaseDate(),
             request.correctedTotalAmount() == null ? parsedSnapshot.totalAmount() : request.correctedTotalAmount(),
             request.correctedCurrency() == null ? parsedSnapshot.currency() : request.correctedCurrency(),
@@ -56,6 +58,7 @@ public class ReceiptCorrectionDiffService {
     ) {
         List<ReceiptCorrectionFieldDiff> diffs = new ArrayList<>();
         addDiff(diffs, "storeName", parsedSnapshot.storeName(), correctedSnapshot.storeName());
+        addDiff(diffs, "category", parsedSnapshot.category(), correctedSnapshot.category());
         addDiff(diffs, "purchaseDate", parsedSnapshot.purchaseDate(), correctedSnapshot.purchaseDate());
         addMoneyDiff(diffs, "totalAmount", parsedSnapshot.totalAmount(), correctedSnapshot.totalAmount());
         addDiff(diffs, "currency", parsedSnapshot.currency(), correctedSnapshot.currency());

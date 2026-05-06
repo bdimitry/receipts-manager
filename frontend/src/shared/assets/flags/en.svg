@@ -1,6 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 16" role="img" aria-hidden="true">
-  <rect width="24" height="16" rx="2" fill="#1f4fa8"/>
-  <path d="M0 2.2h24M0 13.8h24M2.6 0v16M21.4 0v16" stroke="#ffffff" stroke-width="2.8"/>
-  <path d="M0 3.2h24M0 12.8h24M4.1 0v16M19.9 0v16" stroke="#d84b45" stroke-width="1.5"/>
+  <clipPath id="flag-england-clip">
+    <rect width="24" height="16" rx="2"/>
+  </clipPath>
+  <g clip-path="url(#flag-england-clip)">
+    <rect width="24" height="16" fill="#ffffff"/>
+    <rect x="10" width="4" height="16" fill="#d84b45"/>
+    <rect y="6" width="24" height="4" fill="#d84b45"/>
+  </g>
   <rect width="24" height="16" rx="2" fill="none" stroke="#d0c4b3" stroke-width="0.75"/>
 </svg>

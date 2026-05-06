@@ -30,6 +30,7 @@ const schema = z.object({
 
 type ReportFormValues = z.infer<typeof schema>;
 type ReportFormInput = z.input<typeof schema>;
+type AutoReportFormatValue = "" | ReportFormat;
 
 function tone(status: string) {
   if (status === "DONE") {
@@ -65,6 +66,8 @@ export function ReportsPage() {
     defaultValues,
   });
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
+  const [autoReportDate, setAutoReportDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [autoReportFormat, setAutoReportFormat] = useState<AutoReportFormatValue>("");
   const reportsQuery = useQuery({
     queryKey: ["reports"],
     queryFn: getReports,
@@ -86,6 +89,29 @@ export function ReportsPage() {
       queryClient.invalidateQueries({ queryKey: ["dashboard-reports"] });
       setSelectedReportId(report.id);
       reset(defaultValues);
+    },
+  });
+
+  const autoReportMutation = useMutation({
+    mutationFn: async () => {
+      const selectedDate = new Date(`${autoReportDate}T00:00:00`);
+      const formats = autoReportFormat ? [autoReportFormat] : (["CSV", "PDF", "XLSX"] as const);
+      const createdReports = await Promise.all(
+        formats.map((reportFormat) =>
+          createReport({
+            year: selectedDate.getFullYear(),
+            month: selectedDate.getMonth() + 1,
+            reportType: "MONTHLY_SPENDING",
+            reportFormat,
+          }),
+        ),
+      );
+      return createdReports[0];
+    },
+    onSuccess: (report) => {
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-reports"] });
+      setSelectedReportId(report.id);
     },
   });
 
@@ -144,6 +170,38 @@ export function ReportsPage() {
             {t("newReport")}
           </Button>
         </form>
+      </Card>
+      <Card>
+        <div className="section-card__header">
+          <div>
+            <h2>{t("autoReportTitle")}</h2>
+            <p>{t("autoReportHint")}</p>
+          </div>
+        </div>
+        <div className="form-grid">
+          <label className="field">
+            <span>{t("autoReportDate")}</span>
+            <input type="date" value={autoReportDate} onChange={(event) => setAutoReportDate(event.target.value)} />
+          </label>
+          <label className="field">
+            <span>
+              {t("reportFormat")} ({t("optional")})
+            </span>
+            <select value={autoReportFormat} onChange={(event) => setAutoReportFormat(event.target.value as AutoReportFormatValue)}>
+              <option value="">{t("allFormats")}</option>
+              {(["CSV", "PDF", "XLSX"] as const).map((value) => (
+                <option key={value} value={value}>
+                  {getReportFormatLabel(value)}
+                </option>
+              ))}
+            </select>
+          </label>
+          {autoReportMutation.isError ? <p className="form-error">{autoReportMutation.error.message}</p> : null}
+          {autoReportMutation.isSuccess ? <p className="form-success">{t("autoReportQueuedSuccess")}</p> : null}
+          <Button disabled={autoReportMutation.isPending || !autoReportDate} onClick={() => autoReportMutation.mutate()}>
+            {t("enableAutoReport")}
+          </Button>
+        </div>
       </Card>
       <Card>
         <h2>{t("details")}</h2>

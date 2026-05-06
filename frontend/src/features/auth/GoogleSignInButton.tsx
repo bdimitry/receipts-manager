@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { loginWithGoogle } from "./api";
@@ -17,7 +17,7 @@ declare global {
           }) => void;
           renderButton: (
             element: HTMLElement,
-            options: { theme: "outline"; size: "large"; width: string },
+            options: { theme: "outline"; size: "large"; width: number },
           ) => void;
         };
       };
@@ -51,6 +51,7 @@ export function GoogleSignInButton() {
   const navigate = useNavigate();
   const buttonRef = useRef<HTMLDivElement | null>(null);
   const [scriptError, setScriptError] = useState<string | null>(null);
+  const [buttonRendered, setButtonRendered] = useState(false);
 
   const mutation = useMutation({
     mutationFn: loginWithGoogle,
@@ -59,6 +60,12 @@ export function GoogleSignInButton() {
       navigate("/", { replace: true });
     },
   });
+  const handleCredential = useCallback(
+    (credential: string) => {
+      mutation.mutate({ credential });
+    },
+    [mutation.mutate],
+  );
 
   useEffect(() => {
     if (!clientId || !buttonRef.current) {
@@ -66,6 +73,7 @@ export function GoogleSignInButton() {
     }
 
     let mounted = true;
+    setButtonRendered(false);
     loadGoogleScript()
       .then(() => {
         if (!mounted || !window.google || !buttonRef.current) {
@@ -75,23 +83,32 @@ export function GoogleSignInButton() {
           client_id: clientId,
           callback: (response) => {
             if (response.credential) {
-              mutation.mutate({ credential: response.credential });
+              handleCredential(response.credential);
             }
           },
         });
         buttonRef.current.innerHTML = "";
+        const buttonWidth = Math.max(240, Math.min(buttonRef.current.clientWidth || 360, 420));
         window.google.accounts.id.renderButton(buttonRef.current, {
           theme: "outline",
           size: "large",
-          width: "100%",
+          width: buttonWidth,
         });
+        window.setTimeout(() => {
+          if (mounted && buttonRef.current?.querySelector("iframe")) {
+            setButtonRendered(true);
+          }
+          if (mounted && !buttonRef.current?.querySelector("iframe")) {
+            setScriptError("Google button did not render. Check the OAuth JavaScript origin.");
+          }
+        }, 1_500);
       })
       .catch((error: Error) => setScriptError(error.message));
 
     return () => {
       mounted = false;
     };
-  }, [mutation]);
+  }, [handleCredential]);
 
   if (!clientId) {
     return (
@@ -104,6 +121,7 @@ export function GoogleSignInButton() {
   return (
     <div className="google-auth">
       <div ref={buttonRef} />
+      {!buttonRendered && !scriptError ? <p className="field-hint">Loading Google sign-in...</p> : null}
       {scriptError || mutation.isError ? (
         <p className="form-error">{scriptError ?? mutation.error?.message ?? t("errorTitle")}</p>
       ) : null}

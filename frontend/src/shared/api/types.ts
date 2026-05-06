@@ -106,6 +106,50 @@ export interface ReceiptLineItemResponse {
   rawFragment: string | null;
 }
 
+export type ReceiptReviewStatus = "UNREVIEWED" | "NEEDS_REVIEW" | "CORRECTED" | "CONFIRMED";
+
+export interface ReceiptCorrectionItemRequest {
+  title: string;
+  quantity?: number;
+  unit?: string;
+  unitPrice?: number;
+  lineTotal?: number;
+}
+
+export interface ReceiptCorrectionRequest {
+  correctedStoreName?: string;
+  correctedCategory?: string;
+  correctedPurchaseDate?: string;
+  correctedTotalAmount?: number;
+  correctedCurrency?: CurrencyCode;
+  correctedItems?: ReceiptCorrectionItemRequest[];
+  confirmed: boolean;
+}
+
+export interface ReceiptCorrectionSnapshotResponse {
+  storeName: string | null;
+  category: string | null;
+  purchaseDate: string | null;
+  totalAmount: number | null;
+  currency: CurrencyCode | null;
+  items: ReceiptCorrectionItemRequest[];
+}
+
+export interface ReceiptCorrectionResponse {
+  id: number;
+  receiptId: number;
+  userId: number;
+  reviewStatus: ReceiptReviewStatus;
+  parsedSnapshot: ReceiptCorrectionSnapshotResponse;
+  correctedSnapshot: ReceiptCorrectionSnapshotResponse;
+  diffs: Array<{
+    field: string;
+    parsedValue: string | null;
+    correctedValue: string | null;
+  }>;
+  createdAt: string;
+}
+
 export interface NormalizedOcrLineResponse {
   originalText: string;
   normalizedText: string;
@@ -144,6 +188,8 @@ export interface ReceiptOcrResponse {
   lineItems: ReceiptLineItemResponse[];
   parseWarnings?: string[];
   weakParseQuality?: boolean;
+  reviewStatus?: ReceiptReviewStatus;
+  latestCorrection?: ReceiptCorrectionResponse | null;
   ocrErrorMessage: string | null;
   ocrProcessedAt: string | null;
 }

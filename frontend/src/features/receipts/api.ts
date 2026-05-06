@@ -2,6 +2,8 @@ import { apiFetch } from "../../shared/api/http";
 import type {
   CurrencyCode,
   ReceiptCountryHint,
+  ReceiptCorrectionRequest,
+  ReceiptCorrectionResponse,
   ReceiptOcrResponse,
   ReceiptResponse,
 } from "../../shared/api/types";
@@ -16,6 +18,16 @@ export function getReceipt(id: number) {
 
 export function getReceiptOcr(id: number) {
   return apiFetch<ReceiptOcrResponse>(`/api/receipts/${id}/ocr`);
+}
+
+export function submitReceiptCorrection(id: number, request: ReceiptCorrectionRequest) {
+  return apiFetch<ReceiptCorrectionResponse>(`/api/receipts/${id}/correction`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
 }
 
 export async function uploadReceipt(

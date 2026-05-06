@@ -1,10 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { getReceipt, getReceiptOcr } from "../api";
+import { getReceipt, getReceiptOcr, submitReceiptCorrection } from "../api";
 import { getCurrentUser } from "../../user/api";
 import { useI18n } from "../../../shared/i18n/I18nContext";
 import type { TranslationKey } from "../../../shared/i18n/translations";
 import { getOcrStatusLabel } from "../../../shared/lib/domain";
+import { DEFAULT_CURRENCY, SUPPORTED_CURRENCIES } from "../../../shared/lib/currency";
 import { formatCurrency, formatDate, formatDateTime } from "../../../shared/lib/format";
 import { Button } from "../../../shared/ui/Button";
 import { Card } from "../../../shared/ui/Card";
@@ -13,6 +15,44 @@ import { ErrorState } from "../../../shared/ui/ErrorState";
 import { LoadingState } from "../../../shared/ui/LoadingState";
 import { PageIntro } from "../../../shared/ui/PageIntro";
 import { StatusBadge } from "../../../shared/ui/StatusBadge";
+
+interface CorrectionItemDraft {
+  title: string;
+  quantity: string;
+  unit: string;
+  unitPrice: string;
+  lineTotal: string;
+}
+
+function toOptionalNumber(value: string) {
+  if (!value.trim()) {
+    return undefined;
+  }
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : undefined;
+}
+
+function toCorrectionItems(items: CorrectionItemDraft[]) {
+  return items
+    .filter((item) => item.title.trim() || item.lineTotal.trim() || item.unitPrice.trim())
+    .map((item) => ({
+      title: item.title.trim(),
+      quantity: toOptionalNumber(item.quantity),
+      unit: item.unit.trim() || undefined,
+      unitPrice: toOptionalNumber(item.unitPrice),
+      lineTotal: toOptionalNumber(item.lineTotal),
+    }));
+}
+
+function emptyCorrectionItem(): CorrectionItemDraft {
+  return {
+    title: "",
+    quantity: "",
+    unit: "",
+    unitPrice: "",
+    lineTotal: "",
+  };
+}
 
 function tone(status: string) {
   if (status === "DONE") {
@@ -83,8 +123,16 @@ function getRoutingSourceLabel(code: string | null | undefined, t: (key: Transla
 
 export function ReceiptDetailPage() {
   const { t, language } = useI18n();
+  const queryClient = useQueryClient();
   const params = useParams();
   const receiptId = Number(params.id);
+  const [activeTab, setActiveTab] = useState<"summary" | "complete">("summary");
+  const [correctedStoreName, setCorrectedStoreName] = useState("");
+  const [correctedCategory, setCorrectedCategory] = useState("OTHER");
+  const [correctedPurchaseDate, setCorrectedPurchaseDate] = useState("");
+  const [correctedTotalAmount, setCorrectedTotalAmount] = useState("");
+  const [correctedCurrency, setCorrectedCurrency] = useState(DEFAULT_CURRENCY);
+  const [correctedItems, setCorrectedItems] = useState<CorrectionItemDraft[]>([emptyCorrectionItem()]);
   const receiptQuery = useQuery({
     queryKey: ["receipt", receiptId],
     queryFn: () => getReceipt(receiptId),
@@ -101,6 +149,52 @@ export function ReceiptDetailPage() {
     queryKey: ["current-user"],
     queryFn: getCurrentUser,
   });
+  const correctionMutation = useMutation({
+    mutationFn: () =>
+      submitReceiptCorrection(receiptId, {
+        correctedStoreName: correctedStoreName.trim() || undefined,
+        correctedCategory: correctedCategory.trim() || "OTHER",
+        correctedPurchaseDate: correctedPurchaseDate || undefined,
+        correctedTotalAmount: toOptionalNumber(correctedTotalAmount),
+        correctedCurrency,
+        correctedItems: toCorrectionItems(correctedItems),
+        confirmed: false,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["receipt", receiptId] });
+      queryClient.invalidateQueries({ queryKey: ["receipt-ocr", receiptId] });
+      queryClient.invalidateQueries({ queryKey: ["receipts"] });
+      queryClient.invalidateQueries({ queryKey: ["purchases"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-purchases"] });
+      setActiveTab("summary");
+    },
+  });
+
+  useEffect(() => {
+    const ocr = ocrQuery.data;
+    if (!ocr) {
+      return;
+    }
+
+    const latest = ocr.latestCorrection?.correctedSnapshot;
+    const items = latest?.items?.length ? latest.items : ocr.lineItems;
+    setCorrectedStoreName(latest?.storeName ?? ocr.parsedStoreName ?? "");
+    setCorrectedCategory(latest?.category ?? "OTHER");
+    setCorrectedPurchaseDate(latest?.purchaseDate ?? ocr.parsedPurchaseDate ?? "");
+    setCorrectedTotalAmount(String(latest?.totalAmount ?? ocr.parsedTotalAmount ?? ""));
+    setCorrectedCurrency(latest?.currency ?? ocr.parsedCurrency ?? ocr.currency ?? DEFAULT_CURRENCY);
+    setCorrectedItems(
+      items.length
+        ? items.map((item) => ({
+            title: item.title ?? "",
+            quantity: item.quantity == null ? "" : String(item.quantity),
+            unit: item.unit ?? "",
+            unitPrice: item.unitPrice == null ? "" : String(item.unitPrice),
+            lineTotal: item.lineTotal == null ? "" : String(item.lineTotal),
+          }))
+        : [emptyCorrectionItem()],
+    );
+  }, [ocrQuery.data]);
 
   if (receiptQuery.isLoading || ocrQuery.isLoading) {
     return <LoadingState label={t("loading")} />;
@@ -127,6 +221,11 @@ export function ReceiptDetailPage() {
   const displayCurrency = ocr.parsedCurrency ?? ocr.currency;
   const parseWarnings = ocr.parseWarnings ?? [];
   const weakParseQuality = ocr.weakParseQuality ?? false;
+  const updateCorrectionItem = (index: number, patch: Partial<CorrectionItemDraft>) => {
+    setCorrectedItems((current) =>
+      current.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item)),
+    );
+  };
 
   return (
     <div className="page-grid">
@@ -139,6 +238,118 @@ export function ReceiptDetailPage() {
           </Link>
         }
       />
+      <Card>
+        <div className="tab-list" role="tablist" aria-label={t("receiptReviewTabs")}>
+          <button
+            className={`tab-button ${activeTab === "summary" ? "tab-button--active" : ""}`.trim()}
+            type="button"
+            onClick={() => setActiveTab("summary")}
+          >
+            {t("receiptSummaryTab")}
+          </button>
+          <button
+            className={`tab-button ${activeTab === "complete" ? "tab-button--active" : ""}`.trim()}
+            type="button"
+            onClick={() => setActiveTab("complete")}
+          >
+            {t("receiptCompleteTab")}
+          </button>
+        </div>
+      </Card>
+      {activeTab === "complete" ? (
+        <Card>
+          <div className="section-card__header">
+            <div>
+              <h2>{t("receiptCompleteTitle")}</h2>
+              <p>{t("receiptCompleteHint")}</p>
+            </div>
+            {ocr.latestCorrection ? <StatusBadge tone="success">{t("receiptCorrected")}</StatusBadge> : null}
+          </div>
+          <form
+            className="form-grid"
+            onSubmit={(event) => {
+              event.preventDefault();
+              correctionMutation.mutate();
+            }}
+          >
+            <label className="field">
+              <span>{t("storeName")}</span>
+              <input value={correctedStoreName} onChange={(event) => setCorrectedStoreName(event.target.value)} />
+            </label>
+            <label className="field">
+              <span>{t("category")}</span>
+              <input value={correctedCategory} onChange={(event) => setCorrectedCategory(event.target.value)} />
+            </label>
+            <label className="field">
+              <span>{t("purchaseDate")}</span>
+              <input type="date" value={correctedPurchaseDate} onChange={(event) => setCorrectedPurchaseDate(event.target.value)} />
+            </label>
+            <label className="field">
+              <span>{t("amount")}</span>
+              <input step="0.01" type="number" value={correctedTotalAmount} onChange={(event) => setCorrectedTotalAmount(event.target.value)} />
+            </label>
+            <label className="field">
+              <span>{t("currency")}</span>
+              <select value={correctedCurrency} onChange={(event) => setCorrectedCurrency(event.target.value as typeof correctedCurrency)}>
+                {SUPPORTED_CURRENCIES.map((currency) => (
+                  <option key={currency} value={currency}>{currency}</option>
+                ))}
+              </select>
+            </label>
+            <div className="purchase-items-section field--wide">
+              <div className="purchase-items-section__header">
+                <div>
+                  <h3>{t("parsedLineItems")}</h3>
+                  <p className="field-hint">{t("receiptCompleteItemsHint")}</p>
+                </div>
+                <Button variant="ghost" onClick={() => setCorrectedItems((current) => [...current, emptyCorrectionItem()])}>
+                  {t("addItem")}
+                </Button>
+              </div>
+              <div className="purchase-items-list">
+                {correctedItems.map((item, index) => (
+                  <div className="purchase-item-card" key={`${index}-${item.title}`}>
+                    <div className="purchase-item-grid">
+                      <label className="field purchase-item-grid__title">
+                        <span>{`${t("itemTitle")} ${index + 1}`}</span>
+                        <input value={item.title} onChange={(event) => updateCorrectionItem(index, { title: event.target.value })} />
+                      </label>
+                      <label className="field">
+                        <span>{t("quantity")}</span>
+                        <input step="0.001" type="number" value={item.quantity} onChange={(event) => updateCorrectionItem(index, { quantity: event.target.value })} />
+                      </label>
+                      <label className="field">
+                        <span>{t("unit")}</span>
+                        <input value={item.unit} onChange={(event) => updateCorrectionItem(index, { unit: event.target.value })} />
+                      </label>
+                      <label className="field">
+                        <span>{t("unitPrice")}</span>
+                        <input step="0.01" type="number" value={item.unitPrice} onChange={(event) => updateCorrectionItem(index, { unitPrice: event.target.value })} />
+                      </label>
+                      <label className="field">
+                        <span>{t("lineTotal")}</span>
+                        <input step="0.01" type="number" value={item.lineTotal} onChange={(event) => updateCorrectionItem(index, { lineTotal: event.target.value })} />
+                      </label>
+                      <div className="purchase-item-grid__actions">
+                        <Button variant="ghost" onClick={() => setCorrectedItems((current) => current.filter((_, itemIndex) => itemIndex !== index))}>
+                          {t("removeItem")}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {correctionMutation.isError ? <p className="form-error">{correctionMutation.error.message}</p> : null}
+            {correctionMutation.isSuccess ? <p className="form-success">{t("receiptCorrectionSaved")}</p> : null}
+            <Button disabled={correctionMutation.isPending} type="submit">
+              {t("save")}
+            </Button>
+          </form>
+        </Card>
+      ) : null}
+      {activeTab === "summary" ? (
+      <>
       <Card>
         <div className="section-card__header">
           <div>
@@ -277,6 +488,8 @@ export function ReceiptDetailPage() {
             <EmptyState message={ocr.ocrStatus === "FAILED" ? t("ocrFailed") : t("ocrPending")} />
           )}
         </Card>
+      ) : null}
+      </>
       ) : null}
     </div>
   );
